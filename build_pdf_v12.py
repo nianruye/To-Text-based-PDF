@@ -123,44 +123,67 @@ for key in sorted(spot_lines.keys(), key=int):
         if not t: continue
         if is_page_number(t): continue
 
-        # Compute heading height ratio vs body text
-        heading_ratio = 1.0
-        if i < len(polys) and polys[i]:
-            ys = [p[1] for p in polys[i]]
-            px_h = max(ys) - min(ys)
-            # Estimate body avg height from a few body lines on this page
-            body_heights = []
-            for j, lj in enumerate(lines):
-                tj = lj.strip()
-                if not tj or len(tj) < 10: continue
-                if j >= len(polys) or not polys[j]: continue
-                if min(p[0] for p in polys[j]) > page_width_px * 0.4: continue
-                ysj = [p[1] for p in polys[j]]
-                body_heights.append(max(ysj) - min(ysj))
-                if len(body_heights) >= 5: break
-            body_avg = sum(body_heights)/len(body_heights) if body_heights else px_h
-            heading_ratio = px_h / body_avg if body_avg > 0 else 1.0
-
+        # Heading detection with source-coordinate formatting
         is_heading = x_left > page_width_px * 0.4 or (i == 0 and len(t) < 25 and not is_footnote_start(t))
         if is_heading:
             if in_fn: result.append('}\\par'); in_fn = False
 
-            # Font size based on height ratio vs body
-            if heading_ratio >= 1.2:
-                font_cmd = '\\large'  # chapter title: ~14pt
-                # Chapter heading: tighter spacing to next element
-                spacing = '\\vspace{6pt}'
-            elif heading_ratio <= 0.9:
-                font_cmd = '\\footnotesize'  # running header: ~10pt
-                spacing = '\\vspace{8pt}'
-            else:
-                font_cmd = '\\normalsize'
-                spacing = '\\vspace{8pt}'
+            # Compute height ratio vs body text
+            heading_ratio = 1.0
+            src_right_margin = 0
+            if i < len(polys) and polys[i]:
+                ys = [p[1] for p in polys[i]]
+                xs = [p[0] for p in polys[i]]
+                px_h = max(ys) - min(ys)
+                src_right_margin = (PW_PT - max(xs)/SCALE)
+                # Body avg height
+                body_heights = []
+                for j, lj in enumerate(lines):
+                    tj = lj.strip()
+                    if not tj or len(tj) < 5: continue
+                    if j >= len(polys) or not polys[j]: continue
+                    if min(p[0] for p in polys[j]) > page_width_px * 0.4: continue
+                    body_heights.append(max(p[1] for p in polys[j]) - min(p[1] for p in polys[j]))
+                    if len(body_heights) >= 5: break
+                body_avg = sum(body_heights)/len(body_heights) if body_heights else px_h
+                heading_ratio = px_h / body_avg if body_avg > 0 else 1.0
 
-            if x_left > page_width_px * 0.35:
-                result.append('{' + font_cmd + '\\hfill ' + escape_tex(t) + '\\hfill\\null}\\par' + spacing)
+            # Font size: map ratio to LaTeX command
+            if heading_ratio >= 1.25:
+                font_cmd = '\\Large'       # ~14.4pt
+            elif heading_ratio >= 1.15:
+                font_cmd = '\\large'       # ~14pt
+            elif heading_ratio >= 0.85:
+                font_cmd = '\\normalsize'  # ~12pt
             else:
-                result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par' + spacing)
+                font_cmd = '\\footnotesize' # ~10pt
+
+            # Spacing: match source gap to next element
+            src_gap = 0
+            heading_bot = max(p[1] for p in polys[i])/SCALE if i < len(polys) and polys[i] else 40
+            for j in range(i+1, len(lines)):
+                nt = lines[j].strip()
+                if nt and len(nt) > 3 and not is_page_number(nt):
+                    if j < len(polys) and polys[j]:
+                        y_next = min(p[1] for p in polys[j])/SCALE
+                        src_gap = y_next - heading_bot
+                    break
+
+            # Alignment: use exact source right margin for right-aligned headings
+            if x_left > page_width_px * 0.35:
+                # src_right_margin from page edge → adjust for body text area
+                box_rm = src_right_margin - MARGIN_PT  # can be negative (heading extends past body)
+                if box_rm >= 0:
+                    result.append('{' + font_cmd + '\\makebox[\\linewidth][r]{' + escape_tex(t) + '\\hspace*{' + str(int(box_rm)) + 'pt}}\\par}')
+                else:
+                    # Heading extends beyond body area into right margin
+                    result.append('{' + font_cmd + '\\hfill ' + escape_tex(t) + '\\hspace*{' + str(int(src_right_margin)) + 'pt}\\mbox{}}\\par')
+            else:
+                result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par')
+
+            # Gap to next element
+            if src_gap > 4:
+                result.append('\\vspace{' + str(int(src_gap)) + 'pt}')
             continue
 
         if is_footnote_start(t):
