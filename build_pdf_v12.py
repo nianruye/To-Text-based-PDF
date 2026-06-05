@@ -78,7 +78,7 @@ print(f"Source: {SRC_PDF}, start={START_PAGE}, {PW_MM:.0f}x{PH_MM:.0f}mm, margin
 
 header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\usepackage{{xeCJK}}
-\\usepackage[margin={MARGIN_MM}mm, paperwidth={PW_MM:.0f}mm, paperheight={PH_MM:.0f}mm]{{geometry}}
+\\usepackage[top=8.5mm, bottom=18.8mm, left={MARGIN_MM}mm, right={MARGIN_MM}mm, paperwidth={PW_MM:.0f}mm, paperheight={PH_MM:.0f}mm]{{geometry}}
 \\usepackage{{setspace}}
 \\usepackage{{fancyhdr}}
 \\setmainfont{{Noto Serif CJK SC}}
@@ -124,7 +124,9 @@ for key in sorted(spot_lines.keys(), key=int):
         if is_page_number(t): continue
 
         # Heading detection with source-coordinate formatting
-        is_heading = x_left > page_width_px * 0.4 or (i == 0 and len(t) < 25 and not is_footnote_start(t))
+        # Heading: right-aligned, or first line at page-top (y < 50pt) and short
+        y_pt = min(p[1] for p in polys[i]) / SCALE if i < len(polys) and polys[i] else 99
+        is_heading = x_left > page_width_px * 0.4 or (i == 0 and len(t) < 25 and not is_footnote_start(t) and y_pt < 50)
         if is_heading:
             if in_fn: result.append('}\\par'); in_fn = False
 
