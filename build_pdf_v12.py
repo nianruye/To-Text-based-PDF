@@ -10,16 +10,12 @@ import fitz
 
 SRC_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
 OUT_PDF = sys.argv[2] if len(sys.argv) > 2 else "/opt/test/最终版_v12.pdf"
-SPOTTING_LINES = "/opt/test/spotting_lines.json"
-SPOTTING_COORDS = "/opt/test/spotting_coords.json"
+SPOTTING_LINES = sys.argv[3] if len(sys.argv) > 3 else "/opt/test/spotting_lines.json"
+SPOTTING_COORDS = sys.argv[4] if len(sys.argv) > 4 else "/opt/test/spotting_coords.json"
 TEX_FILE = "/tmp/xelatex_build_v12.tex"
 
-SCALE = 2.0
-FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')
-FONT_SIZE = 12.0
-INDENT_THRESHOLD_PX = 40
-TARGET = 300
-INDENT_PT = 24
+SCALE = 2.0  # px→pt ratio, consistent across PaddleOCR API
+FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')  # will be auto-detected later
 
 def clean_text(text):
     return text.lstrip("‖‖| \t")
@@ -70,28 +66,123 @@ for k in spot_lines:
     spot_lines[k] = [clean_text(l) for l in spot_lines[k]]
 
 page_width_px = max(max(pt[0] for pt in poly) for polys in spot_coords.values() for poly in polys if poly)
+
+# ── Dynamic parameter computation from THIS document's spotting data ──
+import statistics
+
+# 1. Body left baseline (x0 of body text lines)
 BODY_LEFT = compute_body_baseline(spot_lines, spot_coords, page_width_px)
+
+# 2. Indent threshold: find indented vs normal clusters in body x0
+all_body_x0 = []
+for k in spot_lines:
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or is_page_number(t) or is_footnote_start(t): continue
+        polys = spot_coords.get(k, [])
+        if i >= len(polys) or not polys[i]: continue
+        xl = min(p[0] for p in polys[i])
+        if xl > page_width_px * 0.4: continue
+        all_body_x0.append(xl)
+# Find two clusters: normal (near BODY_LEFT) and indented (BODY_LEFT + offset)
+norm = [x for x in all_body_x0 if abs(x - BODY_LEFT) < 30]
+indented = [x for x in all_body_x0 if x > BODY_LEFT + 15]
+norm_center = statistics.median(norm) if norm else BODY_LEFT
+indented_center = statistics.median(indented) if indented else BODY_LEFT + 50
+INDENT_THRESHOLD_PX = max(20, (indented_center - norm_center) * 0.5)
+
+# 3. Font size: from P10 of line heights (excludes tall headers)
+all_line_heights = []
+for k in spot_lines:
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or len(t) < 5 or is_page_number(t): continue
+        polys = spot_coords.get(k, [])
+        if i >= len(polys) or not polys[i]: continue
+        if min(p[0] for p in polys[i]) > page_width_px * 0.4: continue
+        all_line_heights.append((max(p[1] for p in polys[i]) - min(p[1] for p in polys[i])) / SCALE)
+all_line_heights.sort()
+# Use P10 of line heights × 0.75 to convert coord bbox→actual glyph size
+FONT_SIZE = round(all_line_heights[len(all_line_heights)//10] * 0.75) if all_line_heights else 12
+FONT_SIZE = max(8, min(16, FONT_SIZE))
+
+# 4. Target width: P90 of body line widths (excludes short lines)
+body_widths_pt = []
+for k in spot_lines:
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or len(t) < 5 or is_page_number(t) or is_footnote_start(t): continue
+        polys = spot_coords.get(k, [])
+        if i >= len(polys) or not polys[i]: continue
+        xs = [p[0] for p in polys[i]]
+        if min(xs) > page_width_px * 0.4: continue
+        body_widths_pt.append((max(xs) - min(xs)) / SCALE)
+body_widths_pt.sort()
+TARGET = int(body_widths_pt[int(len(body_widths_pt)*0.9)]) if body_widths_pt else 300
+
+# 5. Indent width in pt
+INDENT_PT = INDENT_THRESHOLD_PX / SCALE
+
+# 6. Margins from body position
 MARGIN_PT = BODY_LEFT / SCALE
 MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
+TOP_MARGIN_MM = 8.5  # small top margin, body positioned via header gap
 
-print(f"Source: {SRC_PDF}, start={START_PAGE}, {PW_MM:.0f}x{PH_MM:.0f}mm, margin={MARGIN_MM}mm")
+# 7. Line spacing from source body line gaps
+all_body_gaps = []
+for k in spot_lines:
+    prev_y = None
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or is_page_number(t) or is_footnote_start(t): continue
+        polys = spot_coords.get(k, [])
+        if i >= len(polys) or not polys[i]: continue
+        if min(p[0] for p in polys[i]) > page_width_px * 0.4: continue
+        y = min(p[1] for p in polys[i]) / SCALE
+        if prev_y is not None and y > prev_y:
+            all_body_gaps.append(y - prev_y)
+        prev_y = y
+all_body_gaps.sort()
+med_gap = statistics.median(all_body_gaps) if all_body_gaps else 20
+BASE_SKIP = FONT_SIZE * 1.2
+BODY_STRETCH = max(1.0, min(1.8, round(med_gap / BASE_SKIP, 2)))
+
+print(f"Source: {SRC_PDF}, start={START_PAGE}, {PW_MM:.0f}x{PH_MM:.0f}mm")
+# 8. CJK glue stretch: based on line width spread (narrow spread = less stretch needed)
+width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
+CJK_STRETCH = round(max(0.05, min(0.3, width_spread * 0.5)), 2)
+
+# 9. Footnote spacing: ratio of footnote line height to body line height
+fn_heights = []
+for k in spot_lines:
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or not is_footnote_start(t): continue
+        polys = spot_coords.get(k, [])
+        if i >= len(polys) or not polys[i]: continue
+        fn_heights.append((max(p[1] for p in polys[i]) - min(p[1] for p in polys[i])) / SCALE)
+med_fn_h = statistics.median(fn_heights) if fn_heights else FONT_SIZE * 0.8
+FN_STRETCH = round(max(1.0, min(3.0, med_fn_h / BASE_SKIP)), 2)
+
+print(f"Dynamic: FONT={FONT_SIZE}pt, TARGET={TARGET}pt, INDENT_THRESH={INDENT_THRESHOLD_PX:.0f}px")
+print(f"Dynamic: STRETCH={BODY_STRETCH}, CJKglue={CJK_STRETCH}em, FN_STRETCH={FN_STRETCH}")
 
 header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\usepackage{{xeCJK}}
-\\usepackage[top=8.5mm, bottom=18.8mm, left={MARGIN_MM}mm, right={MARGIN_MM}mm, paperwidth={PW_MM:.0f}mm, paperheight={PH_MM:.0f}mm]{{geometry}}
+\\usepackage[top={TOP_MARGIN_MM}mm, bottom={MARGIN_MM}mm, left={MARGIN_MM}mm, right={MARGIN_MM}mm, paperwidth={PW_MM:.0f}mm, paperheight={PH_MM:.0f}mm]{{geometry}}
 \\usepackage{{setspace}}
 \\usepackage{{fancyhdr}}
 \\setmainfont{{Noto Serif CJK SC}}
 \\setCJKmainfont{{Noto Serif CJK SC}}
 \\xeCJKsetup{{PunctStyle=kaiming}}
 \\setlength{{\\parindent}}{{0pt}}
-\\setstretch{{1.67}}
+\\setstretch{{{BODY_STRETCH}}}
 \\setcounter{{page}}{{{START_PAGE}}}
 \\pagestyle{{fancy}}
 \\fancyhf{{}}
 \\fancyfoot[C]{{\\textperiodcentered\\ \\thepage\\ \\textperiodcentered}}
 \\renewcommand{{\\headrulewidth}}{{0pt}}
-\\renewcommand{{\\CJKglue}}{{\\hskip 0pt plus 0.22em minus 0.02em}}
+\\renewcommand{{\\CJKglue}}{{\\hskip 0pt plus {CJK_STRETCH}em minus 0.02em}}
 \\tolerance=500
 \\begin{{document}}
 """
@@ -280,7 +371,7 @@ for key in sorted(spot_lines.keys(), key=int):
                 else:
                     result.append('\\vfill')  # inline markers or tight spacing → fill
                 result.append('\\smallskip\\hrule\\smallskip')
-                result.append('{\\def\\baselinestretch{2.1}\\footnotesize\\parbox{' + str(TARGET) + 'pt}{')
+                result.append('{\\def\\baselinestretch{' + str(FN_STRETCH) + '}\\footnotesize\\parbox{' + str(TARGET) + 'pt}{')
                 fn_rule_added = True
             else:
                 # Separate footnotes with newline within the same parbox
