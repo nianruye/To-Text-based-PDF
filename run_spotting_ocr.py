@@ -4,11 +4,11 @@
 import json, os, re, sys, time, requests
 
 TOKEN_FILE = "/tmp/paddle_token"
-INPUT_PDF = "/opt/test/优化前.pdf"
+INPUT_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
+OUT_LINES = sys.argv[2] if len(sys.argv) > 2 else "/opt/test/spotting_lines.json"
+OUT_COORDS = sys.argv[3] if len(sys.argv) > 3 else "/opt/test/spotting_coords.json"
 JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
 MODEL = "PaddleOCR-VL-1.6"
-OUT_LINES = "/opt/test/spotting_lines.json"
-OUT_COORDS = "/opt/test/spotting_coords.json"
 
 tok = open(TOKEN_FILE).read().strip()
 HEADERS = {"Authorization": "bearer " + tok}
