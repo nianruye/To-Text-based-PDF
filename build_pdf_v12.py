@@ -123,17 +123,17 @@ for key in sorted(spot_lines.keys(), key=int):
         if not t: continue
         if is_page_number(t): continue
 
-        # Heading detection with source-coordinate formatting
+        # Heading detection
         y_pt = min(p[1] for p in polys[i]) / SCALE if i < len(polys) and polys[i] else 99
         is_heading = x_left > page_width_px * 0.4 or (i == 0 and len(t) < 25 and not is_footnote_start(t) and y_pt < 50)
 
-        # Missing header: first line is body text (y>50), not a heading
-        # Add standard running header so body position stays consistent
+        # Missing header: add standard running header
         if i == 0 and y_pt > 50 and not is_page_number(t) and not is_heading:
-            if int(key) % 2 == 0:  # odd page
-                result.append('{\\footnotesize\\hfill 第一部分 马克思的商品拜物教理论\\hfill\\null}\\par\\vspace{39pt}')
-            else:  # even page
-                result.append('{\\footnotesize 马克思价值理论研究}\\par\\vspace{40pt}')
+            if int(key) % 2 == 0:
+                result.append('{\\footnotesize\\hfill 第一部分 马克思的商品拜物教理论\\hfill\\null}\\par')
+            else:
+                result.append('{\\footnotesize 马克思价值理论研究}\\par')
+            result.append('\\vspace{45pt}')
 
         if is_heading:
             if in_fn: result.append('}\\par'); in_fn = False
