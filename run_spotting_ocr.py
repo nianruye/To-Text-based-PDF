@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Step 1: Full spotting OCR on 20 pages."""
 
-import json, os, re, sys, time, requests
+import json, os, re, sys, time, requests, fitz
 
 TOKEN_FILE = "/tmp/paddle_token"
 INPUT_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
@@ -65,7 +65,79 @@ def extract_from_block(block):
     return lines, polys
 
 
+def needs_png_conversion(filepath):
+    """Check if PDF has non-bitonal images (JPEG, etc.) that spotting API can't handle."""
+    doc = fitz.open(filepath)
+    for pi in range(min(3, doc.page_count)):
+        for img in doc[pi].get_images(full=True):
+            bpc = img[2]   # bits per component
+            filt = img[8]  # filter/compression
+            if bpc > 1 or (filt and 'DCT' in str(filt)):
+                doc.close()
+                return True
+    doc.close()
+    return False
+
+
+def process_pdf_via_png(filepath):
+    """Convert PDF pages to PNG, send each to spotting API, merge results."""
+    doc = fitz.open(filepath)
+    all_lines, all_coords = {}, {}
+
+    for pi in range(doc.page_count):
+        page = doc[pi]
+        pix = page.get_pixmap(dpi=200)
+        png_path = f"/tmp/spotting_page_{pi:03d}.png"
+        pix.save(png_path)
+
+        print(f"Page {pi+1}/{doc.page_count}: uploading PNG {pix.width}x{pix.height}...")
+        with open(png_path, "rb") as f:
+            r = requests.post(JOB_URL, headers=HEADERS, data=PAYLOAD, files={"file": f})
+        r.raise_for_status()
+        job_id = r.json()["data"]["jobId"]
+
+        # Poll
+        while True:
+            rr = requests.get(JOB_URL + "/" + job_id, headers=HEADERS)
+            rr.raise_for_status()
+            state = rr.json()["data"]["state"]
+            if state == "done":
+                jsonl_url = rr.json()["data"]["resultUrl"]["jsonUrl"]
+                break
+            elif state == "failed":
+                raise RuntimeError(f"Page {pi+1} failed: " + rr.json()["data"].get("errorMsg", "unknown"))
+            time.sleep(2)
+
+        # Download and parse
+        rr = requests.get(jsonl_url)
+        rr.raise_for_status()
+        for line in rr.text.strip().split("\n"):
+            line = line.strip()
+            if not line: continue
+            result = json.loads(line)["result"]
+            pl, pp = [], []
+            for res in result.get("layoutParsingResults", []):
+                pr = res.get("prunedResult", {})
+                sr = pr.get("spotting_res", {})
+                if sr:
+                    pl = sr.get("rec_texts", [])
+                    pp = sr.get("rec_polys", [])
+            all_lines[str(pi)] = pl
+            all_coords[str(pi)] = [[[round(c, 1) for c in pt] for pt in p] if p else None for p in pp]
+
+        os.unlink(png_path)
+        print(f"  {len(pl)} lines")
+
+    doc.close()
+    return all_lines, all_coords
+
+
 def process_pdf(filepath):
+    # Check if PDF needs PNG conversion
+    if needs_png_conversion(filepath):
+        print(f"PDF has non-bitonal images, converting to PNG pages...")
+        return process_pdf_via_png(filepath)
+
     print(f"Uploading: {filepath}")
     with open(filepath, "rb") as f:
         r = requests.post(JOB_URL, headers=HEADERS, data=PAYLOAD, files={"file": f})
