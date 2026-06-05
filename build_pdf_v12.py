@@ -147,6 +147,24 @@ EVEN_HDR_GAP = statistics.median(even_gaps) if even_gaps else 40
 CHAPTER_GAP = statistics.median(chapter_gaps) if chapter_gaps else 8
 print(f"Header gaps: odd={ODD_HDR_GAP:.0f}pt, even={EVEN_HDR_GAP:.0f}pt, chapter={CHAPTER_GAP:.0f}pt")
 
+# ── Compute per-page footnote gap from source body bottom to footnote top ──
+page_fn_gap = {}
+for key in sorted(spot_lines.keys(), key=int):
+    lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    body_bot = None; fn_top = None
+    for i, l in enumerate(lines):
+        t = l.strip()
+        if not t or is_page_number(t): continue
+        if i >= len(polys) or not polys[i]: continue
+        ys = [p[1] for p in polys[i]]; xs = [p[0] for p in polys[i]]
+        if is_footnote_start(t):
+            if fn_top is None: fn_top = min(ys) / SCALE
+        elif len(t) > 3 and min(xs)/SCALE < 400:
+            body_bot = max(ys) / SCALE
+    if fn_top and body_bot:
+        gap = fn_top - body_bot
+        page_fn_gap[key] = int(gap)
+
 all_tex = []
 prev_body_text = None
 
@@ -256,7 +274,12 @@ for key in sorted(spot_lines.keys(), key=int):
 
             fn_text = ''.join(fn_lines)
             if not fn_rule_added:
-                result.append('\\vfill\\smallskip\\hrule\\smallskip')
+                fn_gap_pt = page_fn_gap.get(key, -1)
+                if fn_gap_pt > 10:  # source gap is positive (footnotes below body)
+                    result.append('\\vspace{' + str(fn_gap_pt) + 'pt}')
+                else:
+                    result.append('\\vfill')  # inline markers or tight spacing → fill
+                result.append('\\smallskip\\hrule\\smallskip')
                 result.append('{\\def\\baselinestretch{2.1}\\footnotesize\\parbox{' + str(TARGET) + 'pt}{')
                 fn_rule_added = True
             else:
