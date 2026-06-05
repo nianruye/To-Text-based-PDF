@@ -124,9 +124,17 @@ for key in sorted(spot_lines.keys(), key=int):
         if is_page_number(t): continue
 
         # Heading detection with source-coordinate formatting
-        # Heading: right-aligned, or first line at page-top (y < 50pt) and short
         y_pt = min(p[1] for p in polys[i]) / SCALE if i < len(polys) and polys[i] else 99
         is_heading = x_left > page_width_px * 0.4 or (i == 0 and len(t) < 25 and not is_footnote_start(t) and y_pt < 50)
+
+        # Missing header: first line is body text (y>50), not a heading
+        # Add standard running header so body position stays consistent
+        if i == 0 and y_pt > 50 and not is_page_number(t) and not is_heading:
+            if int(key) % 2 == 0:  # odd page
+                result.append('{\\footnotesize\\hfill 第一部分 马克思的商品拜物教理论\\hfill\\null}\\par\\vspace{39pt}')
+            else:  # even page
+                result.append('{\\footnotesize 马克思价值理论研究}\\par\\vspace{40pt}')
+
         if is_heading:
             if in_fn: result.append('}\\par'); in_fn = False
 
@@ -152,13 +160,13 @@ for key in sorted(spot_lines.keys(), key=int):
 
             # Font size: map ratio to LaTeX command
             if heading_ratio >= 1.25:
-                font_cmd = '\\Large'       # ~14.4pt
+                font_cmd = '\\Large'
             elif heading_ratio >= 1.15:
-                font_cmd = '\\large'       # ~14pt
+                font_cmd = '\\large'
             elif heading_ratio >= 0.85:
-                font_cmd = '\\normalsize'  # ~12pt
+                font_cmd = '\\normalsize'
             else:
-                font_cmd = '\\footnotesize' # ~10pt
+                font_cmd = '\\footnotesize'
 
             # Spacing: match source gap to next element
             src_gap = 0
@@ -171,19 +179,16 @@ for key in sorted(spot_lines.keys(), key=int):
                         src_gap = y_next - heading_bot
                     break
 
-            # Alignment: use exact source right margin for right-aligned headings
+            # Alignment
             if x_left > page_width_px * 0.35:
-                # src_right_margin from page edge → adjust for body text area
-                box_rm = src_right_margin - MARGIN_PT  # can be negative (heading extends past body)
+                box_rm = src_right_margin - MARGIN_PT
                 if box_rm >= 0:
                     result.append('{' + font_cmd + '\\makebox[\\linewidth][r]{' + escape_tex(t) + '\\hspace*{' + str(int(box_rm)) + 'pt}}\\par}')
                 else:
-                    # Heading extends beyond body area into right margin
                     result.append('{' + font_cmd + '\\hfill ' + escape_tex(t) + '\\hspace*{' + str(int(src_right_margin)) + 'pt}\\mbox{}}\\par')
             else:
                 result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par')
 
-            # Gap to next element
             if src_gap > 4:
                 result.append('\\vspace{' + str(int(src_gap)) + 'pt}')
             continue
