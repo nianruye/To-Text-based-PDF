@@ -1,0 +1,15 @@
+*.aux
+*.log
+*.pdf
+*.whl
+*.deb
+__pycache__/
+output/
+outputs/
+logs/
+build_xelatex*.tex
+paddleocr_markdown.json
+deepseek_markdown.json
+ocr_texts.json
+spotting_*.json
+/tmp/
