@@ -96,6 +96,27 @@ header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\begin{{document}}
 """
 
+# ── Auto-detect running headers from source OCR ──
+odd_headers = {}; even_headers = {}
+for key in sorted(spot_lines.keys(), key=int):
+    lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    if not lines or not lines[0].strip(): continue
+    t0 = lines[0].strip()
+    if len(t0) > 25 or is_page_number(t0) or is_footnote_start(t0): continue
+    if 0 >= len(polys) or not polys[0]: continue
+    y0 = min(p[1] for p in polys[0]) / SCALE
+    x0 = min(p[0] for p in polys[0]) / SCALE
+    if y0 > 50: continue  # not a header
+    if x0 > 200:  # right-aligned → odd page
+        odd_headers[t0] = odd_headers.get(t0, 0) + 1
+    else:  # left-aligned → even page
+        even_headers[t0] = even_headers.get(t0, 0) + 1
+
+DEFAULT_ODD_HEADER = max(odd_headers, key=odd_headers.get) if odd_headers else ''
+DEFAULT_EVEN_HEADER = max(even_headers, key=even_headers.get) if even_headers else ''
+print(f"Detected odd header: '{DEFAULT_ODD_HEADER}' ({len(odd_headers)} variants)")
+print(f"Detected even header: '{DEFAULT_EVEN_HEADER}' ({len(even_headers)} variants)")
+
 all_tex = []
 prev_body_text = None
 
@@ -129,11 +150,13 @@ for key in sorted(spot_lines.keys(), key=int):
 
         # Missing header: add standard running header
         if i == 0 and y_pt > 50 and not is_page_number(t) and not is_heading:
-            if int(key) % 2 == 0:
-                result.append('{\\footnotesize\\hfill 第一部分 马克思的商品拜物教理论\\hfill\\null}\\par')
-            else:
-                result.append('{\\footnotesize 马克思价值理论研究}\\par')
-            result.append('\\vspace{45pt}')
+            header_text = DEFAULT_ODD_HEADER if int(key) % 2 == 0 else DEFAULT_EVEN_HEADER
+            if header_text:
+                if int(key) % 2 == 0:
+                    result.append('{\\footnotesize\\hfill ' + escape_tex(header_text) + '\\hfill\\null}\\par')
+                else:
+                    result.append('{\\footnotesize ' + escape_tex(header_text) + '}\\par')
+                result.append('\\vspace{45pt}')
 
         if is_heading:
             if in_fn: result.append('}\\par'); in_fn = False
