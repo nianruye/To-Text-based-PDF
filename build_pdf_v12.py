@@ -256,7 +256,7 @@ for key in sorted(spot_lines.keys(), key=int):
 
             fn_text = ''.join(fn_lines)
             if not fn_rule_added:
-                result.append('\\smallskip\\hrule\\smallskip')
+                result.append('\\vfill\\smallskip\\hrule\\smallskip')
                 result.append('{\\def\\baselinestretch{2.1}\\footnotesize\\parbox{' + str(TARGET) + 'pt}{')
                 fn_rule_added = True
             else:
