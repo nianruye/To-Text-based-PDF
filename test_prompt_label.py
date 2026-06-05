@@ -6,7 +6,7 @@ TOKEN_FILE = "/tmp/paddle_token"
 if __import__('os').path.exists(TOKEN_FILE):
     tok = open(TOKEN_FILE).read().strip()
 else:
-    tok = "REDACTED_PADDLEOCR_TOKEN"  # fallback
+    tok = open(TOKEN_FILE).read().strip()
 
 HEADERS = {"Authorization": "bearer " + tok}
 JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"

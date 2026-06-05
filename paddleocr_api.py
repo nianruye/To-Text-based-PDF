@@ -7,7 +7,8 @@ import json, time, sys, os
 import requests
 
 API_BASE = "https://dfrf39q5w1zctfyd.aistudio-app.com"
-TOKEN = "REDACTED_PADDLEOCR_TOKEN"
+TOKEN_FILE = "/tmp/paddle_token"
+TOKEN = open(TOKEN_FILE).read().strip()
 INPUT_PDF = "/opt/test/优化前.pdf"
 MARKS_FILE = "/opt/test/paddleocr_markdown.json"
 

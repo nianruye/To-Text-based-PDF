@@ -3,7 +3,7 @@
 import json, requests, time, os, sys
 
 TOKEN_FILE = "/tmp/paddle_token"
-tok = open(TOKEN_FILE).read().strip() if os.path.exists(TOKEN_FILE) else "REDACTED_PADDLEOCR_TOKEN"
+tok = open(TOKEN_FILE).read().strip()
 HEADERS = {"Authorization": "bearer " + tok}
 JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
 

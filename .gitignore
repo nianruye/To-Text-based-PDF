@@ -13,3 +13,4 @@ deepseek_markdown.json
 ocr_texts.json
 spotting_*.json
 /tmp/
+/tmp/paddle_token
