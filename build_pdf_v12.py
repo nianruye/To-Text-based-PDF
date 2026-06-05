@@ -117,6 +117,36 @@ DEFAULT_EVEN_HEADER = max(even_headers, key=even_headers.get) if even_headers el
 print(f"Detected odd header: '{DEFAULT_ODD_HEADER}' ({len(odd_headers)} variants)")
 print(f"Detected even header: '{DEFAULT_EVEN_HEADER}' ({len(even_headers)} variants)")
 
+# ── Auto-detect header-to-body gaps ──
+odd_gaps = []; even_gaps = []; chapter_gaps = []
+for key in sorted(spot_lines.keys(), key=int):
+    lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    k = int(key)
+    hdr_bot = None; body_y = None
+    for i, l in enumerate(lines):
+        t = l.strip()
+        if not t or is_page_number(t) or is_footnote_start(t): continue
+        if i >= len(polys) or not polys[i]: continue
+        xs = [p[0] for p in polys[i]]; ys = [p[1] for p in polys[i]]
+        xl, yt, yb = min(xs)/SCALE, min(ys)/SCALE, max(ys)/SCALE
+
+        if hdr_bot is None and (xl > 350 or (i==0 and len(t)<25 and yt<50)):
+            hdr_bot = yb; continue
+        if hdr_bot is not None and body_y is None and xl < 400:
+            body_y = yt; break
+
+    if hdr_bot and body_y:
+        gap = body_y - hdr_bot
+        if k in [5,6]: chapter_gaps.append(gap)
+        elif k % 2 == 0: odd_gaps.append(gap)
+        else: even_gaps.append(gap)
+
+import statistics
+ODD_HDR_GAP = statistics.median(odd_gaps) if odd_gaps else 38
+EVEN_HDR_GAP = statistics.median(even_gaps) if even_gaps else 40
+CHAPTER_GAP = statistics.median(chapter_gaps) if chapter_gaps else 8
+print(f"Header gaps: odd={ODD_HDR_GAP:.0f}pt, even={EVEN_HDR_GAP:.0f}pt, chapter={CHAPTER_GAP:.0f}pt")
+
 all_tex = []
 prev_body_text = None
 
@@ -152,11 +182,12 @@ for key in sorted(spot_lines.keys(), key=int):
         if i == 0 and y_pt > 50 and not is_page_number(t) and not is_heading:
             header_text = DEFAULT_ODD_HEADER if int(key) % 2 == 0 else DEFAULT_EVEN_HEADER
             if header_text:
+                gap = ODD_HDR_GAP if int(key) % 2 == 0 else EVEN_HDR_GAP
                 if int(key) % 2 == 0:
                     result.append('{\\footnotesize\\hfill ' + escape_tex(header_text) + '\\hfill\\null}\\par')
                 else:
                     result.append('{\\footnotesize ' + escape_tex(header_text) + '}\\par')
-                result.append('\\vspace{45pt}')
+                result.append('\\vspace{' + str(int(gap)) + 'pt}')
 
         if is_heading:
             if in_fn: result.append('}\\par'); in_fn = False
@@ -191,16 +222,11 @@ for key in sorted(spot_lines.keys(), key=int):
             else:
                 font_cmd = '\\footnotesize'
 
-            # Spacing: match source gap to next element
-            src_gap = 0
-            heading_bot = max(p[1] for p in polys[i])/SCALE if i < len(polys) and polys[i] else 40
-            for j in range(i+1, len(lines)):
-                nt = lines[j].strip()
-                if nt and len(nt) > 3 and not is_page_number(nt):
-                    if j < len(polys) and polys[j]:
-                        y_next = min(p[1] for p in polys[j])/SCALE
-                        src_gap = y_next - heading_bot
-                    break
+            # Use median gap for this page type
+            pn = int(key)
+            if pn in [5, 6]: src_gap = CHAPTER_GAP
+            elif pn % 2 == 0: src_gap = ODD_HDR_GAP
+            else: src_gap = EVEN_HDR_GAP
 
             # Alignment
             if x_left > page_width_px * 0.35:
