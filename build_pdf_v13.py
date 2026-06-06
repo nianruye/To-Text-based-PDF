@@ -166,7 +166,7 @@ TARGET = int(body_widths_pt[int(len(body_widths_pt)*0.9)]) if body_widths_pt els
 TARGET = max(TARGET, int(PW_PT * 0.70))
 
 norm = [x for x in body_x0s if abs(x - BODY_LEFT) < 30]
-indented = [x for x in body_x0s if x > BODY_LEFT + 15]
+indented = [x for x in body_x0s if x > BODY_LEFT + 40]
 norm_center = statistics.median(norm) if norm else BODY_LEFT
 indented_center = statistics.median(indented) if indented else BODY_LEFT + 50
 INDENT_THRESHOLD_PX = max(20, (indented_center - norm_center) * 0.5)
@@ -208,7 +208,7 @@ for key in spot_lines:
         if not t or len(t) > 8: continue
         if i >= len(polys) or not polys[i]: continue
         y = min(p[1] for p in polys[i]) / SCALE
-        if y < PH_PT * 0.80: continue  # only bottom 20%
+        if y < PH_PT * 0.55: continue  # only bottom half
         m = re.match(r'[·•‧]?\s*(\d{1,4})\s*[·•‧]?', t)
         if m:
             candidates.append((y, m.group(1)))
@@ -345,7 +345,20 @@ for key in sorted(spot_lines.keys(), key=int):
                 paras.append(cur); cur = []
             cur.append(item)
         if cur: paras.append(cur)
-        for para in paras:
+        # Merge fragment paragraphs: if a para is just one very short line (<5 chars),
+        # merge it into the NEXT paragraph (cross-page sentence continuation)
+        merged = []
+        i = 0
+        while i < len(paras):
+            if i + 1 < len(paras) and len(paras[i]) == 1 and len(paras[i][0]['text']) < 5:
+                # Merge this fragment into next paragraph
+                merged.append(paras[i] + paras[i+1])
+                i += 2
+            else:
+                merged.append(paras[i])
+                i += 1
+
+        for para in merged:
             para_text = ''.join(item['text'] for item in para)
             has_indent = para[0]['indent']
             prefix = '\\hspace*{2em}' if has_indent else ''
