@@ -137,7 +137,7 @@ for k in spot_lines:
         all_line_h.append((max(p[1] for p in polys[i]) - min(p[1] for p in polys[i])) / SCALE)
 all_line_h.sort()
 FONT_SIZE = round(all_line_h[len(all_line_h)//10] * 0.75) if all_line_h else 12
-FONT_SIZE = max(10, min(16, FONT_SIZE))
+FONT_SIZE = max(12, min(14, FONT_SIZE))
 
 body_widths_pt = []
 for k in spot_lines:
@@ -151,6 +151,7 @@ for k in spot_lines:
         body_widths_pt.append((max(xs) - min(xs)) / SCALE)
 body_widths_pt.sort()
 TARGET = int(body_widths_pt[int(len(body_widths_pt)*0.9)]) if body_widths_pt else 300
+TARGET = max(TARGET, int(PW_PT * 0.70))
 
 norm = [x for x in body_x0s if abs(x - BODY_LEFT) < 30]
 indented = [x for x in body_x0s if x > BODY_LEFT + 15]
@@ -179,7 +180,7 @@ BODY_STRETCH = round(statistics.median(body_area_stretches), 2) if body_area_str
 BODY_STRETCH = max(1.0, min(1.8, BODY_STRETCH))
 
 width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
-CJK_STRETCH = round(max(0.05, min(0.3, width_spread * 0.5)), 2)
+CJK_STRETCH = round(max(0.3, min(0.5, width_spread * 0.5)), 2)
 
 MARGIN_PT = BODY_LEFT / SCALE
 MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
@@ -253,7 +254,7 @@ EVEN_HDR_GAP = statistics.median(even_gaps) if even_gaps else 40
 TOP_MARGIN_MM = 8.5
 header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\usepackage{{xeCJK}}
-\\usepackage[top={TOP_MARGIN_MM}mm, bottom={MARGIN_MM}mm, left={MARGIN_MM}mm, right={MARGIN_MM}mm, paperwidth={PW_MM:.0f}mm, paperheight={PH_MM:.0f}mm]{{geometry}}
+\\usepackage[top={TOP_MARGIN_MM}mm, bottom=15mm, left={MARGIN_MM}mm, right={MARGIN_MM}mm, paperwidth={PW_MM:.0f}mm, paperheight={PH_MM:.0f}mm]{{geometry}}
 \\usepackage{{setspace}}
 \\usepackage{{fancyhdr}}
 \\setmainfont{{Noto Serif CJK SC}}
@@ -261,6 +262,7 @@ header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\xeCJKsetup{{PunctStyle=kaiming}}
 \\setlength{{\\parindent}}{{0pt}}
 \\setstretch{{{BODY_STRETCH}}}
+\\setlength{{\\footskip}}{{30pt}}
 \\setcounter{{page}}{{{START_PAGE}}}
 \\pagestyle{{fancy}}
 \\fancyhf{{}}
@@ -397,10 +399,10 @@ for key in sorted(spot_lines.keys(), key=int):
         bw = TARGET if not has_indent else (TARGET - INDENT_PT)
         cjk_eq = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
 
-        if 20 <= cjk_eq <= 30:
-            result.append(indent_cmd + '\\makebox[' + str(int(bw)) + 'pt][s]{' + escape_tex(t) + '}\\\\')
-        else:
+        if cjk_eq < 10:
             result.append(indent_cmd + '\\mbox{' + escape_tex(t) + '}\\\\')
+        else:
+            result.append(indent_cmd + '\\makebox[' + str(int(bw)) + 'pt][s]{' + escape_tex(t) + '}\\\\')
 
     if in_fn: result.append('}\\par')
     result.append('\\par\\newpage')
