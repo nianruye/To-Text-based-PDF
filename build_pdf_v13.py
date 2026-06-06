@@ -159,23 +159,24 @@ indented_center = statistics.median(indented) if indented else BODY_LEFT + 50
 INDENT_THRESHOLD_PX = max(20, (indented_center - norm_center) * 0.5)
 INDENT_PT = INDENT_THRESHOLD_PX / SCALE
 
-all_body_gaps = []
+# Stretch from source body area: body_height ÷ (lines × base_skip)
+BASE_SKIP = FONT_SIZE * 1.2
+body_area_stretches = []
 for k in spot_lines:
-    prev_y = None
+    body_ys = []
     for i, line in enumerate(spot_lines[k]):
         t = line.strip()
         if not t or is_page_number(t) or is_footnote_start(t): continue
         polys = spot_coords.get(k, [])
         if i >= len(polys) or not polys[i]: continue
         if min(p[0] for p in polys[i]) > page_width_px * 0.4: continue
-        y = min(p[1] for p in polys[i]) / SCALE
-        if prev_y is not None and y > prev_y:
-            all_body_gaps.append(y - prev_y)
-        prev_y = y
-all_body_gaps.sort()
-med_gap = statistics.median(all_body_gaps) if all_body_gaps else 20
-BASE_SKIP = FONT_SIZE * 1.2
-BODY_STRETCH = max(1.0, min(1.8, round(med_gap / BASE_SKIP, 2)))
+        body_ys.append(max(p[1] for p in polys[i]) / SCALE)
+    if len(body_ys) > 2:
+        h = max(body_ys) - min(body_ys) + FONT_SIZE
+        s = h / (len(body_ys) * BASE_SKIP)
+        body_area_stretches.append(s)
+BODY_STRETCH = round(statistics.median(body_area_stretches), 2) if body_area_stretches else 1.5
+BODY_STRETCH = max(1.0, min(1.8, BODY_STRETCH))
 
 width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
 CJK_STRETCH = round(max(0.05, min(0.3, width_spread * 0.5)), 2)
@@ -183,23 +184,29 @@ CJK_STRETCH = round(max(0.05, min(0.3, width_spread * 0.5)), 2)
 MARGIN_PT = BODY_LEFT / SCALE
 MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
 
-# Page number detection: find numbers at page bottom from spotting data
+# Page number: find the bottom-most short number or ·N· on each page
 page_numbers = {}
 for key in spot_lines:
     lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    candidates = []
     for i, l in enumerate(lines):
         t = l.strip()
-        if not t or len(t) > 4: continue
-        if not t.isdigit(): continue
+        if not t or len(t) > 8: continue
         if i >= len(polys) or not polys[i]: continue
-        y = max(p[1] for p in polys[i]) / SCALE
-        if y > PH_PT * 0.5:  # bottom half of page
-            page_numbers[key] = t
-            break
-START_PAGE = 1  # fallback
+        y = min(p[1] for p in polys[i]) / SCALE
+        if y < PH_PT * 0.80: continue  # only bottom 20%
+        m = re.match(r'[·•‧]?\s*(\d{1,4})\s*[·•‧]?', t)
+        if m:
+            candidates.append((y, m.group(1)))
+        elif t.isdigit() and len(t) <= 4:
+            candidates.append((y, t))
+    if candidates:
+        candidates.sort(key=lambda x: -x[0])  # lowest on page first
+        page_numbers[key] = candidates[0][1]
+START_PAGE = 1
 if page_numbers:
     vals = sorted(int(v) for v in page_numbers.values())
-    print(f"Page numbers detected: {vals[:3]}...{vals[-3:]}")
+    print(f"Page numbers: {vals[:3]}...{vals[-3:]}")
 START_PAGE = int(list(page_numbers.values())[0]) if page_numbers else 1
 
 print(f"FONT={FONT_SIZE}pt TARGET={TARGET}pt INDENT={INDENT_THRESHOLD_PX:.0f}px STRETCH={BODY_STRETCH}")
@@ -273,31 +280,22 @@ def fuzzy_key(text):
     t = t.replace(' ', '')
     return t[:20]  # first 20 chars as key
 
-all_texts = {}
-all_fuzzy = {}
-for k in spot_lines:
-    for l in spot_lines[k]:
-        t = l.strip()
-        if t and len(t) > 3 and not is_page_number(t):
-            all_texts[t] = all_texts.get(t, 0) + 1
-            fk = fuzzy_key(t)
-            all_fuzzy[fk] = all_fuzzy.get(fk, 0) + 1
+# Watermarks: short text at very bottom of page, appearing on >30% pages
 watermark_texts = set()
-for t, cnt in all_texts.items():
-    if cnt >= len(spot_lines) * 0.1:
-        fk = fuzzy_key(t)
-        if all_fuzzy.get(fk, 0) >= len(spot_lines) * 0.2:
-            watermark_texts.add(t)
-# Also add position-based: bottom 15% of page height
+text_bottom_count = {}
 for k in spot_lines:
     for i, l in enumerate(spot_lines[k]):
         t = l.strip()
-        if not t or len(t) < 3: continue
+        if not t or len(t) < 3 or len(t) > 30: continue
+        if is_page_number(t) or is_footnote_start(t): continue
         polys = spot_coords.get(k, [])
         if i >= len(polys) or not polys[i]: continue
         y = max(p[1] for p in polys[i]) / SCALE
-        if y > PH_PT * 0.65 and not is_page_number(t) and not t[0] in FN_CIRCLE:
-            watermark_texts.add(t)
+        if y > PH_PT * 0.95:
+            text_bottom_count[t] = text_bottom_count.get(t, 0) + 1
+for t, cnt in text_bottom_count.items():
+    if cnt >= len(spot_lines) * 0.3:
+        watermark_texts.add(t)
 if watermark_texts:
     print(f"Watermark filter: {len(watermark_texts)} patterns")
 
@@ -393,6 +391,9 @@ for key in sorted(spot_lines.keys(), key=int):
         # Body
         has_indent = (x_left - BODY_LEFT) > INDENT_THRESHOLD_PX
         indent_cmd = '\\hspace*{2em}' if has_indent else ''
+        # Paragraph break before indented lines (tight spacing)
+        if has_indent:
+            result.append('\\smallskip')
         bw = TARGET if not has_indent else (TARGET - INDENT_PT)
         cjk_eq = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
 
