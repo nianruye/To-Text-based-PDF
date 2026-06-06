@@ -137,7 +137,19 @@ for k in spot_lines:
         all_line_h.append((max(p[1] for p in polys[i]) - min(p[1] for p in polys[i])) / SCALE)
 all_line_h.sort()
 FONT_SIZE = round(all_line_h[len(all_line_h)//10] * 0.75) if all_line_h else 12
-FONT_SIZE = max(12, min(14, FONT_SIZE))
+# Font size = \linewidth ÷ max_body_chars, so longest body lines fit without wrapping
+max_cjk = 20
+for k in spot_lines:
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or len(t) < 5: continue
+        if is_page_number(t) or is_footnote_start(t): continue
+        polys = spot_coords.get(k, [])
+        if i < len(polys) and polys[i] and min(p[0] for p in polys[i]) > page_width_px * 0.4: continue
+        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        if cjk > max_cjk: max_cjk = cjk
+AVAIL_WIDTH = PW_PT - 2 * (BODY_LEFT / SCALE)  # \linewidth in pt
+FONT_SIZE = max(10, min(14, round(AVAIL_WIDTH / max_cjk)))
 
 body_widths_pt = []
 for k in spot_lines:
@@ -182,7 +194,8 @@ BODY_STRETCH = max(1.0, min(1.8, BODY_STRETCH))
 width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
 CJK_STRETCH = 0.8  # high stretch so short lines can fill target width
 
-MARGIN_PT = BODY_LEFT / SCALE
+MARGIN_PT = 20  # tight margins for max text width
+TARGET = PW_PT - 2 * MARGIN_PT  # \linewidth = target
 MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
 
 # Page number: find the bottom-most short number or ·N· on each page
@@ -270,6 +283,7 @@ header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\renewcommand{{\\headrulewidth}}{{0pt}}
 \\renewcommand{{\\CJKglue}}{{\\hskip 0pt plus {CJK_STRETCH}em minus 0.02em}}
 \\raggedbottom
+\\emergencystretch=2em
 \\tolerance=500
 \\begin{{document}}
 """
@@ -321,6 +335,22 @@ for key in sorted(spot_lines.keys(), key=int):
         result.append('\\setcounter{page}{' + src_pn + '}')
 
     fn_rule_added = False; in_fn = False
+    body_buf = []
+
+    def flush_body():
+        if not body_buf: return
+        paras = []; cur = []
+        for item in body_buf:
+            if item['indent'] and cur:
+                paras.append(cur); cur = []
+            cur.append(item)
+        if cur: paras.append(cur)
+        for para in paras:
+            para_text = ''.join(item['text'] for item in para)
+            has_indent = para[0]['indent']
+            prefix = '\\hspace*{2em}' if has_indent else ''
+            result.append(prefix + escape_tex(para_text) + '\\par')
+        body_buf.clear()
 
     for i in range(len(lines)):
         t = lines[i].strip()
@@ -377,6 +407,7 @@ for key in sorted(spot_lines.keys(), key=int):
         is_running_hdr = is_header and not md_level
 
         if md_level >= 2 or is_running_hdr or coord_heading:
+            flush_body()
             if in_fn: result.append('}\\par'); in_fn = False
 
             # Compute height ratio for THIS heading line
@@ -417,6 +448,7 @@ for key in sorted(spot_lines.keys(), key=int):
 
         # Footnote
         if is_footnote_start(t):
+            flush_body()
             if not fn_rule_added:
                 result.append('\\vfill\\smallskip\\hrule\\smallskip')
                 result.append('{\\footnotesize')
@@ -429,22 +461,13 @@ for key in sorted(spot_lines.keys(), key=int):
             result.append('\\mbox{' + escape_tex(t) + '}\\\\')
             continue
 
-        # Body
-        has_indent = (x_left - BODY_LEFT) > INDENT_THRESHOLD_PX
-        indent_cmd = '\\hspace*{2em}' if has_indent else ''
-        # Paragraph break before indented lines (tight spacing)
-        if has_indent:
-            result.append('\\smallskip')
-        bw = TARGET if not has_indent else (TARGET - INDENT_PT)
-        cjk_eq = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
-        est_w = cjk_eq * FONT_SIZE
+        # Body — buffer for paragraph grouping
+        body_buf.append({
+            'text': t, 'indent': (x_left - BODY_LEFT) > INDENT_THRESHOLD_PX,
+            'cjk': sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        })
 
-        # Lines with >15 CJK chars: \linebreak justifies. Short lines: \mbox natural width.
-        if cjk_eq > 15 and est_w < TARGET * 0.95:
-            result.append(indent_cmd + escape_tex(t) + '\\linebreak')
-        else:
-            result.append(indent_cmd + '\\mbox{' + escape_tex(t) + '}\\\\')
-
+    flush_body()
     if in_fn: result.append('}\\par')
     result.append('\\par\\newpage')
     all_tex.append('\n'.join(result))
