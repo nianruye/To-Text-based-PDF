@@ -180,7 +180,7 @@ BODY_STRETCH = round(statistics.median(body_area_stretches), 2) if body_area_str
 BODY_STRETCH = max(1.0, min(1.8, BODY_STRETCH))
 
 width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
-CJK_STRETCH = round(max(0.3, min(0.5, width_spread * 0.5)), 2)
+CJK_STRETCH = 0.8  # high stretch so short lines can fill target width
 
 MARGIN_PT = BODY_LEFT / SCALE
 MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
@@ -342,6 +342,27 @@ for key in sorted(spot_lines.keys(), key=int):
         md_level = is_heading_by_md(t, md_headings)
         is_header = (x_left > page_width_px * 0.4) or (i == 0 and len(t) < 25 and y_pt < 50)
 
+        # Coordinate-based heading: line height > 1.15x body avg + short + not at page top
+        coord_heading = False
+        if i < len(polys) and polys[i] and not is_header and not is_footnote_start(t):
+            ys_h = [p[1] for p in polys[i]]
+            h = max(ys_h) - min(ys_h)
+            # Get body avg height from surrounding lines
+            body_hs = []
+            for j in range(max(0,i-5), min(len(lines), i+6)):
+                if j == i: continue
+                tj = lines[j].strip()
+                if not tj or len(tj) < 5: continue
+                if j >= len(polys) or not polys[j]: continue
+                if min(p[0] for p in polys[j]) > page_width_px * 0.4: continue
+                body_hs.append(max(p[1] for p in polys[j]) - min(p[1] for p in polys[j]))
+            if body_hs:
+                body_h_avg = sum(body_hs) / len(body_hs)
+                ratio = h / body_h_avg if body_h_avg > 0 else 1.0
+                if ratio > 1.06 and 3 < len(t) < 25 and y_pt > 50:
+                    coord_heading = True
+                    md_level = max(md_level, 2)  # treat as ## level
+
         # Missing header
         if i == 0 and y_pt > 50 and not is_header:
             hdr_text = DEFAULT_ODD_HDR if int(key) % 2 == 0 else DEFAULT_EVEN_HDR
@@ -355,25 +376,43 @@ for key in sorted(spot_lines.keys(), key=int):
 
         is_running_hdr = is_header and not md_level
 
-        if md_level >= 2 or is_running_hdr:
+        if md_level >= 2 or is_running_hdr or coord_heading:
             if in_fn: result.append('}\\par'); in_fn = False
 
-            if md_level >= 3:
-                font_cmd = '\\large\\textbf'
-            elif md_level == 2:
+            # Compute height ratio for THIS heading line
+            heading_ratio = 1.0
+            if i < len(polys) and polys[i]:
+                ys_h = [p[1] for p in polys[i]]
+                h_h = max(ys_h) - min(ys_h)
+                body_hs = []
+                for j in range(max(0,i-5), min(len(lines), i+6)):
+                    if j == i: continue
+                    tj = lines[j].strip()
+                    if not tj or len(tj) < 3: continue
+                    if j >= len(polys) or not polys[j]: continue
+                    if min(p[0] for p in polys[j]) > page_width_px * 0.4: continue
+                    body_hs.append(max(p[1] for p in polys[j]) - min(p[1] for p in polys[j]))
+                body_avg = sum(body_hs)/len(body_hs) if body_hs else h_h
+                heading_ratio = h_h / body_avg if body_avg > 0 else 1.0
+
+            if heading_ratio > 1.2:
+                font_cmd = '\\Large'
+            elif heading_ratio > 1.1:
                 font_cmd = '\\large'
+            elif heading_ratio > 0.85:
+                font_cmd = '\\normalsize'
             else:
                 font_cmd = '\\footnotesize'
 
             if is_running_hdr:
                 if x_left > page_width_px * 0.4:
-                    result.append('{' + font_cmd + '\\hfill ' + escape_tex(t) + '\\hfill\\null}\\par')
+                    result.append('{' + font_cmd + '\\hfill ' + escape_tex(t) + '\\hfill\\null}\\par\\normalsize')
                 else:
-                    result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par')
-            elif md_level >= 2:
-                result.append('\\vspace{10pt}\\noindent{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\vspace{6pt}')
+                    result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\normalsize')
+            elif md_level >= 2 or coord_heading:
+                result.append('\\par\\vspace{8pt}\\noindent{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\vspace{4pt}\\normalsize')
             else:
-                result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par')
+                result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\normalsize')
             continue
 
         # Footnote
@@ -398,11 +437,13 @@ for key in sorted(spot_lines.keys(), key=int):
             result.append('\\smallskip')
         bw = TARGET if not has_indent else (TARGET - INDENT_PT)
         cjk_eq = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        est_w = cjk_eq * FONT_SIZE
 
-        if cjk_eq < 10:
-            result.append(indent_cmd + '\\mbox{' + escape_tex(t) + '}\\\\')
+        # Lines with >15 CJK chars: \linebreak justifies. Short lines: \mbox natural width.
+        if cjk_eq > 15 and est_w < TARGET * 0.95:
+            result.append(indent_cmd + escape_tex(t) + '\\linebreak')
         else:
-            result.append(indent_cmd + '\\makebox[' + str(int(bw)) + 'pt][s]{' + escape_tex(t) + '}\\\\')
+            result.append(indent_cmd + '\\mbox{' + escape_tex(t) + '}\\\\')
 
     if in_fn: result.append('}\\par')
     result.append('\\par\\newpage')
