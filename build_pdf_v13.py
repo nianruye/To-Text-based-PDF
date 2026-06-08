@@ -111,6 +111,72 @@ if md_headings:
     for h, lv in sorted(md_headings, key=lambda x: x[1])[:5]:
         print(f"  {'#'*lv} {h[:50]}")
 
+# ── Source-derived detection thresholds ──
+# Scan all OCR lines, classify as heading (matches MD) or body, collect geometry.
+# All thresholds below are computed from THIS document's actual data.
+_src_heading_hs = []      # px heights of heading lines
+_src_heading_widths = []  # px widths of heading lines
+_src_body_hs = []         # px heights of body lines
+_src_body_widths = []     # px widths of body lines (excl. footnotes/page-nums)
+for k in spot_lines:
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or len(t) < 3: continue
+        polys = spot_coords.get(k, [])
+        if i >= len(polys) or not polys[i]: continue
+        xs = [p[0] for p in polys[i]]; ys = [p[1] for p in polys[i]]
+        xl, xr, yt, yb = min(xs), max(xs), min(ys), max(ys)
+        w = xr - xl; h = yb - yt
+        # Skip right-aligned headers, footnotes, page numbers, watermark
+        if xl > page_width_px * 0.4: continue
+        if is_footnote_start(t) or is_page_number(t): continue
+        if is_heading_by_md(t, md_headings):
+            _src_heading_hs.append(h)
+            _src_heading_widths.append(w)
+        elif w > 200 and len(t) > 5:
+            _src_body_hs.append(h)
+            _src_body_widths.append(w)
+
+# Coordinate-based heading ratio threshold — fully source-derived:
+# 1. heading_median_h / body_median_h = how much taller headings are
+# 2. body local-ratio P95 = OCR noise level (lines taller than this are NOT noise)
+# Take the max: if headings are similar height to body, rely on noise floor.
+# This document: heading/body = 1.024, noise_p95 = 1.097 → threshold = 1.10
+_src_body_local_ratios = []  # h / local_avg for each body line
+for k in spot_lines:
+    c = spot_coords.get(k, [])
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t or len(t) < 5: continue
+        if i >= len(c) or not c[i]: continue
+        xs = [p[0] for p in c[i]]; ys = [p[1] for p in c[i]]
+        if min(xs) > page_width_px * 0.4: continue
+        if is_footnote_start(t) or is_page_number(t): continue
+        if is_heading_by_md(t, md_headings): continue
+        h = max(ys) - min(ys)
+        body_h = []
+        for j in range(max(0,i-5), min(len(spot_lines[k]), i+6)):
+            if j == i: continue
+            tj = spot_lines[k][j].strip()
+            if not tj or len(tj) < 3: continue
+            if j >= len(c) or not c[j]: continue
+            yj = [p[1] for p in c[j]]; xj = [p[0] for p in c[j]]
+            if min(xj) > page_width_px * 0.4: continue
+            body_h.append(max(yj) - min(yj))
+        if body_h:
+            _src_body_local_ratios.append(h / (sum(body_h)/len(body_h)))
+if _src_body_local_ratios:
+    _src_body_local_ratios.sort()
+    _noise_p95 = _src_body_local_ratios[int(len(_src_body_local_ratios) * 0.95)]
+else:
+    _noise_p95 = 1.07
+_heading_body_ratio = statistics.median(_src_heading_hs) / statistics.median(_src_body_hs) if _src_heading_hs and _src_body_hs else 1.07
+COORD_HEADING_RATIO = max(_heading_body_ratio, _noise_p95)
+COORD_HEADING_RATIO = round(COORD_HEADING_RATIO, 3)
+# Min heading width: below min actual heading width (rejects narrow body continuation lines)
+MIN_HEADING_WIDTH = (min(_src_heading_widths) * 0.8) if _src_heading_widths else page_width_px * 0.35
+print(f"Source-derived thresholds: heading_ratio={COORD_HEADING_RATIO:.3f} min_heading_w={MIN_HEADING_WIDTH:.0f}px")
+
 # ── Dynamic parameters ──
 BODY_LEFT = 0
 body_x0s = []
@@ -271,10 +337,11 @@ for key in sorted(spot_lines.keys(), key=int):
         h_pt = (max(ys) - min(ys)) / SCALE
         if y_top > _HDR_REGION_INITIAL: break
         pos = 'right' if x_left > page_width_px * 0.4 else 'left'
-        # Header-like: at header position (right side) or short text on left
-        # Use ratio-based check: real headers are much shorter than body lines
-        line_w = (max(xs) - min(xs)) / SCALE
-        is_hdr_like = (x_left > page_width_px * 0.4) or line_w < PW_PT * 0.6
+        # Header-like: at header position (right side) or narrower than typical body
+        # Derived: use median of heading widths as boundary (headers are narrower than body)
+        _hdr_like_max_w = statistics.median(_src_heading_widths) if _src_heading_widths else PW_PT * 0.6
+        line_w_px = max(xs) - min(xs)
+        is_hdr_like = (x_left > page_width_px * 0.4) or line_w_px < _hdr_like_max_w
         if header_region_lines:
             prev = header_region_lines[-1]
             # Gap between previous header bottom and this line top (in px)
@@ -618,8 +685,8 @@ for key in sorted(spot_lines.keys(), key=int):
                 ratio = h / body_h_avg if body_h_avg > 0 else 1.0
                 # Reject narrow short lines at body-left position (e.g. continuation "命的。"③)
                 # Real headings span wider; narrow short lines at body-left are body continuations
-                min_heading_width = page_width_px * 0.35
-                if (ratio > 1.07 and 3 < len(t) < 28 and y_pt > HDR_REGION_Y
+                min_heading_width = MIN_HEADING_WIDTH
+                if (ratio > COORD_HEADING_RATIO and 3 < len(t) < 28 and y_pt > HDR_REGION_Y
                         and line_width_px > min_heading_width):
                     coord_heading = True
                     md_level = max(md_level, 2)  # treat as ## level
