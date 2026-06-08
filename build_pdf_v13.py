@@ -236,6 +236,27 @@ print(f"FONT={FONT_SIZE}pt TARGET={TARGET}pt INDENT={INDENT_THRESHOLD_PX:.0f}px 
 
 # ── Auto-detect headers per page ──
 # For each page, record: header text, position (left/right), line height (pt)
+# MERGE_GAP_PT: header lines with inter-line gap < this (in pt) are considered
+# a split header and merged. Derived from median header line height.
+_hdr_h_pts = []
+for key in sorted(spot_lines.keys(), key=int):
+    polys_h = spot_coords.get(key, [])
+    for i, l in enumerate(spot_lines[key]):
+        t = l.strip()
+        if not t or is_page_number(t) or is_footnote_start(t): continue
+        if i >= len(polys_h) or not polys_h[i]: continue
+        ys = [p[1] for p in polys_h[i]]; xs = [p[0] for p in polys_h[i]]
+        if min(ys) / SCALE > 50: break
+        if min(xs) > page_width_px * 0.4 or len(t) < 30:
+            _hdr_h_pts.append((max(ys) - min(ys)) / SCALE)
+            break
+MERGE_GAP_PT = round(statistics.median(_hdr_h_pts) * 0.8) if _hdr_h_pts else 8
+MERGE_GAP_PX = MERGE_GAP_PT * SCALE  # convert to pixels for raw coordinate comparison
+
+# Preliminary header region threshold: top ~12% of page (scales with page size)
+# Refined later as HDR_REGION_Y after computing header gaps
+_HDR_REGION_INITIAL = PH_PT * 0.12
+
 page_headers = {}  # key → {'text': str, 'pos': 'left'|'right', 'h_pt': float}
 for key in sorted(spot_lines.keys(), key=int):
     page_lines = spot_lines[key]; polys = spot_coords.get(key, [])
@@ -248,18 +269,18 @@ for key in sorted(spot_lines.keys(), key=int):
         x_left = min(xs); y_top = min(ys) / SCALE
         y_bot = max(ys) / SCALE
         h_pt = (max(ys) - min(ys)) / SCALE
-        if y_top > 50: break
+        if y_top > _HDR_REGION_INITIAL: break
         pos = 'right' if x_left > page_width_px * 0.4 else 'left'
-        # Only add to merge candidates if it looks like a header line:
-        # - It's at header position (right side or short left-side text)
-        # - AND it's visually adjacent to the previous header line (if any)
-        is_hdr_like = (x_left > page_width_px * 0.4) or len(t) < 30
+        # Header-like: at header position (right side) or short text on left
+        # Use ratio-based check: real headers are much shorter than body lines
+        line_w = (max(xs) - min(xs)) / SCALE
+        is_hdr_like = (x_left > page_width_px * 0.4) or line_w < PW_PT * 0.6
         if header_region_lines:
             prev = header_region_lines[-1]
-            # Gap between previous header bottom and this line top
+            # Gap between previous header bottom and this line top (in px)
             gap_px = min(ys) - prev['y_bot_raw']
-            # Only merge if very close (within 30px ≈ 7pt) and also header-like
-            if gap_px > 30 or not is_hdr_like:
+            # Only merge if gap < dynamic threshold and also header-like
+            if gap_px > MERGE_GAP_PX or not is_hdr_like:
                 break
         elif not is_hdr_like:
             break
@@ -283,7 +304,6 @@ DEFAULT_RIGHT_HDR = max(right_hdr, key=right_hdr.get) if right_hdr else ''
 DEFAULT_LEFT_HDR = max(left_hdr, key=left_hdr.get) if left_hdr else ''
 RIGHT_HDR_H = statistics.median([v['h_pt'] for v in page_headers.values() if v['pos']=='right']) if right_hdr else 8
 LEFT_HDR_H = statistics.median([v['h_pt'] for v in page_headers.values() if v['pos']=='left']) if left_hdr else 9
-print(f"Headers: RIGHT='{DEFAULT_RIGHT_HDR}' h={RIGHT_HDR_H:.1f}pt  LEFT='{DEFAULT_LEFT_HDR}' h={LEFT_HDR_H:.1f}pt")
 
 # Header gaps: distance from header bottom to body text start, per position
 right_gaps = []; left_gaps = []
@@ -298,9 +318,9 @@ for key in sorted(spot_lines.keys(), key=int):
         if i >= len(polys) or not polys[i]: continue
         xs = [p[0] for p in polys[i]]; ys = [p[1] for p in polys[i]]
         xl, yt, yb = min(xs)/SCALE, min(ys)/SCALE, max(ys)/SCALE
-        if hdr_bot is None and (xl > 350 or (i==0 and len(t)<25 and yt<50)):
+        if hdr_bot is None and (xl > page_width_px*0.3 or (i==0 and len(t)<30 and yt<_HDR_REGION_INITIAL)):
             hdr_bot = yb; continue
-        if hdr_bot and body_y is None and xl < 400:
+        if hdr_bot and body_y is None and xl < page_width_px*0.4:
             body_y = yt; break
     if hdr_bot and body_y:
         gap = body_y - hdr_bot
@@ -308,6 +328,14 @@ for key in sorted(spot_lines.keys(), key=int):
         else: left_gaps.append(gap)
 RIGHT_HDR_GAP = statistics.median(right_gaps) if right_gaps else 38
 LEFT_HDR_GAP = statistics.median(left_gaps) if left_gaps else 40
+# Min header gap floor: half a body line height (dynamic, scales with font size)
+HDR_GAP_MIN = round(FONT_SIZE * 0.6) if FONT_SIZE else 6
+
+# Refined header region threshold: header bottom + 1.5× gap, derived from source
+_hdr_bot_pts = [v['h_pt'] for v in page_headers.values()]
+_hdr_gap_approx = statistics.median(right_gaps + left_gaps) if (right_gaps or left_gaps) else 38
+HDR_REGION_Y = (statistics.median(_hdr_bot_pts) if _hdr_bot_pts else 10) + _hdr_gap_approx * 1.5
+print(f"Headers: RIGHT='{DEFAULT_RIGHT_HDR}' h={RIGHT_HDR_H:.1f}pt  LEFT='{DEFAULT_LEFT_HDR}' h={LEFT_HDR_H:.1f}pt")
 
 # ── Per-page footnote gap from source ──
 page_fn_gap = {}  # key → gap in pt between body end and footnote start
@@ -591,13 +619,13 @@ for key in sorted(spot_lines.keys(), key=int):
                 # Reject narrow short lines at body-left position (e.g. continuation "命的。"③)
                 # Real headings span wider; narrow short lines at body-left are body continuations
                 min_heading_width = page_width_px * 0.35
-                if (ratio > 1.07 and 3 < len(t) < 28 and y_pt > 50
+                if (ratio > 1.07 and 3 < len(t) < 28 and y_pt > HDR_REGION_Y
                         and line_width_px > min_heading_width):
                     coord_heading = True
                     md_level = max(md_level, 2)  # treat as ## level
 
         # Missing header: if first body line is y>50, add default header from source position
-        if i == 0 and y_pt > 50 and not is_header:
+        if i == 0 and y_pt > HDR_REGION_Y and not is_header:
             hdr_info = page_headers.get(key)
             if hdr_info:
                 hdr_text = hdr_info['text']
@@ -614,7 +642,7 @@ for key in sorted(spot_lines.keys(), key=int):
                     result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont\\hfill ' + escape_tex(hdr_text) + '}\\par\\normalsize')
                 else:
                     result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont ' + escape_tex(hdr_text) + '}\\par\\normalsize')
-                result.append('\\vspace{' + str(max(int(hdr_gap), 20)) + 'pt}')
+                result.append('\\vspace{' + str(max(int(hdr_gap), HDR_GAP_MIN)) + 'pt}')
 
         is_running_hdr = is_header and not md_level
 
@@ -688,7 +716,7 @@ for key in sorted(spot_lines.keys(), key=int):
                     result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont\\hfill ' + escape_tex(hdr_render_text) + '}\\par\\normalsize')
                 else:
                     result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont ' + escape_tex(hdr_render_text) + '}\\par\\normalsize')
-                result.append('\\vspace{' + str(max(int(hdr_gap), 20)) + 'pt}')
+                result.append('\\vspace{' + str(max(int(hdr_gap), HDR_GAP_MIN)) + 'pt}')
             elif md_level >= 2 or coord_heading:
                 # Merge heading lines into one continuous text; LaTeX wraps naturally
                 # at the heading font size, matching the source document's layout.
