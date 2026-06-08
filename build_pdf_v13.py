@@ -139,6 +139,7 @@ all_line_h.sort()
 FONT_SIZE = round(all_line_h[len(all_line_h)//10] * 0.75) if all_line_h else 12
 # Font size = \linewidth ÷ max_body_chars, so longest body lines fit without wrapping
 max_cjk = 20
+body_cjk_list = []
 for k in spot_lines:
     for i, line in enumerate(spot_lines[k]):
         t = line.strip()
@@ -147,9 +148,17 @@ for k in spot_lines:
         polys = spot_coords.get(k, [])
         if i < len(polys) and polys[i] and min(p[0] for p in polys[i]) > page_width_px * 0.4: continue
         cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        if cjk > 10: body_cjk_list.append(cjk)
         if cjk > max_cjk: max_cjk = cjk
 AVAIL_WIDTH = PW_PT - 2 * (BODY_LEFT / SCALE)  # \linewidth in pt
 FONT_SIZE = max(10, min(14, round(AVAIL_WIDTH / max_cjk)))
+# Stretch threshold: 85% of median body CJK count → only genuine full-width lines get \makebox[s]
+if body_cjk_list:
+    body_cjk_list.sort()
+    _median_cjk = body_cjk_list[len(body_cjk_list)//2]
+    STRETCH_THRESHOLD = round(_median_cjk * 0.85)
+else:
+    STRETCH_THRESHOLD = 25
 
 body_widths_pt = []
 for k in spot_lines:
@@ -189,10 +198,10 @@ for k in spot_lines:
         s = h / (len(body_ys) * BASE_SKIP)
         body_area_stretches.append(s)
 BODY_STRETCH = round(statistics.median(body_area_stretches), 2) if body_area_stretches else 1.5
-BODY_STRETCH = max(1.0, min(1.8, BODY_STRETCH))
+BODY_STRETCH = max(1.4, min(1.8, BODY_STRETCH))
 
 width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
-CJK_STRETCH = 0.8  # high stretch so short lines can fill target width
+CJK_STRETCH = 0  # high stretch so short lines can fill target width
 
 MARGIN_PT = 20  # tight margins for max text width
 TARGET = PW_PT - 2 * MARGIN_PT  # \linewidth = target
@@ -225,28 +234,65 @@ START_PAGE = int(list(page_numbers.values())[0]) if page_numbers else 1
 
 print(f"FONT={FONT_SIZE}pt TARGET={TARGET}pt INDENT={INDENT_THRESHOLD_PX:.0f}px STRETCH={BODY_STRETCH}")
 
-# ── Auto-detect headers ──
-odd_headers = {}; even_headers = {}
+# ── Auto-detect headers per page ──
+# For each page, record: header text, position (left/right), line height (pt)
+page_headers = {}  # key → {'text': str, 'pos': 'left'|'right', 'h_pt': float}
 for key in sorted(spot_lines.keys(), key=int):
-    lines = spot_lines[key]; polys = spot_coords.get(key, [])
-    if not lines or not lines[0].strip(): continue
-    t0 = lines[0].strip()
-    if len(t0) > 25 or is_page_number(t0) or is_footnote_start(t0): continue
-    if 0 >= len(polys) or not polys[0]: continue
-    y0 = min(p[1] for p in polys[0]) / SCALE; x0 = min(p[0] for p in polys[0]) / SCALE
-    if y0 > 50: continue
-    if x0 > 200: odd_headers[t0] = odd_headers.get(t0, 0) + 1
-    else: even_headers[t0] = even_headers.get(t0, 0) + 1
+    page_lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    header_region_lines = []  # collect consecutive header-region lines for merging
+    for i, l in enumerate(page_lines):
+        t = l.strip()
+        if not t or is_page_number(t) or is_footnote_start(t): continue
+        if i >= len(polys) or not polys[i]: continue
+        xs = [p[0] for p in polys[i]]; ys = [p[1] for p in polys[i]]
+        x_left = min(xs); y_top = min(ys) / SCALE
+        y_bot = max(ys) / SCALE
+        h_pt = (max(ys) - min(ys)) / SCALE
+        if y_top > 50: break
+        pos = 'right' if x_left > page_width_px * 0.4 else 'left'
+        # Only add to merge candidates if it looks like a header line:
+        # - It's at header position (right side or short left-side text)
+        # - AND it's visually adjacent to the previous header line (if any)
+        is_hdr_like = (x_left > page_width_px * 0.4) or len(t) < 30
+        if header_region_lines:
+            prev = header_region_lines[-1]
+            # Gap between previous header bottom and this line top
+            gap_px = min(ys) - prev['y_bot_raw']
+            # Only merge if very close (within 30px ≈ 7pt) and also header-like
+            if gap_px > 30 or not is_hdr_like:
+                break
+        elif not is_hdr_like:
+            break
+        header_region_lines.append({'text': t, 'pos': pos, 'h_pt': h_pt,
+                                    'x_left': x_left, 'idx': i, 'y_bot_raw': max(ys)})
+        if len(header_region_lines) >= 3: break  # max 3 header lines to merge
+    if header_region_lines:
+        # Merge split headers: if multiple lines in header region, combine them
+        merged_text = ''.join(hl['text'] for hl in header_region_lines)
+        # Use the position from the first line (determines left/right alignment)
+        h0 = header_region_lines[0]
+        page_headers[key] = {'text': merged_text, 'pos': h0['pos'], 'h_pt': h0['h_pt'],
+                             'merge_indices': set(hl['idx'] for hl in header_region_lines)}
 
-DEFAULT_ODD_HDR = max(odd_headers, key=odd_headers.get) if odd_headers else ''
-DEFAULT_EVEN_HDR = max(even_headers, key=even_headers.get) if even_headers else ''
+# Defaults
+right_hdr = {}; left_hdr = {}
+for k, v in page_headers.items():
+    if v['pos'] == 'right': right_hdr[v['text']] = right_hdr.get(v['text'], 0) + 1
+    else: left_hdr[v['text']] = left_hdr.get(v['text'], 0) + 1
+DEFAULT_RIGHT_HDR = max(right_hdr, key=right_hdr.get) if right_hdr else ''
+DEFAULT_LEFT_HDR = max(left_hdr, key=left_hdr.get) if left_hdr else ''
+RIGHT_HDR_H = statistics.median([v['h_pt'] for v in page_headers.values() if v['pos']=='right']) if right_hdr else 8
+LEFT_HDR_H = statistics.median([v['h_pt'] for v in page_headers.values() if v['pos']=='left']) if left_hdr else 9
+print(f"Headers: RIGHT='{DEFAULT_RIGHT_HDR}' h={RIGHT_HDR_H:.1f}pt  LEFT='{DEFAULT_LEFT_HDR}' h={LEFT_HDR_H:.1f}pt")
 
-# Header gaps
-odd_gaps = []; even_gaps = []
+# Header gaps: distance from header bottom to body text start, per position
+right_gaps = []; left_gaps = []
 for key in sorted(spot_lines.keys(), key=int):
-    lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    page_lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    hdr_info = page_headers.get(key)
+    if not hdr_info: continue
     hdr_bot = body_y = None
-    for i, l in enumerate(lines):
+    for i, l in enumerate(page_lines):
         t = l.strip()
         if not t or is_page_number(t) or is_footnote_start(t): continue
         if i >= len(polys) or not polys[i]: continue
@@ -258,10 +304,134 @@ for key in sorted(spot_lines.keys(), key=int):
             body_y = yt; break
     if hdr_bot and body_y:
         gap = body_y - hdr_bot
-        if int(key) % 2 == 0: odd_gaps.append(gap)
-        else: even_gaps.append(gap)
-ODD_HDR_GAP = statistics.median(odd_gaps) if odd_gaps else 38
-EVEN_HDR_GAP = statistics.median(even_gaps) if even_gaps else 40
+        if hdr_info['pos'] == 'right': right_gaps.append(gap)
+        else: left_gaps.append(gap)
+RIGHT_HDR_GAP = statistics.median(right_gaps) if right_gaps else 38
+LEFT_HDR_GAP = statistics.median(left_gaps) if left_gaps else 40
+
+# ── Per-page footnote gap from source ──
+page_fn_gap = {}  # key → gap in pt between body end and footnote start
+for key in sorted(spot_lines.keys(), key=int):
+    page_lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    fn_start = None
+    for i, l in enumerate(page_lines):
+        t = l.strip()
+        if t and is_footnote_start(t):
+            fn_start = i; break
+    if fn_start is None: continue
+    # Body last line y
+    body_last_y = None
+    for i in range(fn_start - 1, -1, -1):
+        t = page_lines[i].strip()
+        if not t or len(t) <= 3 or is_page_number(t): continue
+        if i < len(polys) and polys[i]:
+            body_last_y = max(p[1] for p in polys[i]) / SCALE
+        break
+    # Footnote first line y
+    fn_first_y = None
+    if fn_start < len(polys) and polys[fn_start]:
+        fn_first_y = min(p[1] for p in polys[fn_start]) / SCALE
+    if body_last_y and fn_first_y:
+        page_fn_gap[key] = max(10, fn_first_y - body_last_y)
+
+FN_GAP_DEFAULT = statistics.median(list(page_fn_gap.values())) if page_fn_gap else 18
+print(f"Footnote gaps: per-page={len(page_fn_gap)} pages, default={FN_GAP_DEFAULT:.0f}pt")
+
+# ── Dynamic footnote params from source ──
+fn_line_heights = []   # line height in pt
+fn_line_gaps = []      # baseline-to-baseline gap in pt
+fn_marker_xs = []      # ① lines x_left in px
+fn_cont_xs = []        # continuation lines x_left in px
+body_left_xs = []      # body text x_left in px
+fn_char_densities = [] # pt per CJK char
+
+for key in sorted(spot_lines.keys(), key=int):
+    page_lines = spot_lines[key]; polys = spot_coords.get(key, [])
+    fn_start = None
+    for i, l in enumerate(page_lines):
+        t = l.strip()
+        if t and is_footnote_start(t):
+            fn_start = i; break
+    if fn_start is None: continue
+
+    # Body text left x (first few body lines)
+    for i in range(len(page_lines)):
+        t = page_lines[i].strip()
+        if not t or len(t) < 5: continue
+        if i >= len(polys) or not polys[i]: continue
+        poly = polys[i]
+        xl = min(p[0] for p in poly)
+        if xl > page_width_px * 0.5: continue
+        if not is_page_number(t) and not is_footnote_start(t):
+            body_left_xs.append(xl)
+            break
+
+    prev_yb = None
+    for i in range(fn_start, len(page_lines)):
+        t = page_lines[i].strip()
+        if not t: continue
+        if is_page_number(t): continue
+        if '学习理论' in t: continue
+        if i >= len(polys) or not polys[i]: continue
+        poly = polys[i]
+        xl = min(p[0] for p in poly)
+        yt = min(p[1] for p in poly) / SCALE
+        yb = max(p[1] for p in poly) / SCALE
+        h = yb - yt
+        w = (max(p[0] for p in poly) - min(p[0] for p in poly)) / SCALE
+
+        fn_line_heights.append(h)
+        if is_footnote_start(t):
+            fn_marker_xs.append(xl)
+        else:
+            fn_cont_xs.append(xl)
+        if prev_yb is not None:
+            fn_line_gaps.append(yt - prev_yb)
+        prev_yb = yb
+
+        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        if cjk > 15:
+            fn_char_densities.append(w / cjk)
+
+# Compute dynamic params
+FN_FONT_SIZE = round(statistics.median(fn_line_heights) * 0.78) if fn_line_heights else 6
+FN_BASELINE = round((statistics.median(fn_line_heights) + statistics.median(fn_line_gaps)) if fn_line_heights and fn_line_gaps else FN_FONT_SIZE * 1.5)
+
+body_x_median = statistics.median(body_left_xs) if body_left_xs else BODY_LEFT
+marker_x_median = statistics.median(fn_marker_xs) if fn_marker_xs else body_x_median + 40
+FN_INDENT_PX = max(0, marker_x_median - body_x_median)
+FN_INDENT_PT = round(FN_INDENT_PX / SCALE)
+
+if fn_char_densities:
+    fn_em = statistics.median(fn_char_densities)
+    fn_glue_em = max(0.02, (fn_em - FN_FONT_SIZE) / FN_FONT_SIZE)
+    FN_CJK_GLUE_BASE = f"{fn_glue_em:.2f}"
+    FN_CJK_GLUE = f"{fn_glue_em:.2f}em plus {fn_glue_em:.2f}em"
+else:
+    FN_CJK_GLUE_BASE = "0.08"
+    FN_CJK_GLUE = "0.08em plus 0.08em"
+
+# Footnote stretch threshold: justify full-width footnote lines like body text
+fn_cjk_list = []
+for k in spot_lines:
+    in_fn_block = False
+    for i, line in enumerate(spot_lines[k]):
+        t = line.strip()
+        if not t: continue
+        if is_footnote_start(t):
+            in_fn_block = True
+        elif is_page_number(t):
+            in_fn_block = False; continue
+        if not in_fn_block: continue
+        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        if cjk > 10: fn_cjk_list.append(cjk)
+if fn_cjk_list:
+    fn_cjk_list.sort()
+    FN_STRETCH_THRESHOLD = round(fn_cjk_list[len(fn_cjk_list)//2] * 0.85)
+else:
+    FN_STRETCH_THRESHOLD = 24
+
+print(f"Footnote params: font={FN_FONT_SIZE}pt baseline={FN_BASELINE}pt indent={FN_INDENT_PT}pt CJKglue={FN_CJK_GLUE}")
 
 # ── LaTeX header ──
 TOP_MARGIN_MM = 8.5
@@ -272,16 +442,18 @@ header = f"""\\documentclass[{int(FONT_SIZE)}pt]{{article}}
 \\usepackage{{fancyhdr}}
 \\setmainfont{{Noto Serif CJK SC}}
 \\setCJKmainfont{{Noto Serif CJK SC}}
+\\setCJKsansfont{{Noto Sans CJK SC}}
+\\setCJKfamilyfont{{kaiti}}{{AR PL KaitiM GB}}
 \\xeCJKsetup{{PunctStyle=kaiming}}
 \\setlength{{\\parindent}}{{0pt}}
-\\setstretch{{{BODY_STRETCH}}}
+\\linespread{{{BODY_STRETCH}}}
 \\setlength{{\\footskip}}{{30pt}}
 \\setcounter{{page}}{{{START_PAGE}}}
 \\pagestyle{{fancy}}
 \\fancyhf{{}}
 \\fancyfoot[C]{{\\large\\thepage}}
 \\renewcommand{{\\headrulewidth}}{{0pt}}
-\\renewcommand{{\\CJKglue}}{{\\hskip 0pt plus {CJK_STRETCH}em minus 0.02em}}
+\\renewcommand{{\\CJKglue}}{{\\hskip 0pt plus 0.6em minus 0em}}
 \\raggedbottom
 \\emergencystretch=2em
 \\tolerance=500
@@ -296,21 +468,24 @@ def fuzzy_key(text):
     t = t.replace(' ', '')
     return t[:20]  # first 20 chars as key
 
-# Watermarks: short text at very bottom of page, appearing on >30% pages
+# Watermarks: short repeated text in lower half, appearing on >25% pages
 watermark_texts = set()
 text_bottom_count = {}
 for k in spot_lines:
+    seen_this_page = set()
+    polys = spot_coords.get(k, [])
     for i, l in enumerate(spot_lines[k]):
         t = l.strip()
         if not t or len(t) < 3 or len(t) > 30: continue
         if is_page_number(t) or is_footnote_start(t): continue
-        polys = spot_coords.get(k, [])
-        if i >= len(polys) or not polys[i]: continue
-        y = max(p[1] for p in polys[i]) / SCALE
-        if y > PH_PT * 0.95:
-            text_bottom_count[t] = text_bottom_count.get(t, 0) + 1
+        if i < len(polys) and polys[i]:
+            y = max(p[1] for p in polys[i]) / SCALE
+            if y < PH_PT * 0.55: continue
+        if t in seen_this_page: continue
+        seen_this_page.add(t)
+        text_bottom_count[t] = text_bottom_count.get(t, 0) + 1
 for t, cnt in text_bottom_count.items():
-    if cnt >= len(spot_lines) * 0.3:
+    if cnt >= len(spot_lines) * 0.25:
         watermark_texts.add(t)
 if watermark_texts:
     print(f"Watermark filter: {len(watermark_texts)} patterns")
@@ -345,27 +520,27 @@ for key in sorted(spot_lines.keys(), key=int):
                 paras.append(cur); cur = []
             cur.append(item)
         if cur: paras.append(cur)
-        # Merge fragment paragraphs: if a para is just one very short line (<5 chars),
-        # merge it into the NEXT paragraph (cross-page sentence continuation)
-        merged = []
-        i = 0
-        while i < len(paras):
-            if i + 1 < len(paras) and len(paras[i]) == 1 and len(paras[i][0]['text']) < 5:
-                # Merge this fragment into next paragraph
-                merged.append(paras[i] + paras[i+1])
-                i += 2
-            else:
-                merged.append(paras[i])
-                i += 1
-
-        for para in merged:
-            para_text = ''.join(item['text'] for item in para)
-            has_indent = para[0]['indent']
-            prefix = '\\hspace*{2em}' if has_indent else ''
-            result.append(prefix + escape_tex(para_text) + '\\par')
+        for para in paras:
+            for idx, item in enumerate(para):
+                prefix = '\\hspace*{2em}' if item['indent'] else ''
+                txt = item['text']
+                cjk_count = item['cjk']
+                # Only stretch genuine full-width lines (CJK > STRETCH_THRESHOLD).
+                # Short/partial lines like "科学性"的理论实质集中概括为：" (CJK≈22)
+                # should keep natural spacing, not be stretched to \linewidth.
+                if cjk_count > STRETCH_THRESHOLD:
+                    result.append('\\makebox[\\linewidth][s]{' + prefix + escape_tex(txt) + '}\\par')
+                else:
+                    result.append(prefix + escape_tex(txt) + '\\par')
         body_buf.clear()
 
+    skip_lines = set()
+    # Get merged header indices for this page — skip those lines in render loop
+    hdr_merge = page_headers.get(key, {}).get('merge_indices', set())
     for i in range(len(lines)):
+        if i in skip_lines: continue
+        # Skip lines that are part of a merged header (already rendered with first line)
+        if i in hdr_merge and i > min(hdr_merge): continue
         t = lines[i].strip()
         if t in watermark_texts: continue
         t = lines[i].strip()
@@ -381,6 +556,15 @@ for key in sorted(spot_lines.keys(), key=int):
 
         if is_page_number(t): continue
 
+        # ── Footnote continuation (must be BEFORE heading detection) ──
+        if in_fn and not is_footnote_start(t):
+            cjk_fn = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+            if cjk_fn > FN_STRETCH_THRESHOLD:
+                result.append('\\makebox[\\linewidth][s]{' + escape_tex(t) + '}\\par')
+            else:
+                result.append(escape_tex(t) + '\\par')
+            continue
+
         # ── MD-based heading detection ──
         md_level = is_heading_by_md(t, md_headings)
         is_header = (x_left > page_width_px * 0.4) or (i == 0 and len(t) < 25 and y_pt < 50)
@@ -389,7 +573,9 @@ for key in sorted(spot_lines.keys(), key=int):
         coord_heading = False
         if i < len(polys) and polys[i] and not is_header and not is_footnote_start(t):
             ys_h = [p[1] for p in polys[i]]
+            xs_h = [p[0] for p in polys[i]]
             h = max(ys_h) - min(ys_h)
+            line_width_px = max(xs_h) - min(xs_h)
             # Get body avg height from surrounding lines
             body_hs = []
             for j in range(max(0,i-5), min(len(lines), i+6)):
@@ -402,26 +588,39 @@ for key in sorted(spot_lines.keys(), key=int):
             if body_hs:
                 body_h_avg = sum(body_hs) / len(body_hs)
                 ratio = h / body_h_avg if body_h_avg > 0 else 1.0
-                if ratio > 1.06 and 3 < len(t) < 25 and y_pt > 50:
+                # Reject narrow short lines at body-left position (e.g. continuation "命的。"③)
+                # Real headings span wider; narrow short lines at body-left are body continuations
+                min_heading_width = page_width_px * 0.35
+                if (ratio > 1.07 and 3 < len(t) < 28 and y_pt > 50
+                        and line_width_px > min_heading_width):
                     coord_heading = True
                     md_level = max(md_level, 2)  # treat as ## level
 
-        # Missing header
+        # Missing header: if first body line is y>50, add default header from source position
         if i == 0 and y_pt > 50 and not is_header:
-            hdr_text = DEFAULT_ODD_HDR if int(key) % 2 == 0 else DEFAULT_EVEN_HDR
-            if hdr_text:
-                gap = ODD_HDR_GAP if int(key) % 2 == 0 else EVEN_HDR_GAP
+            hdr_info = page_headers.get(key)
+            if hdr_info:
+                hdr_text = hdr_info['text']
+                hdr_pos = hdr_info['pos']
+            else:
                 if int(key) % 2 == 0:
-                    result.append('{\\footnotesize\\hfill ' + escape_tex(hdr_text) + '\\hfill\\null}\\par')
+                    hdr_text = DEFAULT_RIGHT_HDR; hdr_pos = 'right'
                 else:
-                    result.append('{\\footnotesize ' + escape_tex(hdr_text) + '}\\par')
-                result.append('\\vspace{' + str(int(gap)) + 'pt}')
+                    hdr_text = DEFAULT_LEFT_HDR; hdr_pos = 'left'
+            hdr_gap = RIGHT_HDR_GAP if hdr_pos == 'right' else LEFT_HDR_GAP
+            hdr_size = round(RIGHT_HDR_H * 0.75) if hdr_pos == 'right' else round(LEFT_HDR_H * 0.75)
+            if hdr_text:
+                if hdr_pos == 'right':
+                    result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont\\hfill ' + escape_tex(hdr_text) + '}\\par\\normalsize')
+                else:
+                    result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont ' + escape_tex(hdr_text) + '}\\par\\normalsize')
+                result.append('\\vspace{' + str(max(int(hdr_gap), 20)) + 'pt}')
 
         is_running_hdr = is_header and not md_level
 
         if md_level >= 2 or is_running_hdr or coord_heading:
             flush_body()
-            if in_fn: result.append('}\\par'); in_fn = False
+            if in_fn: result.append('}'); in_fn = False
 
             # Compute height ratio for THIS heading line
             heading_ratio = 1.0
@@ -439,39 +638,85 @@ for key in sorted(spot_lines.keys(), key=int):
                 body_avg = sum(body_hs)/len(body_hs) if body_hs else h_h
                 heading_ratio = h_h / body_avg if body_avg > 0 else 1.0
 
-            if heading_ratio > 1.2:
-                font_cmd = '\\Large'
-            elif heading_ratio > 1.1:
-                font_cmd = '\\large'
-            elif heading_ratio > 0.85:
-                font_cmd = '\\normalsize'
-            else:
-                font_cmd = '\\footnotesize'
+            # Font size from heading ratio × body FONT_SIZE (relative scaling)
+            # Ensures headings scale correctly relative to body text in our output
+            heading_font_size = max(FONT_SIZE, round(FONT_SIZE * heading_ratio))
+
+            # Merge consecutive heading lines: OCR may split a long heading into
+            # multiple spotting lines. Strategy: use markdown headings as ground truth.
+            # If the OCR text is a prefix of a markdown heading, merge subsequent OCR
+            # lines until the markdown heading is fully covered.
+            heading_lines = [t]
+            norm_t = re.sub(r'\s+', '', t).replace('“', '“').replace('”', '”').replace('‘', '‘').replace('’', '’')
+            target_h_norm = None
+            for h_text, level in md_headings:
+                h_norm = re.sub(r'\s+', '', h_text).replace('“', '“').replace('”', '”')
+                # OCR text is a strict prefix of a markdown heading
+                if len(norm_t) > 8 and len(h_norm) > len(norm_t) and h_norm.startswith(norm_t):
+                    target_h_norm = h_norm
+                    break
+            if target_h_norm:
+                accumulated = norm_t
+                j = i + 1
+                while j < len(lines) and accumulated != target_h_norm:
+                    tj = lines[j].strip()
+                    if not tj or len(tj) < 2: break
+                    if is_page_number(tj) or is_footnote_start(tj): break
+                    norm_tj = re.sub(r'\s+', '', tj).replace('“', '“').replace('”', '”')
+                    new_acc = accumulated + norm_tj
+                    if target_h_norm.startswith(new_acc):
+                        heading_lines.append(tj)
+                        skip_lines.add(j)
+                        accumulated = new_acc
+                        j += 1
+                    else:
+                        break
 
             if is_running_hdr:
-                if x_left > page_width_px * 0.4:
-                    result.append('{' + font_cmd + '\\hfill ' + escape_tex(t) + '\\hfill\\null}\\par\\normalsize')
+                # Use merged header text from page_headers if available
+                hdr_info = page_headers.get(key)
+                if hdr_info and i == min(hdr_merge) if hdr_merge else i == 0:
+                    # This is the primary header line — use merged text
+                    hdr_render_text = hdr_info['text'] if hdr_info else t
                 else:
-                    result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\normalsize')
+                    hdr_render_text = t
+                # Consistent font size: use same formula for all headers
+                hdr_pos = 'right' if x_left > page_width_px * 0.4 else 'left'
+                hdr_size = round(RIGHT_HDR_H * 0.75) if hdr_pos == 'right' else round(LEFT_HDR_H * 0.75)
+                hdr_gap = RIGHT_HDR_GAP if hdr_pos == 'right' else LEFT_HDR_GAP
+                if hdr_pos == 'right':
+                    result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont\\hfill ' + escape_tex(hdr_render_text) + '}\\par\\normalsize')
+                else:
+                    result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont ' + escape_tex(hdr_render_text) + '}\\par\\normalsize')
+                result.append('\\vspace{' + str(max(int(hdr_gap), 20)) + 'pt}')
             elif md_level >= 2 or coord_heading:
-                result.append('\\par\\vspace{8pt}\\noindent{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\vspace{4pt}\\normalsize')
+                # Merge heading lines into one continuous text; LaTeX wraps naturally
+                # at the heading font size, matching the source document's layout.
+                heading_text = ''.join(heading_lines)
+                result.append('\\par\\vspace{10pt}\\noindent{\\CJKfamily{kaiti}\\fontsize{' + str(heading_font_size) + 'pt}{' + str(round(heading_font_size*1.5)) + 'pt}\\selectfont ' + escape_tex(heading_text) + '}\\par\\vspace{6pt}\\normalfont\\normalsize')
             else:
-                result.append('{' + font_cmd + ' ' + escape_tex(t) + '}\\par\\normalsize')
+                heading_text = ''.join(heading_lines)
+                result.append('{\\CJKfamily{kaiti}\\fontsize{' + str(heading_font_size) + 'pt}{1em}\\selectfont ' + escape_tex(heading_text) + '}\\par\\normalfont\\normalsize')
             continue
 
         # Footnote
         if is_footnote_start(t):
             flush_body()
             if not fn_rule_added:
-                result.append('\\vfill\\smallskip\\hrule\\smallskip')
-                result.append('{\\footnotesize')
+                fn_gap = page_fn_gap.get(key, FN_GAP_DEFAULT)
+                result.append('\\vspace{' + str(int(fn_gap)) + 'pt}\\hrule\\vspace{3pt}')
+                # All footnote params dynamically computed from source document
+                # CJK glue with generous stretch so \makebox[s] can fill \linewidth
+                # Short lines use \par (single-line paragraph) so stretch is unused
+                result.append('{\\fontsize{' + str(FN_FONT_SIZE) + 'pt}{' + str(FN_BASELINE) + 'pt}\\selectfont\\renewcommand{\\CJKglue}{\\hskip ' + FN_CJK_GLUE_BASE + 'em plus 1em}')
                 fn_rule_added = True
             in_fn = True
-            result.append('\\mbox{' + escape_tex(t) + '}\\\\')
-            continue
-
-        if in_fn:
-            result.append('\\mbox{' + escape_tex(t) + '}\\\\')
+            # ① lines: indented from body left (dynamically computed from source x coords)
+            cjk_fn = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+            if cjk_fn > FN_STRETCH_THRESHOLD:
+                result.append('\\makebox[\\linewidth][s]{\\hspace{' + str(FN_INDENT_PT) + 'pt}' + escape_tex(t) + '}\\par')
+            else:
+                result.append('\\hspace{' + str(FN_INDENT_PT) + 'pt}' + escape_tex(t) + '\\par')
             continue
 
         # Body — buffer for paragraph grouping
@@ -481,7 +726,7 @@ for key in sorted(spot_lines.keys(), key=int):
         })
 
     flush_body()
-    if in_fn: result.append('}\\par')
+    if in_fn: result.append('}')
     result.append('\\par\\newpage')
     all_tex.append('\n'.join(result))
 
