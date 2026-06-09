@@ -77,100 +77,154 @@ class PDFProcessor:
         return lines, polys
 
     def _run_api_ocr_sync(self, pdf_path: str, work_dir: str):
-        """Full spotting OCR: extract lines + coords, generate markdown for v13."""
-        import requests, time, json as json_mod, fitz, re
+        """Full spotting OCR with auto PNG conversion for JPEG PDFs."""
+        import requests, time, json as json_mod, fitz
 
-        # Read token
         tok_file = "/tmp/paddle_token"
         if not os.path.exists(tok_file):
             raise RuntimeError("PaddleOCR token not found at /tmp/paddle_token")
         tok = open(tok_file).read().strip()
 
+        # Check if PDF has JPEG images → needs per-page PNG conversion
+        doc = fitz.open(pdf_path)
+        needs_png = False
+        for pi in range(min(3, doc.page_count)):
+            for img in doc[pi].get_images(full=True):
+                if img[2] > 1 or (img[8] and 'DCT' in str(img[8])):
+                    needs_png = True; break
+            if needs_png: break
+        total_pages = doc.page_count
+        doc.close()
+
+        if needs_png:
+            all_lines, all_coords = self._ocr_via_png(pdf_path, work_dir, total_pages, tok)
+        else:
+            JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+            headers = {"Authorization": "bearer " + tok}
+            payload = {
+                "model": "PaddleOCR-VL-1.6",
+                "optionalPayload": json_mod.dumps({
+                    "useDocOrientationClassify": False, "useDocUnwarping": False,
+                    "useChartRecognition": False, "useLayoutDetection": False,
+                    "promptLabel": "spotting", "temperature": 0,
+                }),
+            }
+            raw = self._submit_and_poll(JOB_URL, headers, payload, pdf_path)
+            all_lines, all_coords = self._parse_jsonl_response(raw)
+
+        return self._save_ocr_files(all_lines, all_coords, work_dir)
+
+    def _submit_and_poll(self, url, headers, payload, file_path):
+        """Submit file to OCR API, poll until done, return raw response text."""
+        import requests, time
+        with open(file_path, "rb") as f:
+            r = requests.post(url, headers=headers, data=payload, files={"file": f})
+        r.raise_for_status()
+        job_id = r.json()["data"]["jobId"]
+        while True:
+            r = requests.get(url + "/" + job_id, headers=headers)
+            r.raise_for_status()
+            d = r.json()
+            if d["data"]["state"] == "done":
+                rr = requests.get(d["data"]["resultUrl"]["jsonUrl"])
+                rr.raise_for_status()
+                return rr.text
+            elif d["data"]["state"] == "failed":
+                raise RuntimeError("OCR failed: " + d["data"].get("errorMsg", "unknown"))
+            time.sleep(5)
+
+    def _ocr_via_png(self, pdf_path, work_dir, total_pages, tok):
+        """Convert each page to PNG, submit individually, merge results."""
+        import fitz, os
         JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
         headers = {"Authorization": "bearer " + tok}
+        import json as json_mod
         payload = {
             "model": "PaddleOCR-VL-1.6",
             "optionalPayload": json_mod.dumps({
-                "useDocOrientationClassify": False,
-                "useDocUnwarping": False,
-                "useChartRecognition": False,
-                "useLayoutDetection": False,
-                "promptLabel": "spotting",
-                "temperature": 0,
+                "useDocOrientationClassify": False, "useDocUnwarping": False,
+                "useChartRecognition": False, "useLayoutDetection": False,
+                "promptLabel": "spotting", "temperature": 0,
             }),
         }
-
-        # Submit
-        with open(pdf_path, "rb") as f:
-            r = requests.post(JOB_URL, headers=headers, data=payload, files={"file": f})
-        r.raise_for_status()
-        job_id_api = r.json()["data"]["jobId"]
-
-        # Poll
-        while True:
-            r = requests.get(JOB_URL + "/" + job_id_api, headers=headers)
-            r.raise_for_status()
-            d = r.json()
-            state = d["data"]["state"]
-            if state == "done":
-                jsonl_url = d["data"]["resultUrl"]["jsonUrl"]
-                break
-            elif state == "failed":
-                raise RuntimeError("OCR failed: " + d["data"]["errorMsg"])
-            time.sleep(5)
-
-        # Download and parse — extract lines, coords like run_spotting_ocr.py
-        rr = requests.get(jsonl_url)
-        rr.raise_for_status()
-
+        doc = fitz.open(pdf_path)
         all_lines, all_coords = {}, {}
-        for page_idx, line in enumerate(rr.text.strip().split("\n")):
+        for pi in range(total_pages):
+            pix = doc[pi].get_pixmap(dpi=200)
+            png_path = os.path.join(work_dir, f"page_{pi:03d}.png")
+            pix.save(png_path)
+            raw = self._submit_and_poll(JOB_URL, headers, payload, png_path)
+            pl, pp = self._parse_jsonl_single_page(raw)
+            all_lines[str(pi)] = pl
+            all_coords[str(pi)] = pp
+            os.unlink(png_path)
+        doc.close()
+        return all_lines, all_coords
+
+    def _parse_jsonl_single_page(self, raw_text):
+        """Parse a single page from JSONL response."""
+        import json as json_mod
+        pl, pp = [], []
+        for line in raw_text.strip().split("\n"):
             line = line.strip()
             if not line: continue
             result = json_mod.loads(line)["result"]
-            pl, pp = [], []
-            for res in result.get("layoutParsingResults", []):
-                pr = res.get("layoutParsingResult", {})
-                blocks = pr.get("parsing_res_list", [])
-                if not blocks:
-                    blocks = pr.get("prunedResult", {}).get("parsing_res_list", [])
-                if not blocks:
-                    blocks = res.get("parsing_res_list", [])
-                if blocks:
-                    for blk in blocks:
-                        bl, bp = self._parse_spotting_block(blk)
-                        pl.extend(bl)
-                        pp.extend(bp)
-                else:
-                    sr = res.get("spotting_res") or pr.get("spotting_res")
-                    if sr:
-                        pl.extend(sr.get("rec_texts", []))
-                        pp.extend(sr.get("rec_polys", []))
+            pl, pp = self._extract_spotting(result, pl, pp)
+        pp = [[[round(c, 1) for c in pt] for pt in p] if p else None for p in pp]
+        return pl, pp
+
+    def _parse_jsonl_response(self, raw_text):
+        """Parse multi-page JSONL response."""
+        import json as json_mod
+        all_lines, all_coords = {}, {}
+        for page_idx, line in enumerate(raw_text.strip().split("\n")):
+            line = line.strip()
+            if not line: continue
+            result = json_mod.loads(line)["result"]
+            pl, pp = self._extract_spotting(result, [], [])
             all_lines[str(page_idx)] = pl
             all_coords[str(page_idx)] = [
                 [[round(c, 1) for c in pt] for pt in p] if p else None for p in pp
             ]
+        return all_lines, all_coords
 
-        # Save spotting_lines.json and spotting_coords.json
+    def _extract_spotting(self, result, pl, pp):
+        """Extract spotting lines and polys from a result dict."""
+        for res in result.get("layoutParsingResults", []):
+            pr = res.get("layoutParsingResult", {})
+            pruned = res.get("prunedResult", {})
+            sr = pruned.get("spotting_res") or pr.get("spotting_res") or res.get("spotting_res")
+            if sr and isinstance(sr, dict) and sr.get("rec_texts"):
+                pl.extend(sr["rec_texts"])
+                pp.extend(sr.get("rec_polys", []))
+            else:
+                blocks = pr.get("parsing_res_list", []) or pruned.get("parsing_res_list", [])
+                if not blocks:
+                    blocks = res.get("parsing_res_list", [])
+                for blk in blocks:
+                    bl, bp = self._parse_spotting_block(blk)
+                    pl.extend(bl)
+                    pp.extend(bp)
+        return pl, pp
+
+    def _save_ocr_files(self, all_lines, all_coords, work_dir):
+        """Save spotting JSON files and generate markdown. Return file paths."""
         lines_path = os.path.join(work_dir, "spotting_lines.json")
         coords_path = os.path.join(work_dir, "spotting_coords.json")
         with open(lines_path, "w", encoding="utf-8") as f:
             json.dump(all_lines, f, ensure_ascii=False, indent=2)
         with open(coords_path, "w", encoding="utf-8") as f:
             json.dump(all_coords, f, ensure_ascii=False, indent=2)
-
-        # Generate markdown from spotting lines for heading detection
         md_lines = []
         for k in sorted(all_lines.keys(), key=int):
             for ln in all_lines[k]:
                 t = ln.strip()
                 if not t: continue
                 md_lines.append(t)
-            md_lines.append("")  # page break
+            md_lines.append("")
         md_path = os.path.join(work_dir, "ocr_markdown.md")
         with open(md_path, "w", encoding="utf-8") as f:
             f.write("\n".join(md_lines))
-
         return lines_path, coords_path, md_path
 
     def _blocks_to_markdown(self, blocks: list) -> str:
