@@ -947,6 +947,12 @@ for key in sorted(spot_lines.keys(), key=int):
     lines = spot_lines[key]; polys = spot_coords.get(key, [])
     result = []
 
+    # Detect TOC pages: these should render ragged (no stretch) to avoid
+    # ugly justification of "标题 …… 页码" entries with huge inter-char gaps.
+    is_toc_page = (any('目录' in l for l in lines)
+                   or sum(1 for l in lines
+                          if re.search(r'[…\.]{2,}\s*\d{1,4}\s*$', l.strip())) >= 3)
+
     this_body = ''.join(l.strip() for l in lines if l.strip() and not is_page_number(l.strip()) and not is_footnote_start(l.strip()))
     is_duplicate = (prev_body_text == this_body) and len(this_body) > 50
     prev_body_text = this_body
@@ -1050,7 +1056,7 @@ for key in sorted(spot_lines.keys(), key=int):
                     _font_open = '{\\bfseries'; _font_close = '}'
                 elif _fb:
                     _font_open = _font_open.rstrip('}') + '\\bfseries' + _font_close
-                if cjk_count > STRETCH_THRESHOLD:
+                if cjk_count > STRETCH_THRESHOLD and not is_toc_page:
                     result.append('\\makebox[\\linewidth][s]{' + prefix + _font_open + escape_tex(txt) + _font_close + '}\\par')
                 else:
                     result.append(prefix + _font_open + escape_tex(txt) + _font_close + '\\par')
@@ -1110,7 +1116,8 @@ for key in sorted(spot_lines.keys(), key=int):
         # Disabled in text-layer mode: OCR coordinates / SCALE are unreliable and cause
         # full-width body lines to be falsely detected as headings (adding extra vspace).
         coord_heading = False
-        if (not has_text_layer and key in content_page_keys and i < len(polys)
+        if (not has_text_layer and key in content_page_keys and not is_toc_page
+                and i < len(polys)
                 and polys[i] and not is_header and not is_footnote_start(t)):
             ys_h = [p[1] for p in polys[i]]
             xs_h = [p[0] for p in polys[i]]
@@ -1159,7 +1166,7 @@ for key in sorted(spot_lines.keys(), key=int):
         # Replaces font classifier-based detection.
         # Run even when md_level>0 to allow pattern-based font override.
         # Only on content pages — skip covers, CIP, copyright pages.
-        if key in content_page_keys and not is_header and not is_footnote_start(t):
+        if key in content_page_keys and not is_toc_page and not is_header and not is_footnote_start(t):
             # Compute body height average for coord_heading detection
             body_hs = []
             for j in range(max(0,i-5), min(len(lines), i+6)):
