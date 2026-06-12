@@ -1012,6 +1012,14 @@ for key in sorted(spot_lines.keys(), key=int):
         if re.match(r'^[(（][一二三四五六七八九十\d]+[)）]', t):
             return 'L3', 2
 
+        # L3: Chinese numeral without separator (e.g., "二驳斥杜林...", "一澄清杜林...")
+        # Requires visual height confirmation (>1.15× body) to avoid body-text false
+        # positives like "一般而言...", "一切...".
+        if len(t) >= 5 and re.match(r'^[一二三四五六七八九十百]+', t):
+            _r3 = h / body_h_avg if body_h_avg > 0 else 1.0
+            if _r3 > 1.15:
+                return 'L3', 2
+
         # coord_heading: visually tall line (height ratio)
         # Must be short (real headings are short, not full sentences)
         # Skip body fragments ending with sentence punctuation
