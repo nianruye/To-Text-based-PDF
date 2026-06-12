@@ -28,6 +28,16 @@ def is_page_number(t):
     if re.match(r'^[·•‧]?\s*\d{1,4}\s*[·•‧]?$', s): return True
     return bool(re.match(r'^\d{1,4}$', s)) and len(s) <= 4
 
+def is_toc_entry(t):
+    """Detect TOC (table of contents) entries: lines with leader dots + page number."""
+    return bool(re.search(r'[…\.]{2,}\s*\d{1,4}\s*$', t.strip()))
+
+def is_body_fragment(t):
+    """Short body text fragments (paragraph endings) ending with sentence punctuation.
+    Real headings rarely end with 。！？ etc."""
+    s = t.strip()
+    return len(s) <= 10 and s and s[-1] in '。！？；：…'
+
 def is_footnote_start(t):
     return bool(t.strip()) and t.strip()[0] in FN_CIRCLE
 
@@ -950,6 +960,10 @@ for key in sorted(spot_lines.keys(), key=int):
         if not (1 < len(t) < 45 and y_pt > HDR_REGION_Y):
             return None, 0
 
+        # Skip TOC entries: lines with leader dots + page number
+        if is_toc_entry(t):
+            return None, 0
+
         # L1: 第X章/节/部分/编/篇 (chapter-level) - must be short to avoid false positives
         if re.match(r'^第[一二三四五六七八九十百千零\d]+[章节部分编篇]', t) and len(t) < 20:
             return 'L1', 2
@@ -975,13 +989,20 @@ for key in sorted(spot_lines.keys(), key=int):
             return 'L3', 2
 
         # coord_heading: visually tall line (height ratio)
-        if body_h_avg > 0 and h / body_h_avg > COORD_HEADING_RATIO and line_w_px > MIN_HEADING_WIDTH:
+        # Must be short (real headings are short, not full sentences)
+        # Skip body fragments ending with sentence punctuation
+        if (body_h_avg > 0 and h / body_h_avg > COORD_HEADING_RATIO
+                and line_w_px > MIN_HEADING_WIDTH and len(t) <= 15
+                and not is_body_fragment(t)):
             return 'coord_heading', 2
 
-        # centered short line
+        # centered short line: require BOTH centered AND tall (height ratio > 1.1)
+        # to avoid false positives from narrow body text fragments
         x_center = x_left + line_w_px / 2
         page_center = page_width_px / 2
-        if abs(x_center - page_center) < page_width_px * 0.1 and len(t) < 20:
+        _r = h / body_h_avg if body_h_avg > 0 else 1.0
+        if (abs(x_center - page_center) < page_width_px * 0.1
+                and 4 < len(t) <= 15 and _r > 1.1):
             return 'centered', 2
 
         return None, 0
@@ -1101,8 +1122,11 @@ for key in sorted(spot_lines.keys(), key=int):
                 # Reject narrow short lines at body-left position (e.g. continuation "命的。"③)
                 # Real headings span wider; narrow short lines at body-left are body continuations
                 min_heading_width = MIN_HEADING_WIDTH
-                if (ratio > COORD_HEADING_RATIO and 2 < len(t) < 28 and y_pt > HDR_REGION_Y
-                        and line_width_px > min_heading_width):
+                # coord_heading: tall line, but MUST be short (real headings are short,
+                # not full sentences). Excludes body text with OCR height noise.
+                if (ratio > COORD_HEADING_RATIO and 2 <= len(t) <= 15 and y_pt > HDR_REGION_Y
+                        and line_width_px > min_heading_width
+                        and not is_toc_entry(t) and not is_body_fragment(t)):
                     coord_heading = True
                     md_level = max(md_level, 2)  # treat as ## level
 
@@ -1125,7 +1149,8 @@ for key in sorted(spot_lines.keys(), key=int):
         # Use pattern library + visual signals to detect headings.
         # Replaces font classifier-based detection.
         # Run even when md_level>0 to allow pattern-based font override.
-        if not is_header and not is_footnote_start(t):
+        # Only on content pages — skip covers, CIP, copyright pages.
+        if key in content_page_keys and not is_header and not is_footnote_start(t):
             # Compute body height average for coord_heading detection
             body_hs = []
             for j in range(max(0,i-5), min(len(lines), i+6)):
