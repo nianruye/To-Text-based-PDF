@@ -1366,6 +1366,31 @@ for key in sorted(spot_lines.keys(), key=int):
                     else:
                         break
 
+            # ── Structural heading merge (scan PDFs, no text layer) ──
+            # When OCR splits a long heading across lines, merge continuation
+            # lines that share the heading's (large) font height. Body text
+            # has smaller font height, so it stops the merge — no false merges.
+            if not has_text_layer and len(heading_lines) == 1 and i < len(polys) and polys[i]:
+                _heading_h = max(p[1] for p in polys[i]) - min(p[1] for p in polys[i])
+                _merge_j = i + 1
+                while _merge_j < len(lines) and _merge_j - i <= 3:
+                    _mt = lines[_merge_j].strip()
+                    if not _mt or len(_mt) > 25: break
+                    if is_page_number(_mt) or is_footnote_start(_mt): break
+                    if _mt[-1] in '。！？': break  # sentence end → body, not heading tail
+                    # Stop at any new heading pattern
+                    if re.match(r'^第[一二三四五六七八九十百千零\d]+[章节部分编篇]', _mt): break
+                    if re.match(r'^[\d]+[.．、]', _mt): break
+                    if re.match(r'^专题', _mt): break
+                    if re.match(r'^[一二三四五六七八九十]+[.．、""""]', _mt): break
+                    # Must share the heading's large font height
+                    if _merge_j < len(polys) and polys[_merge_j]:
+                        _mh = max(p[1] for p in polys[_merge_j]) - min(p[1] for p in polys[_merge_j])
+                        if _mh < _heading_h * 0.85: break
+                    heading_lines.append(_mt)
+                    skip_lines.add(_merge_j)
+                    _merge_j += 1
+
             if is_running_hdr:
                 # Use merged header text from page_headers if available
                 hdr_info = page_headers.get(key)
