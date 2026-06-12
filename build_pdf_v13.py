@@ -33,10 +33,12 @@ def is_toc_entry(t):
     return bool(re.search(r'[…\.]{2,}\s*\d{1,4}\s*$', t.strip()))
 
 def is_body_fragment(t):
-    """Short body text fragments (paragraph endings) ending with sentence punctuation.
-    Real headings rarely end with 。！？ etc."""
+    """Short body text fragments (paragraph endings) ending with sentence punctuation
+    or a footnote marker. Real headings rarely end with 。！？ or ①②③."""
     s = t.strip()
-    return len(s) <= 10 and s and s[-1] in '。！？；：…'
+    if not (s and len(s) <= 10):
+        return False
+    return s[-1] in '。！？；：…' or s[-1] in FN_CIRCLE
 
 def is_footnote_start(t):
     return bool(t.strip()) and t.strip()[0] in FN_CIRCLE
@@ -413,6 +415,12 @@ else:
 _heading_body_ratio = statistics.median(_src_heading_hs) / statistics.median(_src_body_hs) if _src_heading_hs and _src_body_hs else 1.07
 COORD_HEADING_RATIO = max(_heading_body_ratio, _noise_p95)
 COORD_HEADING_RATIO = round(COORD_HEADING_RATIO, 3)
+# Floor: OCR height noise on scanned pages is typically <20%, so a body line may
+# read up to ~1.15x the body average purely from noise. Real headings are ≥30%
+# taller. Floor the dynamic ratio at 1.25 to suppress body-text false positives
+# (e.g. "思想的有害影响" r=1.14, "命的。"③ r=1.10) while keeping genuine tall
+# headings (e.g. "导论" r=1.32, "写作的时代背景及其问题意识" r=1.45).
+COORD_HEADING_RATIO = max(COORD_HEADING_RATIO, 1.25)
 # Min heading width: below min actual heading width (rejects narrow body continuation lines)
 MIN_HEADING_WIDTH = (min(_src_heading_widths) * 0.8) if _src_heading_widths else page_width_px * 0.35
 print(f"Source-derived thresholds: heading_ratio={COORD_HEADING_RATIO:.3f} min_heading_w={MIN_HEADING_WIDTH:.0f}px")
@@ -1102,7 +1110,8 @@ for key in sorted(spot_lines.keys(), key=int):
         # Disabled in text-layer mode: OCR coordinates / SCALE are unreliable and cause
         # full-width body lines to be falsely detected as headings (adding extra vspace).
         coord_heading = False
-        if not has_text_layer and i < len(polys) and polys[i] and not is_header and not is_footnote_start(t):
+        if (not has_text_layer and key in content_page_keys and i < len(polys)
+                and polys[i] and not is_header and not is_footnote_start(t)):
             ys_h = [p[1] for p in polys[i]]
             xs_h = [p[0] for p in polys[i]]
             h = max(ys_h) - min(ys_h)
