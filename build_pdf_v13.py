@@ -40,6 +40,15 @@ def is_body_fragment(t):
         return False
     return s[-1] in '。！？；：…' or s[-1] in FN_CIRCLE
 
+def is_toc_entry_start(t):
+    """Detect the start of a new TOC entry (for flushing no-number continuations)."""
+    s = t.strip()
+    return bool(re.match(
+        r'^(第[一二三四五六七八九十百千零\d]+[章节部分编篇]'
+        r'|专题[一二三四五六七八九十\d]+'
+        r'|附录|参考文献|后记|前言|序言|绪论'
+        r'|[（(]?[一二三四五六七八九十\d]+[)）、.．])', s))
+
 def is_footnote_start(t):
     return bool(t.strip()) and t.strip()[0] in FN_CIRCLE
 
@@ -952,6 +961,7 @@ for key in sorted(spot_lines.keys(), key=int):
     is_toc_page = (any('目录' in l for l in lines)
                    or sum(1 for l in lines
                           if re.search(r'[…\.]{2,}\s*\d{1,4}\s*$', l.strip())) >= 3)
+    _toc_buf = []  # buffered continuation texts awaiting a trailing page number
 
     this_body = ''.join(l.strip() for l in lines if l.strip() and not is_page_number(l.strip()) and not is_footnote_start(l.strip()))
     is_duplicate = (prev_body_text == this_body) and len(this_body) > 50
@@ -1213,6 +1223,42 @@ for key in sorted(spot_lines.keys(), key=int):
                     result.append('{\\fontsize{' + str(hdr_size) + 'pt}{1em}\\selectfont ' + escape_tex(hdr_text) + '}\\par\\normalsize')
                 result.append('\\vspace{' + str(max(int(hdr_gap), HDR_GAP_MIN)) + 'pt}')
 
+        # ── TOC entry rendering: restore source layout (text left, leader dots,
+        # page number right-aligned). Merge continuation lines (more-indented
+        # wrapped tails) into their entry using x-position. ──
+        if is_toc_page and not is_header:
+            _toc_m = re.match(r'^(.*?)\s*[…·\.]{2,}\s*(\d{1,4})\s*$', t)
+            if _toc_m:
+                # Numbered line. Decide: wrap-continuation of the buffer (much
+                # more indented) vs a NEW entry (similar/shallower indent, whose
+                # own number survived while the buffer's was lost to OCR).
+                _WRAP = INDENT_THRESHOLD_PX * 1.5
+                if _toc_buf and x_left < _toc_buf[0][1] + _WRAP:
+                    # New entry: flush the buffered (number-less) entry first.
+                    _sx0 = _toc_buf[0][1]
+                    _ind0 = '\\hspace*{2em}' if (_sx0 - BODY_LEFT) > INDENT_THRESHOLD_PX else ''
+                    result.append(_ind0 + escape_tex(''.join(b[0] for b in _toc_buf)) + '\\par')
+                    _toc_buf = []
+                    _toc_text = _toc_m.group(1).rstrip(' …·.')
+                    _start_x = x_left
+                else:
+                    _start_x = _toc_buf[0][1] if _toc_buf else x_left
+                    _toc_text = ''.join(b[0] for b in _toc_buf) + _toc_m.group(1).rstrip(' …·.')
+                _toc_num = _toc_m.group(2)
+                _toc_ind = '\\hspace*{2em}' if (_start_x - BODY_LEFT) > INDENT_THRESHOLD_PX else ''
+                result.append(_toc_ind + escape_tex(_toc_text)
+                              + '\\dotfill\\nobreak\\makebox[3em][r]{' + _toc_num + '}\\par')
+                _toc_buf = []
+            else:
+                # No-number line: continuation (more indented) vs new entry (same/shallower).
+                if _toc_buf and x_left < _toc_buf[-1][1] + INDENT_THRESHOLD_PX:
+                    _start_x = _toc_buf[0][1]
+                    _toc_ind = '\\hspace*{2em}' if (_start_x - BODY_LEFT) > INDENT_THRESHOLD_PX else ''
+                    result.append(_toc_ind + escape_tex(''.join(b[0] for b in _toc_buf)) + '\\par')
+                    _toc_buf = []
+                _toc_buf.append((t, x_left))
+            continue
+
         # Header-region lines are ALWAYS running headers, never content headings.
         # Markdown heading match is suppressed because running headers often share
         # the same text as section titles (e.g. "导论", "第一部分 历史考证").
@@ -1426,6 +1472,12 @@ for key in sorted(spot_lines.keys(), key=int):
         })
 
     flush_body()
+    # Flush any trailing TOC continuation that never got a page number
+    if _toc_buf:
+        _start_x = _toc_buf[0][1]
+        _toc_ind = '\\hspace*{2em}' if (_start_x - BODY_LEFT) > INDENT_THRESHOLD_PX else ''
+        result.append(_toc_ind + escape_tex(''.join(b[0] for b in _toc_buf)) + '\\par')
+        _toc_buf.clear()
     if in_fn: result.append('}')
     result.append('\\par\\newpage')
     all_tex.append('\n'.join(result))
