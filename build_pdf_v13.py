@@ -1380,6 +1380,9 @@ for key in sorted(spot_lines.keys(), key=int):
             # 2. 如果无 Markdown，检查 OCR titles（前缀匹配时记录的）
             if not target_h_norm and '_ocr_target_title' in dir() and _ocr_target_title:
                 target_h_norm = _ocr_target_title
+            # 运行页眉是固定单行，禁止任何续行合并（避免吞掉页眉正下方的真实标题）
+            if is_running_hdr:
+                target_h_norm = None
             if target_h_norm:
                 accumulated = norm_t
                 j = i + 1
@@ -1402,7 +1405,7 @@ for key in sorted(spot_lines.keys(), key=int):
             # font size (e.g. "物和社会职能（形式）" after "第四章").
             # The OCR text layer stores the actual font size per line — if a
             # non-heading OCR line has heading-level size, it's part of the title.
-            if has_text_layer and len(heading_lines) == 1:
+            if has_text_layer and not is_running_hdr and len(heading_lines) == 1:
                 _tl_hlines = _text_layer_params.get('heading_lines', {}).get(key, [])
                 _heading_size = _text_layer_params.get('HEADING_FONT_SIZE', FONT_SIZE)
                 _body_size = FONT_SIZE
@@ -1434,7 +1437,10 @@ for key in sorted(spot_lines.keys(), key=int):
             # When OCR splits a long heading across lines, merge continuation
             # lines that share the heading's (large) font height. Body text
             # has smaller font height, so it stops the merge — no false merges.
-            if not has_text_layer and len(heading_lines) == 1 and i < len(polys) and polys[i]:
+            # Running headers are fixed single lines and must never absorb the
+            # following line (e.g. a real heading sitting right under the header).
+            if (not has_text_layer and not is_running_hdr
+                    and len(heading_lines) == 1 and i < len(polys) and polys[i]):
                 _heading_h = max(p[1] for p in polys[i]) - min(p[1] for p in polys[i])
                 _merge_j = i + 1
                 while _merge_j < len(lines) and _merge_j - i <= 3:
