@@ -1005,7 +1005,7 @@ for key in sorted(spot_lines.keys(), key=int):
             return 'L2', 2
 
         # L3: Chinese numeral + separator (e.g., 一"、二、)
-        if re.match(r'^[一二三四五六七八九十]+[.．、"""]', t):
+        if re.match("^[一二三四五六七八九十]+[.．、\u0022\u201c\u201d\u2018\u2019]", t):
             return 'L3', 2
 
         # L3: Chinese numeral in parens (e.g., （一）、(2))
