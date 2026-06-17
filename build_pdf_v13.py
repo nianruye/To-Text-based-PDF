@@ -464,7 +464,6 @@ COORD_HEADING_RATIO = round(COORD_HEADING_RATIO, 3)
 # Floor: OCR height noise on scanned pages is typically <20%, so a body line may
 # read up to ~1.15x the body average purely from noise. Real headings are ≥30%
 # taller. Floor the dynamic ratio at 1.25 to suppress body-text false positives
-# (e.g. "思想的有害影响" r=1.14, "命的。"③ r=1.10) while keeping genuine tall
 # headings (e.g. "导论" r=1.32, "写作的时代背景及其问题意识" r=1.45).
 COORD_HEADING_RATIO = max(COORD_HEADING_RATIO, 1.25)
 # Min heading width: below min actual heading width (rejects narrow body continuation lines)
@@ -1132,12 +1131,14 @@ for key in sorted(spot_lines.keys(), key=int):
         if i < len(polys) and polys[i]:
             xs = [p[0] for p in polys[i]]; ys = [p[1] for p in polys[i]]
             x_left, y_pt = min(xs), min(ys)/SCALE
+            line_w_px = max(xs) - min(xs)  # 当前行真实宽度（覆盖页眉检测循环残留值）
             # Bottom 10% of page, not a page number → likely watermark/footer
             # But preserve footnote continuation lines (in_fn=True) from being dropped
             if y_pt > PH_PT * 0.88 and not is_page_number(t) and not is_footnote_start(t) and not in_fn:
                 continue
         else:
             x_left, y_pt = 0, 99
+            line_w_px = 0
 
         if is_page_number(t): continue
 
@@ -1190,7 +1191,6 @@ for key in sorted(spot_lines.keys(), key=int):
             if body_hs:
                 body_h_avg = sum(body_hs) / len(body_hs)
                 ratio = h / body_h_avg if body_h_avg > 0 else 1.0
-                # Reject narrow short lines at body-left position (e.g. continuation "命的。"③)
                 # Real headings span wider; narrow short lines at body-left are body continuations
                 min_heading_width = MIN_HEADING_WIDTH
                 # coord_heading: tall line, but MUST be short (real headings are short,
@@ -1332,6 +1332,7 @@ for key in sorted(spot_lines.keys(), key=int):
         if is_running_hdr:
             md_level = 0  # suppress heading rendering for header-region lines
 
+            _hs = _heading_signal
         if md_level >= 2 or is_running_hdr or coord_heading:
             flush_body()
             if in_fn: result.append('}'); in_fn = False
