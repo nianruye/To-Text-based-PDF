@@ -507,7 +507,7 @@ for k in content_page_keys:
         if is_page_number(t) or is_footnote_start(t): continue
         polys = spot_coords.get(k, [])
         if i < len(polys) and polys[i] and min(p[0] for p in polys[i]) > page_width_px * 0.4: continue
-        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalnum())
         if cjk > 10: body_cjk_list.append(cjk)
         if cjk > max_cjk: max_cjk = cjk
 AVAIL_WIDTH = PW_PT - 2 * (BODY_LEFT / SCALE)  # \linewidth in pt
@@ -815,7 +815,7 @@ for key in content_page_keys:
             fn_line_gaps.append(yt - prev_yb)
         prev_yb = yb
 
-        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalnum())
         if cjk > 15:
             fn_char_densities.append(w / cjk)
 
@@ -864,7 +864,7 @@ for k in content_page_keys:
         elif is_page_number(t):
             in_fn_block = False; continue
         if not in_fn_block: continue
-        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
+        cjk = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalnum())
         if cjk > 10: fn_cjk_list.append(cjk)
 if fn_cjk_list:
     fn_cjk_list.sort()
@@ -1562,7 +1562,7 @@ for key in sorted(spot_lines.keys(), key=int):
         # Body text: default songti (no classifier-based font switching)
         body_buf.append({
             'text': t, 'indent': (x_left - BODY_LEFT) > INDENT_THRESHOLD_PX,
-            'cjk': sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha()),
+            'cjk': sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalnum()),
             'font_family': 'songti',
             'bold': False,
         })
