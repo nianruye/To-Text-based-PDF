@@ -15,7 +15,7 @@ HEADERS = {"Authorization": "bearer " + tok}
 PAYLOAD = {
     "model": MODEL,
     "optionalPayload": json.dumps({
-        "useLayoutDetection": False,
+        "useLayoutDetection": True,  # 启用版面分析，获取标题标记和字体信息
         "promptLabel": "spotting",
         "temperature": 0,
     }),
@@ -80,9 +80,10 @@ def needs_png_conversion(filepath):
 
 
 def process_pdf_via_png(filepath):
-    """Convert PDF pages to PNG, send each to spotting API, merge results."""
+    """Convert PDF pages to PNG, send each to spotting API, merge results.
+    启用版面分析后，提取 block_label 识别标题类型。"""
     doc = fitz.open(filepath)
-    all_lines, all_coords = {}, {}
+    all_lines, all_coords, all_labels = {}, {}, {}
 
     for pi in range(doc.page_count):
         page = doc[pi]
@@ -108,31 +109,58 @@ def process_pdf_via_png(filepath):
                 raise RuntimeError(f"Page {pi+1} failed: " + rr.json()["data"].get("errorMsg", "unknown"))
             time.sleep(2)
 
-        # Download and parse
+        # Download and parse (启用版面分析后的新格式)
         rr = requests.get(jsonl_url)
         rr.raise_for_status()
         for line in rr.text.strip().split("\n"):
             line = line.strip()
             if not line: continue
             result = json.loads(line)["result"]
-            pl, pp = [], []
-            for res in result.get("layoutParsingResults", []):
-                pr = res.get("prunedResult", {})
-                sr = pr.get("spotting_res", {})
-                if sr:
-                    pl = sr.get("rec_texts", [])
-                    pp = sr.get("rec_polys", [])
+
+            # 从 layoutParsingResults 提取 parsing_res_list
+            lpr_list = result.get("layoutParsingResults", [])
+            if not lpr_list:
+                continue
+            pr = lpr_list[0].get("prunedResult", {})
+            blocks = pr.get("parsing_res_list", [])
+
+            pl, pp, pb = [], [], []  # texts, polys, labels
+            for blk in blocks:
+                label = blk.get("block_label", "text")
+                content = blk.get("block_content", "")
+                poly_pts = blk.get("block_polygon_points") or blk.get("block_bbox")
+
+                if content:
+                    pl.append(content)
+                    pb.append(label)
+                    # 转换 polygon 为标准格式
+                    if poly_pts:
+                        if isinstance(poly_pts, list) and len(poly_pts) >= 4:
+                            # 已经是 polygon 格式
+                            pp.append([[round(c, 1) for c in pt] for pt in poly_pts[:4]])
+                        elif isinstance(poly_pts, dict) or len(poly_pts) == 4 and isinstance(poly_pts[0], (int, float)):
+                            # bbox 格式 [x1, y1, x2, y2]，转换为 polygon
+                            x1, y1, x2, y2 = poly_pts[:4]
+                            pp.append([[round(x1,1), round(y1,1)], [round(x2,1), round(y1,1)],
+                                      [round(x2,1), round(y2,1)], [round(x1,1), round(y2,1)]])
+                        else:
+                            pp.append(None)
+                    else:
+                        pp.append(None)
+
             all_lines[str(pi)] = pl
-            all_coords[str(pi)] = [[[round(c, 1) for c in pt] for pt in p] if p else None for p in pp]
+            all_coords[str(pi)] = pp
+            all_labels[str(pi)] = pb
 
         os.unlink(png_path)
-        print(f"  {len(pl)} lines")
+        print(f"  {len(pl)} lines, titles: {sum(1 for l in pb if 'title' in l)}")
 
     doc.close()
-    return all_lines, all_coords
+    return all_lines, all_coords, all_labels
 
 
 def process_pdf(filepath):
+    """直接上传 PDF（非 PNG 转换路径）。启用版面分析后提取 block_label。"""
     # Check if PDF needs PNG conversion
     if needs_png_conversion(filepath):
         print(f"PDF has non-bitonal images, converting to PNG pages...")
@@ -159,41 +187,71 @@ def process_pdf(filepath):
         time.sleep(5)
     rr = requests.get(jsonl_url)
     rr.raise_for_status()
-    page_lines, page_coords = {}, {}
+    page_lines, page_coords, page_labels = {}, {}, {}
     for page_idx, line in enumerate(rr.text.strip().split("\n")):
         line = line.strip()
         if not line:
             continue
         result = json.loads(line)["result"]
-        pl, pp = [], []
-        for res in result.get("layoutParsingResults", []):
-            pr = res.get("layoutParsingResult", {})
+
+        # 从 layoutParsingResults 提取 parsing_res_list（新格式）
+        lpr_list = result.get("layoutParsingResults", [])
+        if lpr_list:
+            pr = lpr_list[0].get("prunedResult", {})
             blocks = pr.get("parsing_res_list", [])
-            if not blocks:
-                blocks = pr.get("prunedResult", {}).get("parsing_res_list", [])
-            if not blocks:
-                blocks = res.get("parsing_res_list", [])
-            if blocks:
-                for blk in blocks:
-                    bl, bp = extract_from_block(blk)
-                    pl.extend(bl)
-                    pp.extend(bp)
-            else:
-                sr = res.get("spotting_res") or pr.get("spotting_res")
-                if sr:
-                    pl.extend(sr.get("rec_texts", []))
-                    pp.extend(sr.get("rec_polys", []))
+            pl, pp, pb = [], [], []
+            for blk in blocks:
+                label = blk.get("block_label", "text")
+                content = blk.get("block_content", "")
+                poly_pts = blk.get("block_polygon_points") or blk.get("block_bbox")
+                if content:
+                    pl.append(content)
+                    pb.append(label)
+                    if poly_pts:
+                        if isinstance(poly_pts, list) and len(poly_pts) >= 4 and isinstance(poly_pts[0], list):
+                            pp.append([[round(c, 1) for c in pt] for pt in poly_pts[:4]])
+                        else:
+                            pp.append(None)
+                    else:
+                        pp.append(None)
+        else:
+            # 兼容旧格式（未启用版面分析）
+            pl, pp = [], []
+            for res in result.get("layoutParsingResults", []):
+                pr = res.get("layoutParsingResult", {})
+                blocks = pr.get("parsing_res_list", [])
+                if not blocks:
+                    blocks = pr.get("prunedResult", {}).get("parsing_res_list", [])
+                if not blocks:
+                    blocks = res.get("parsing_res_list", [])
+                if blocks:
+                    for blk in blocks:
+                        bl, bp = extract_from_block(blk)
+                        pl.extend(bl)
+                        pp.extend(bp)
+                else:
+                    sr = res.get("spotting_res") or pr.get("spotting_res")
+                    if sr:
+                        pl.extend(sr.get("rec_texts", []))
+                        pp.extend(sr.get("rec_polys", []))
+            pb = ["text"] * len(pl)  # 旧格式无 label，默认 text
+
         page_lines[str(page_idx)] = pl
         page_coords[str(page_idx)] = pp
-        print(f"Page {page_idx}: {len(pl)} lines")
-    return page_lines, page_coords
+        page_labels[str(page_idx)] = pb
+        titles = sum(1 for l in pb if "title" in l)
+        print(f"Page {page_idx}: {len(pl)} lines, titles: {titles}")
+    return page_lines, page_coords, page_labels
 
 
 if __name__ == "__main__":
-    print(f"Spotting OCR: {INPUT_PDF}")
-    lines_data, coords_data = process_pdf(INPUT_PDF)
+    print(f"Spotting OCR (layout detection ON): {INPUT_PDF}")
+    lines_data, coords_data, labels_data = process_pdf(INPUT_PDF)
     total = sum(len(v) for v in lines_data.values())
-    print(f"Total: {len(lines_data)} pages, {total} lines")
+    titles_total = sum(sum(1 for l in v if "title" in l) for v in labels_data.values())
+    print(f"Total: {len(lines_data)} pages, {total} lines, {titles_total} titles")
+
+    # 输出 lines 和 coords（向后兼容）
     with open(OUT_LINES, "w", encoding="utf-8") as f:
         json.dump(lines_data, f, ensure_ascii=False, indent=2)
     print(f"Saved: {OUT_LINES}")
@@ -206,4 +264,11 @@ if __name__ == "__main__":
     with open(OUT_COORDS, "w", encoding="utf-8") as f:
         json.dump(cs, f, ensure_ascii=False, indent=2)
     print(f"Saved: {OUT_COORDS}")
+
+    # 输出 labels（新增：版面分析标签，识别标题类型）
+    base, ext = os.path.splitext(OUT_LINES)
+    out_labels = base + "_labels" + ext
+    with open(out_labels, "w", encoding="utf-8") as f:
+        json.dump(labels_data, f, ensure_ascii=False, indent=2)
+    print(f"Saved: {out_labels}")
     print("Step 1 complete.")

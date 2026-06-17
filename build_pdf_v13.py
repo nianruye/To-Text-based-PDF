@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build PDF v13 — use PaddleOCR markdown for structure detection.
-MD provides heading levels (##, ###, ####), footnotes, page breaks.
-Spotting provides coordinates. Combine both for better layout.
+"""Build PDF v13 — use PaddleOCR layout detection for heading detection.
+OCR labels provide paragraph_title/doc_title markers (more accurate than
+structural rules). Spotting provides coordinates. Combine for better layout.
 """
 import json, os, re, subprocess, sys, statistics, fitz
 
@@ -9,12 +9,32 @@ SRC_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
 OUT_PDF = sys.argv[2] if len(sys.argv) > 2 else "/opt/test/最终版_v13.pdf"
 SPOTTING_LINES = sys.argv[3] if len(sys.argv) > 3 else "/opt/test/spotting_lines.json"
 SPOTTING_COORDS = sys.argv[4] if len(sys.argv) > 4 else "/opt/test/spotting_coords.json"
-MARKDOWN_FILE = sys.argv[5] if len(sys.argv) > 5 else ""
+SPOTTING_TITLES = sys.argv[5] if len(sys.argv) > 5 else ""  # OCR标题集合文件（可选）
+MARKDOWN_FILE = sys.argv[6] if len(sys.argv) > 6 else ""
 
 FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')
 
 def clean_text(text):
     return text.lstrip("‖‖| \t")
+
+# 引号归一化映射表：各种引号变体 → 统一形式（用于标题文本匹配）
+_QUOTE_MAP = str.maketrans({
+    '"': '"',  # " ASCII
+    '“': '"',  # " 左弯引号 → "
+    '”': '"',  # " 右弯引号 → "
+    '‘': "'",       # ' 左单引号
+    '’': "'",       # ' 右单引号
+    '、': '、',  # 、
+})
+
+def normalize_text(text):
+    """归一化文本用于匹配：去空白 + 统一引号。
+    OCR 逐行数据和 block 标题文本可能空格/引号不同，归一化后才能匹配。"""
+    # 去掉所有空白字符
+    s = re.sub(r'\s+', '', text)
+    # 统一引号
+    s = s.translate(_QUOTE_MAP)
+    return s
 
 def escape_tex(text):
     for char, repl in [('\\', r'\textbackslash{}'), ('{', r'\{'), ('}', r'\}'),
@@ -115,6 +135,23 @@ spot_lines = json.load(open(SPOTTING_LINES))
 spot_coords = json.load(open(SPOTTING_COORDS))
 for k in spot_lines:
     spot_lines[k] = [clean_text(l) for l in spot_lines[k]]
+
+# 加载 OCR 版面分析提取的标题文本集合（如果有）
+spot_titles = set()
+if SPOTTING_TITLES and os.path.exists(SPOTTING_TITLES):
+    titles_data = json.load(open(SPOTTING_TITLES))
+    # titles_data 可能是全局 set/list，或按页的 dict
+    if isinstance(titles_data, dict):
+        # 每页的标题列表
+        for pg, title_list in titles_data.items():
+            for title in title_list:
+                spot_titles.add(normalize_text(title))
+    else:
+        # 全局标题集合
+        for title in titles_data:
+            spot_titles.add(normalize_text(title))
+    if spot_titles:
+        print(f"OCR titles loaded: {len(spot_titles)} titles for matching")
 
 # Compute SCALE: the ratio converting OCR pixel coords → PDF pt coords.
 # Two OCR paths exist (see run_spotting_ocr.py):
@@ -1179,7 +1216,27 @@ for key in sorted(spot_lines.keys(), key=int):
                     break
 
         
-        # ── Structural heading detection (all PDFs) ══
+        # ══ OCR Layout Detection (优先级最高) ══
+        # 用 OCR 版面分析提取的标题文本集合，文本匹配判断标题
+        # （新版面分析按"块"输出，与逐行索引不对应，故用文本匹配）
+        _ocr_target_title = None  # 记录匹配的 OCR 标题（用于后续续行 merge）
+        if spot_titles and not is_header and not is_footnote_start(t):
+            _norm_t = normalize_text(t)
+            if _norm_t in spot_titles:
+                md_level = 2
+                _heading_signal = 'ocr_title'
+                _ocr_target_title = _norm_t  # 记录完整匹配的标题
+            elif len(_norm_t) >= 10:
+                # 前缀匹配：当前行是某 OCR 标题的开头部分
+                # 用于处理旧逐行 OCR 把长标题拆成多行的情况
+                for _otitle in spot_titles:
+                    if len(_otitle) > len(_norm_t) + 5 and _otitle.startswith(_norm_t):
+                        md_level = 2
+                        _heading_signal = 'ocr_title'
+                        _ocr_target_title = _otitle  # 记录完整标题用于 merge
+                        break
+
+        # ── Structural heading detection (all PDFs, 作为 fallback) ══
         # Use pattern library + visual signals to detect headings.
         # Replaces font classifier-based detection.
         # Run even when md_level>0 to allow pattern-based font override.
@@ -1308,14 +1365,20 @@ for key in sorted(spot_lines.keys(), key=int):
             # If the OCR text is a prefix of a markdown heading, merge subsequent OCR
             # lines until the markdown heading is fully covered.
             heading_lines = [t]
-            norm_t = re.sub(r'\s+', '', t).replace('“', '“').replace('”', '”').replace('‘', '‘').replace('’', '’')
+            norm_t = normalize_text(t)  # 用统一的归一化方式
             target_h_norm = None
+
+            # 1. 优先用 Markdown headings（更精确）
             for h_text, level in md_headings:
-                h_norm = re.sub(r'\s+', '', h_text).replace('“', '“').replace('”', '”')
+                h_norm = normalize_text(h_text)
                 # OCR text is a strict prefix of a markdown heading
                 if len(norm_t) > 8 and len(h_norm) > len(norm_t) and h_norm.startswith(norm_t):
                     target_h_norm = h_norm
                     break
+
+            # 2. 如果无 Markdown，检查 OCR titles（前缀匹配时记录的）
+            if not target_h_norm and '_ocr_target_title' in dir() and _ocr_target_title:
+                target_h_norm = _ocr_target_title
             if target_h_norm:
                 accumulated = norm_t
                 j = i + 1
@@ -1323,7 +1386,7 @@ for key in sorted(spot_lines.keys(), key=int):
                     tj = lines[j].strip()
                     if not tj or len(tj) < 2: break
                     if is_page_number(tj) or is_footnote_start(tj): break
-                    norm_tj = re.sub(r'\s+', '', tj).replace('“', '“').replace('”', '”')
+                    norm_tj = normalize_text(tj)  # 统一归一化方式
                     new_acc = accumulated + norm_tj
                     if target_h_norm.startswith(new_acc):
                         heading_lines.append(tj)
