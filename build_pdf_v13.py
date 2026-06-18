@@ -210,6 +210,40 @@ def is_content_page(key):
     # sparse content pages (PDF3 page 9 has fw=9, a real content page).
     return full_width_lines >= 9 and body_text_chars > 100
 
+# ── Detect TOC (table of contents) pages ──
+# TOC pages are often filtered out by is_content_page because entries are short.
+# We detect them explicitly: contains "目录" title OR has a right column of page numbers.
+def is_toc_page_by_ocr(key):
+    """Detect TOC pages from OCR data (more reliable than text-layer check).
+    Criteria: contains '目录' OR has ≥5 right-aligned pure-number lines."""
+    pg_lines = spot_lines.get(key, [])
+    pg_polys = spot_coords.get(key, [])
+
+    # Criterion 1: contains "目录" (TOC title)
+    if any('目录' in l for l in pg_lines):
+        return True
+
+    # Criterion 2: right column has multiple pure-number lines (page numbers)
+    right_nums = 0
+    for i, l in enumerate(pg_lines):
+        t = l.strip()
+        if not re.match(r'^\d{1,4}$', t):
+            continue
+        if i >= len(pg_polys) or not pg_polys[i]:
+            continue
+        xs = [p[0] for p in pg_polys[i]]
+        if min(xs) > page_width_px * 0.70:  # right-aligned column
+            right_nums += 1
+    if right_nums >= 5:
+        return True
+
+    # Criterion 3: inline TOC entries (text …… page_number on same line)
+    inline_toc = sum(1 for l in pg_lines if re.search(r'[…·\.]{2,}\s*\d{1,4}\s*$', l.strip()))
+    return inline_toc >= 5
+
+toc_page_keys = [k for k in sorted(spot_lines.keys(), key=int) if is_toc_page_by_ocr(k)]
+print(f"TOC pages: {len(toc_page_keys)} (keys {toc_page_keys})")
+
 content_page_keys = [k for k in sorted(spot_lines.keys(), key=int) if is_content_page(k)]
 print(f"Content pages: {len(content_page_keys)}/{len(spot_lines)} "
       f"(keys {content_page_keys[0] if content_page_keys else '?'}..{content_page_keys[-1] if content_page_keys else '?'})")
@@ -984,6 +1018,98 @@ if not has_text_layer:
     _fc_doc.close()
     print(f"Font classifier: {_fc_total} lines classified across {len(content_page_keys)} pages")
 
+# ── TOC row grouping: ordered pairing (text → page number by Y order) ──
+def group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD_PX):
+    """Pair TOC text entries with page numbers by Y-order (one-to-one mapping).
+    Returns: list of (indent_em, text, page_num, y_center) in reading order."""
+    if not lines or not polys:
+        return []
+
+    # Collect all lines with metadata
+    items = []  # (y_center, x_left, text, is_page_num, is_inline)
+    for i, l in enumerate(lines):
+        t = l.strip()
+        if not t or i >= len(polys) or not polys[i]:
+            continue
+        xs = [p[0] for p in polys[i]]
+        ys = [p[1] for p in polys[i]]
+        x_left = min(xs)
+        y_center = (min(ys) + max(ys)) / 2
+        is_page_num = re.match(r'^\d{1,4}$', t) and x_left > page_width_px * 0.70
+        # Inline: text contains …… followed by number
+        is_inline = bool(re.search(r'[…·\.]+\s*\d{1,4}\s*$', t)) and not is_page_num
+        items.append((y_center, x_left, t, is_page_num, is_inline))
+
+    # Sort by Y (reading order)
+    items.sort(key=lambda x: x[0])
+
+    def _indent_from_x(x_left):
+        indent_px = x_left - BODY_LEFT
+        if indent_px > INDENT_THRESHOLD_PX * 2.5:
+            return 3
+        elif indent_px > INDENT_THRESHOLD_PX * 1.5:
+            return 2
+        elif indent_px > INDENT_THRESHOLD_PX * 0.5:
+            return 1
+        return 0
+
+    toc_entries = []
+    page_nums = []  # pure page numbers from right column (in Y order)
+    text_entries = []  # text entries (non-page-num, non-inline, in Y order)
+
+    # First pass: separate into categories
+    for yc, xl, t, is_pn, is_inline in items:
+        if t == '目录':
+            continue  # TOC title handled separately
+        if is_pn:
+            page_nums.append((yc, xl, t))
+        elif is_inline:
+            # Inline entry: parse text and number directly
+            m = re.match(r'^(.*?)\s*[…·\.]+\s*(\d{1,4})\s*$', t)
+            if m:
+                text = m.group(1).rstrip(' …·.')
+                num = m.group(2)
+                toc_entries.append((_indent_from_x(xl), text, num, yc))
+        else:
+            text_entries.append((yc, xl, t))
+
+    # Group adjacent text entries into TOC entries (primary + continuation lines)
+    # Continuation lines: more indented (x_left larger) and close Y to previous
+    # New entry: less indented than previous OR large Y gap
+    grouped_entries = []  # each entry = list of (yc, xl, t) lines
+    for yc, xl, t in text_entries:
+        if not grouped_entries:
+            grouped_entries.append([(yc, xl, t)])
+            continue
+        prev = grouped_entries[-1]
+        prev_yc = prev[0][0]
+        prev_xl_min = min(p[1] for p in prev)
+        # Continuation: more indented (x > prev_xl_min + threshold) AND Y close
+        is_continuation = (xl > prev_xl_min + INDENT_THRESHOLD_PX * 0.8
+                          and abs(yc - prev_yc) < 60)  # within 60px Y gap
+        if is_continuation:
+            prev.append((yc, xl, t))  # add to same entry
+        else:
+            grouped_entries.append([(yc, xl, t)])  # new entry
+
+    # Pair grouped entries with page numbers (ordered pairing by Y sequence)
+    # Assumption: page_nums[i] corresponds to grouped_entries[i] (both sorted by Y)
+    for i, group in enumerate(grouped_entries):
+        # Merge text parts (in x order, left → right)
+        group.sort(key=lambda x: x[1])
+        merged_text = ''.join(g[2] for g in group)
+        x_left_min = min(g[1] for g in group)
+        yc_group = group[0][0]  # use first line's Y for ordering
+
+        # Get corresponding page number (same index in ordered list)
+        page_num = page_nums[i][2] if i < len(page_nums) else None
+
+        toc_entries.append((_indent_from_x(x_left_min), merged_text, page_num, yc_group))
+
+    # Sort by Y (reading order)
+    toc_entries.sort(key=lambda x: x[3])
+    return toc_entries
+
 # ── Render ──
 all_tex = []
 prev_body_text = None
@@ -1003,6 +1129,38 @@ for key in sorted(spot_lines.keys(), key=int):
     is_duplicate = (prev_body_text == this_body) and len(this_body) > 50
     prev_body_text = this_body
     if is_duplicate:
+        continue
+
+    # ══ TOC page rendering: use Y-grouping to pair text + page numbers ══
+    if key in toc_page_keys:
+        toc_entries = group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD_PX)
+
+        # Render TOC title "目录" (centered, heiti) if present
+        toc_title = None
+        for l in lines:
+            if '目录' in l.strip() and len(l.strip()) <= 10:
+                toc_title = l.strip()
+                break
+        if toc_title:
+            result.append('\\centering{\\CJKfamily{heiti}' + escape_tex(toc_title) + '}\\par\\vspace{10pt}')
+
+        # Render each TOC entry
+        for indent_em, text, page_num, yc in toc_entries:
+            # Skip the TOC title itself (already rendered above)
+            if text == toc_title:
+                continue
+            # Indentation (2em per level)
+            ind_cmd = '\\hspace*{' + str(indent_em * 2) + 'em}' if indent_em > 0 else ''
+            # Entry text + leader dots + page number
+            entry_tex = escape_tex(text)
+            if page_num:
+                entry_tex += '\\dotfill\\nobreak\\makebox[3em][r]{' + page_num + '}\\par'
+            else:
+                entry_tex += '\\dotfill\\par'  # no page number, dots extend to line end
+            result.append(ind_cmd + entry_tex)
+
+        # Skip the normal rendering loop for TOC pages
+        all_tex.append('\\newpage\n' + ''.join(result))
         continue
 
     # Set page number to source value
