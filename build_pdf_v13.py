@@ -1136,28 +1136,32 @@ for key in sorted(spot_lines.keys(), key=int):
         toc_entries = group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD_PX)
 
         # Render TOC title "目录" (centered, heiti) if present
+        # IMPORTANT: \centering must be scoped in braces so it doesn't persist
         toc_title = None
         for l in lines:
             if '目录' in l.strip() and len(l.strip()) <= 10:
                 toc_title = l.strip()
                 break
         if toc_title:
-            result.append('\\centering{\\CJKfamily{heiti}' + escape_tex(toc_title) + '}\\par\\vspace{10pt}')
+            result.append('{\\centering {\\CJKfamily{heiti} ' + escape_tex(toc_title) + '}\\par}')
+            result.append('\\vspace{12pt}')
 
-        # Render each TOC entry
+        # Render each TOC entry as its own paragraph
+        # Reserve right margin for page number via \rightskip so long entries
+        # wrap before the number column (prevents overfull line 1 + stranded number)
         for indent_em, text, page_num, yc in toc_entries:
             # Skip the TOC title itself (already rendered above)
             if text == toc_title:
                 continue
             # Indentation (2em per level)
             ind_cmd = '\\hspace*{' + str(indent_em * 2) + 'em}' if indent_em > 0 else ''
-            # Entry text + leader dots + page number
-            entry_tex = escape_tex(text)
+            # Group with \rightskip=2.5em to reserve page-number space
             if page_num:
-                entry_tex += '\\dotfill\\nobreak\\makebox[3em][r]{' + page_num + '}\\par'
+                entry_tex = ('{\\rightskip=2.5em\\noindent ' + ind_cmd + escape_tex(text)
+                             + '\\dotfill\\nobreak ' + page_num + '\\par}')
             else:
-                entry_tex += '\\dotfill\\par'  # no page number, dots extend to line end
-            result.append(ind_cmd + entry_tex)
+                entry_tex = '\\noindent ' + ind_cmd + escape_tex(text) + '\\par'
+            result.append(entry_tex)
 
         # Skip the normal rendering loop for TOC pages
         all_tex.append('\\newpage\n' + ''.join(result))
