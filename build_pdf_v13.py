@@ -1164,7 +1164,9 @@ for key in sorted(spot_lines.keys(), key=int):
             result.append(entry_tex)
 
         # Skip the normal rendering loop for TOC pages
-        all_tex.append('\\newpage\n' + ''.join(result))
+        # Append TOC content with trailing \par\newpage (matches normal page pattern
+        # so the following content page starts on a fresh page, not merged with TOC)
+        all_tex.append(''.join(result) + '\\par\\newpage')
         continue
 
     # Set page number to source value
