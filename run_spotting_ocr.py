@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Step 1: Full spotting OCR on 20 pages."""
 
-import json, os, re, sys, time, requests, fitz
+import json, os, re, sys, time, tempfile, shutil, requests, fitz
 
 TOKEN_FILE = "/tmp/paddle_token"
 INPUT_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
@@ -20,6 +20,8 @@ PAYLOAD = {
         "temperature": 0,
     }),
 }
+
+BATCH_SIZE = 90  # PaddleOCR-VL API 单次 ≤100 页,留余量防收紧
 
 
 def parse_spotting_line(raw_line):
@@ -159,15 +161,62 @@ def process_pdf_via_png(filepath):
     return all_lines, all_coords, all_labels
 
 
-def process_pdf(filepath):
-    """直接上传 PDF（非 PNG 转换路径）。启用版面分析后提取 block_label。"""
-    # Check if PDF needs PNG conversion
-    if needs_png_conversion(filepath):
-        print(f"PDF has non-bitonal images, converting to PNG pages...")
-        return process_pdf_via_png(filepath)
+def split_pdf_batches(filepath):
+    """用 fitz 把 filepath 切成 ≤BATCH_SIZE 页的临时 PDF。
+    返回 (batches, tmp_dir):batches=[(tmp_path, batch_start, batch_len), ...]。
+    tmp_dir 由调用方负责清理。"""
+    src = fitz.open(filepath)
+    n = src.page_count
+    batches = []
+    tmp_dir = tempfile.mkdtemp(prefix="ocr_batch_")
+    for start in range(0, n, BATCH_SIZE):
+        end = min(start + BATCH_SIZE, n)
+        out_doc = fitz.open()
+        out_doc.insert_pdf(src, from_page=start, to_page=end - 1)
+        tmp_path = os.path.join(tmp_dir, f"batch_{start:05d}.pdf")
+        out_doc.save(tmp_path)
+        out_doc.close()
+        batches.append((tmp_path, start, end - start))
+    src.close()
+    return batches, tmp_dir
 
-    print(f"Uploading: {filepath}")
-    with open(filepath, "rb") as f:
+
+def _parse_page(lpr):
+    """从单个 layoutParsingResults 元素解析一页的 (lines, polys, labels)。
+    API 返回的 result.layoutParsingResults 是页数组,每元素=一页。
+    新格式:prunedResult.parsing_res_list(含 block_label)。回退 spotting_res。"""
+    pr = lpr.get("prunedResult", {}) if isinstance(lpr, dict) else {}
+    blocks = pr.get("parsing_res_list", [])
+    pl, pp, pb = [], [], []
+    for blk in blocks:
+        label = blk.get("block_label", "text")
+        content = blk.get("block_content", "")
+        poly_pts = blk.get("block_polygon_points") or blk.get("block_bbox")
+        if content:
+            pl.append(content)
+            pb.append(label)
+            if poly_pts:
+                if isinstance(poly_pts, list) and len(poly_pts) >= 4 and isinstance(poly_pts[0], list):
+                    pp.append([[round(c, 1) for c in pt] for pt in poly_pts[:4]])
+                else:
+                    pp.append(None)
+            else:
+                pp.append(None)
+    # 回退:无版面块时用 spotting_res(未开版面分析的旧格式)
+    if not pl:
+        sr = pr.get("spotting_res") or (lpr.get("spotting_res") if isinstance(lpr, dict) else None)
+        if sr and isinstance(sr, dict) and sr.get("rec_texts"):
+            pl = list(sr.get("rec_texts", []))
+            pp = list(sr.get("rec_polys", []))
+            pb = ["text"] * len(pl)
+    return pl, pp, pb
+
+
+def _upload_and_parse(pdf_path):
+    """上传单个 PDF(≤BATCH_SIZE 页)→ 轮询 → 解析 jsonl。
+    返回 (lines, coords, labels), key = 切片内局部页号 str(0-indexed)。"""
+    print(f"Uploading: {pdf_path}")
+    with open(pdf_path, "rb") as f:
         r = requests.post(JOB_URL, headers=HEADERS, data=PAYLOAD, files={"file": f})
     r.raise_for_status()
     job_id = r.json()["data"]["jobId"]
@@ -187,61 +236,79 @@ def process_pdf(filepath):
         time.sleep(5)
     rr = requests.get(jsonl_url)
     rr.raise_for_status()
-    page_lines, page_coords, page_labels = {}, {}, {}
-    for page_idx, line in enumerate(rr.text.strip().split("\n")):
-        line = line.strip()
-        if not line:
-            continue
+    lines, coords, labels = {}, {}, {}
+    raw_lines = [l for l in rr.text.strip().split("\n") if l.strip()]
+    # jsonl 每行=一个文档;result.layoutParsingResults 是页数组,每元素=一页
+    page_counter = 0
+    for line in raw_lines:
         result = json.loads(line)["result"]
-
-        # 从 layoutParsingResults 提取 parsing_res_list（新格式）
         lpr_list = result.get("layoutParsingResults", [])
-        if lpr_list:
-            pr = lpr_list[0].get("prunedResult", {})
-            blocks = pr.get("parsing_res_list", [])
-            pl, pp, pb = [], [], []
-            for blk in blocks:
-                label = blk.get("block_label", "text")
-                content = blk.get("block_content", "")
-                poly_pts = blk.get("block_polygon_points") or blk.get("block_bbox")
-                if content:
-                    pl.append(content)
-                    pb.append(label)
-                    if poly_pts:
-                        if isinstance(poly_pts, list) and len(poly_pts) >= 4 and isinstance(poly_pts[0], list):
-                            pp.append([[round(c, 1) for c in pt] for pt in poly_pts[:4]])
-                        else:
-                            pp.append(None)
-                    else:
-                        pp.append(None)
-        else:
-            # 兼容旧格式（未启用版面分析）
-            pl, pp = [], []
-            for res in result.get("layoutParsingResults", []):
-                pr = res.get("layoutParsingResult", {})
-                blocks = pr.get("parsing_res_list", [])
-                if not blocks:
-                    blocks = pr.get("prunedResult", {}).get("parsing_res_list", [])
-                if not blocks:
-                    blocks = res.get("parsing_res_list", [])
-                if blocks:
-                    for blk in blocks:
-                        bl, bp = extract_from_block(blk)
-                        pl.extend(bl)
-                        pp.extend(bp)
-                else:
-                    sr = res.get("spotting_res") or pr.get("spotting_res")
-                    if sr:
-                        pl.extend(sr.get("rec_texts", []))
-                        pp.extend(sr.get("rec_polys", []))
-            pb = ["text"] * len(pl)  # 旧格式无 label，默认 text
+        for lpr in lpr_list:
+            pl, pp, pb = _parse_page(lpr)
+            lines[str(page_counter)] = pl
+            coords[str(page_counter)] = pp
+            labels[str(page_counter)] = pb
+            titles = sum(1 for x in pb if "title" in x)
+            print(f"  page {page_counter}: {len(pl)} lines, titles: {titles}")
+            page_counter += 1
+    return lines, coords, labels
 
-        page_lines[str(page_idx)] = pl
-        page_coords[str(page_idx)] = pp
-        page_labels[str(page_idx)] = pb
-        titles = sum(1 for l in pb if "title" in l)
-        print(f"Page {page_idx}: {len(pl)} lines, titles: {titles}")
-    return page_lines, page_coords, page_labels
+
+def _upload_and_parse_with_retry(batch_pdf, retries=3, backoff=10):
+    """单批上传+解析,失败重试(指数退避)。覆盖网络错/API 5xx/state==failed。"""
+    last = None
+    for attempt in range(1, retries + 1):
+        try:
+            return _upload_and_parse(batch_pdf)
+        except Exception as e:
+            last = e
+            print(f"  Batch failed (attempt {attempt}/{retries}): {e}")
+            if attempt < retries:
+                time.sleep(backoff * attempt)
+    raise RuntimeError(f"Batch {batch_pdf} failed after {retries} attempts: {last}")
+
+
+def process_pdf(filepath):
+    """直接上传 PDF(非 PNG 转换路径)。启用版面分析提取 block_label。
+    >BATCH_SIZE 页时自动切片分批,合并时全局 key = batch_start + 局部页号。"""
+    # Check if PDF needs PNG conversion
+    if needs_png_conversion(filepath):
+        print(f"PDF has non-bitonal images, converting to PNG pages...")
+        return process_pdf_via_png(filepath)
+
+    n = fitz.open(filepath).page_count
+    if n <= BATCH_SIZE:
+        # 单批:局部 key 即全局 key(batch_start=0),零行为变化
+        print(f"Single batch: {n} pages (≤ {BATCH_SIZE})")
+        bl, bc, bbl = _upload_and_parse_with_retry(filepath)
+        if len(bl) != n:
+            raise RuntimeError(f"Parse mismatch: expected {n} pages, got {len(bl)}")
+        return bl, bc, bbl
+
+    # 多批:切片 → 逐批上传+校验 → 偏移合并
+    print(f"PDF has {n} pages > {BATCH_SIZE}, splitting into batches...")
+    batches, tmp_dir = split_pdf_batches(filepath)
+    all_lines, all_coords, all_labels = {}, {}, {}
+    total = len(batches)
+    try:
+        for i, (batch_pdf, batch_start, batch_len) in enumerate(batches, 1):
+            print(f"=== Batch {i}/{total}: pages {batch_start}-{batch_start + batch_len - 1} ===")
+            bl, bc, bbl = _upload_and_parse_with_retry(batch_pdf)
+            # 校验:解析页数必须 == 切片页数,否则丢页/多页导致坐标全错
+            if len(bl) != batch_len:
+                raise RuntimeError(
+                    f"Batch parse mismatch at pages {batch_start}-{batch_start+batch_len-1}: "
+                    f"expected {batch_len} pages, got {len(bl)}")
+            # 偏移合并:全局页号 = batch_start + 局部页号
+            for local_k in bl:
+                gk = str(batch_start + int(local_k))
+                all_lines[gk] = bl[local_k]
+                all_coords[gk] = bc[local_k]
+                all_labels[gk] = bbl[local_k]
+            print(f"  merged {len(bl)} pages → global keys {batch_start}-{batch_start+len(bl)-1}")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    return all_lines, all_coords, all_labels
 
 
 if __name__ == "__main__":

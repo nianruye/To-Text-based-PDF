@@ -21,7 +21,8 @@ class PDFProcessor:
         await self._emit(progress_callback, job_id, "ocr", 10,
                          message="Running PaddleOCR-VL API...")
 
-        lines_path, coords_path, md_path = await self._run_api_ocr(input_pdf, work_dir)
+        lines_path, coords_path, md_path = await self._run_api_ocr(
+            input_pdf, work_dir, job_id, progress_callback)
 
         await self._emit(progress_callback, job_id, "ocr", 90,
                          message="OCR complete")
@@ -41,10 +42,12 @@ class PDFProcessor:
 
         return output_path
 
-    async def _run_api_ocr(self, pdf_path: str, work_dir: str):
+    async def _run_api_ocr(self, pdf_path: str, work_dir: str,
+                          job_id: str = None, progress_callback=None):
         """Run spotting OCR and save lines, coords, and markdown files for v13."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._run_api_ocr_sync, pdf_path, work_dir)
+        return await loop.run_in_executor(
+            None, self._run_api_ocr_sync, pdf_path, work_dir, job_id, progress_callback, loop)
 
     def _parse_spotting_block(self, block):
         """Extract lines and polygons from a spotting block (same as run_spotting_ocr.py)."""
@@ -76,9 +79,11 @@ class PDFProcessor:
                     polys.append(None)
         return lines, polys
 
-    def _run_api_ocr_sync(self, pdf_path: str, work_dir: str):
-        """Full spotting OCR with auto PNG conversion for JPEG PDFs."""
-        import requests, time, json as json_mod, fitz
+    def _run_api_ocr_sync(self, pdf_path: str, work_dir: str,
+                         job_id: str = None, progress_callback=None, loop=None):
+        """Full spotting OCR with auto PNG conversion for JPEG PDFs.
+        非 PNG 路径:>BATCH_SIZE 页自动切片分批,合并用全局 key 偏移。"""
+        import fitz
 
         tok_file = "/tmp/paddle_token"
         if not os.path.exists(tok_file):
@@ -96,23 +101,76 @@ class PDFProcessor:
         total_pages = doc.page_count
         doc.close()
 
+        # 从 executor 线程向主 loop 投递进度(executor 内不能直接 await)
+        def emit_progress(stage, progress, message):
+            if progress_callback and loop:
+                asyncio.run_coroutine_threadsafe(
+                    self._emit(progress_callback, job_id, stage, progress, message=message),
+                    loop)
+
         if needs_png:
             all_lines, all_coords = self._ocr_via_png(pdf_path, work_dir, total_pages, tok)
         else:
-            JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
-            headers = {"Authorization": "bearer " + tok}
-            payload = {
-                "model": "PaddleOCR-VL-1.6",
-                "optionalPayload": json_mod.dumps({
-                    "useDocOrientationClassify": False, "useDocUnwarping": False,
-                    "useChartRecognition": False, "useLayoutDetection": False,
-                    "promptLabel": "spotting", "temperature": 0,
-                }),
-            }
-            raw = self._submit_and_poll(JOB_URL, headers, payload, pdf_path)
-            all_lines, all_coords = self._parse_jsonl_response(raw)
+            all_lines, all_coords = self._ocr_pdf_batched(
+                pdf_path, total_pages, tok, emit_progress)
 
         return self._save_ocr_files(all_lines, all_coords, work_dir)
+
+    def _ocr_pdf_batched(self, pdf_path, total_pages, tok, emit_progress=None):
+        """直接上传路径的批量驱动。>BATCH_SIZE 页时切片分批,合并用全局 key 偏移。
+        镜像 run_spotting_ocr.process_pdf 分批逻辑。web 路径不开版面分析,无 labels。"""
+        import fitz, tempfile, os, shutil, json as json_mod
+
+        BATCH_SIZE = 90  # API 单次 ≤100 页,留 10 页余量
+        JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+        headers = {"Authorization": "bearer " + tok}
+        payload = {
+            "model": "PaddleOCR-VL-1.6",
+            "optionalPayload": json_mod.dumps({
+                "useDocOrientationClassify": False, "useDocUnwarping": False,
+                "useChartRecognition": False, "useLayoutDetection": False,
+                "promptLabel": "spotting", "temperature": 0,
+            }),
+        }
+
+        # 切片:range(0, n, BATCH_SIZE) → 每批 [start, start+BATCH_SIZE)
+        src = fitz.open(pdf_path)
+        batches = []
+        tmp_dir = tempfile.mkdtemp(prefix="ocr_batch_")
+        for start in range(0, total_pages, BATCH_SIZE):
+            end = min(start + BATCH_SIZE, total_pages)
+            out_doc = fitz.open()
+            out_doc.insert_pdf(src, from_page=start, to_page=end - 1)
+            tmp_path = os.path.join(tmp_dir, f"batch_{start:05d}.pdf")
+            out_doc.save(tmp_path)
+            out_doc.close()
+            batches.append((tmp_path, start, end - start))
+        src.close()
+
+        all_lines, all_coords = {}, {}
+        total = len(batches)
+        try:
+            for i, (batch_pdf, batch_start, batch_len) in enumerate(batches, 1):
+                # OCR 阶段进度在 10-90 区间按批插值
+                if emit_progress:
+                    emit_progress("ocr",
+                        10 + (i - 1) / total * 80,
+                        f"OCR 批次 {i}/{total} (页 {batch_start}-{batch_start + batch_len - 1})")
+                raw = self._submit_and_poll(JOB_URL, headers, payload, batch_pdf)
+                # page_offset=batch_start:解析出的 key 直接是全局页号
+                bl, bc = self._parse_jsonl_response(raw, page_offset=batch_start)
+                # 校验:解析页数必须 == 切片页数,否则丢页/多页导致坐标全错
+                if len(bl) != batch_len:
+                    raise RuntimeError(
+                        f"Batch parse mismatch at pages {batch_start}-{batch_start+batch_len-1}: "
+                        f"expected {batch_len} pages, got {len(bl)}")
+                all_lines.update(bl)
+                all_coords.update(bc)
+                if emit_progress:
+                    emit_progress("ocr", 10 + i / total * 80, f"OCR 批次 {i}/{total} 完成")
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        return all_lines, all_coords
 
     def _submit_and_poll(self, url, headers, payload, file_path):
         """Submit file to OCR API, poll until done, return raw response text."""
@@ -161,51 +219,56 @@ class PDFProcessor:
         doc.close()
         return all_lines, all_coords
 
-    def _parse_jsonl_single_page(self, raw_text):
-        """Parse a single page from JSONL response."""
-        import json as json_mod
+    def _parse_page(self, lpr):
+        """解析单个 layoutParsingResults 元素(= 一页)→ (lines, polys)。
+        web 路径不开版面分析,优先用 spotting_res;回退 parsing_res_list。"""
+        pruned = lpr.get("prunedResult", {}) if isinstance(lpr, dict) else {}
+        pr = lpr.get("layoutParsingResult", {}) if isinstance(lpr, dict) else {}
+        sr = (pruned.get("spotting_res") or pr.get("spotting_res")
+              or (lpr.get("spotting_res") if isinstance(lpr, dict) else None))
         pl, pp = [], []
+        if sr and isinstance(sr, dict) and sr.get("rec_texts"):
+            pl = list(sr.get("rec_texts", []))
+            pp = list(sr.get("rec_polys", []))
+        else:
+            blocks = pruned.get("parsing_res_list", []) or pr.get("parsing_res_list", [])
+            if not blocks and isinstance(lpr, dict):
+                blocks = lpr.get("parsing_res_list", [])
+            for blk in blocks:
+                bl, bp = self._parse_spotting_block(blk)
+                pl.extend(bl)
+                pp.extend(bp)
+        pp = [[[round(c, 1) for c in pt] for pt in p] if p else None for p in pp]
+        return pl, pp
+
+    def _parse_jsonl_single_page(self, raw_text):
+        """Parse a single page from JSONL response (PNG 逐页上传 = 1 文档 1 页)。"""
+        import json as json_mod
         for line in raw_text.strip().split("\n"):
             line = line.strip()
             if not line: continue
             result = json_mod.loads(line)["result"]
-            pl, pp = self._extract_spotting(result, pl, pp)
-        pp = [[[round(c, 1) for c in pt] for pt in p] if p else None for p in pp]
-        return pl, pp
+            for lpr in result.get("layoutParsingResults", []):
+                return self._parse_page(lpr)
+        return [], []
 
-    def _parse_jsonl_response(self, raw_text):
-        """Parse multi-page JSONL response."""
+    def _parse_jsonl_response(self, raw_text, page_offset=0):
+        """解析多页 JSONL:每行=一个文档,result.layoutParsingResults=页数组。
+        page_offset 用于分批合并:全局 key = page_offset + 文档内页序号。"""
         import json as json_mod
         all_lines, all_coords = {}, {}
-        for page_idx, line in enumerate(raw_text.strip().split("\n")):
+        page_counter = 0
+        for line in raw_text.strip().split("\n"):
             line = line.strip()
             if not line: continue
             result = json_mod.loads(line)["result"]
-            pl, pp = self._extract_spotting(result, [], [])
-            all_lines[str(page_idx)] = pl
-            all_coords[str(page_idx)] = [
-                [[round(c, 1) for c in pt] for pt in p] if p else None for p in pp
-            ]
+            for lpr in result.get("layoutParsingResults", []):
+                pl, pp = self._parse_page(lpr)
+                gk = str(page_offset + page_counter)
+                all_lines[gk] = pl
+                all_coords[gk] = pp
+                page_counter += 1
         return all_lines, all_coords
-
-    def _extract_spotting(self, result, pl, pp):
-        """Extract spotting lines and polys from a result dict."""
-        for res in result.get("layoutParsingResults", []):
-            pr = res.get("layoutParsingResult", {})
-            pruned = res.get("prunedResult", {})
-            sr = pruned.get("spotting_res") or pr.get("spotting_res") or res.get("spotting_res")
-            if sr and isinstance(sr, dict) and sr.get("rec_texts"):
-                pl.extend(sr["rec_texts"])
-                pp.extend(sr.get("rec_polys", []))
-            else:
-                blocks = pr.get("parsing_res_list", []) or pruned.get("parsing_res_list", [])
-                if not blocks:
-                    blocks = res.get("parsing_res_list", [])
-                for blk in blocks:
-                    bl, bp = self._parse_spotting_block(blk)
-                    pl.extend(bl)
-                    pp.extend(bp)
-        return pl, pp
 
     def _save_ocr_files(self, all_lines, all_coords, work_dir):
         """Save spotting JSON files and generate markdown. Return file paths."""

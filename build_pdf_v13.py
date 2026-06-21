@@ -11,6 +11,7 @@ SPOTTING_LINES = sys.argv[3] if len(sys.argv) > 3 else "/opt/test/spotting_lines
 SPOTTING_COORDS = sys.argv[4] if len(sys.argv) > 4 else "/opt/test/spotting_coords.json"
 SPOTTING_TITLES = sys.argv[5] if len(sys.argv) > 5 else ""  # OCR标题集合文件（可选）
 MARKDOWN_FILE = sys.argv[6] if len(sys.argv) > 6 else ""
+PAGE_NUMBERS_JSON = sys.argv[7] if len(sys.argv) > 7 else ""  # 外部页码表(key→页码,可选)
 
 FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')
 
@@ -608,25 +609,30 @@ TARGET = max(TARGET, int(PW_PT * 0.70))  # minimum 70% of page width
 MARGIN_PT = (PW_PT - TARGET) / 2
 MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
 
-# Page number: find the bottom-most short number or ·N· on each page
+# ── Page numbers: 外部文件优先,否则内部提取 ──
 page_numbers = {}
-for key in spot_lines:
-    lines = spot_lines[key]; polys = spot_coords.get(key, [])
-    candidates = []
-    for i, l in enumerate(lines):
-        t = l.strip()
-        if not t or len(t) > 8: continue
-        if i >= len(polys) or not polys[i]: continue
-        y = min(p[1] for p in polys[i]) / SCALE
-        if y < PH_PT * 0.55: continue  # only bottom half
-        m = re.match(r'[·•‧]?\s*(\d{1,4})\s*[·•‧]?', t)
-        if m:
-            candidates.append((y, m.group(1)))
-        elif t.isdigit() and len(t) <= 4:
-            candidates.append((y, t))
-    if candidates:
-        candidates.sort(key=lambda x: -x[0])  # lowest on page first
-        page_numbers[key] = candidates[0][1]
+if PAGE_NUMBERS_JSON and os.path.exists(PAGE_NUMBERS_JSON):
+    page_numbers = json.load(open(PAGE_NUMBERS_JSON))
+    print(f"使用外部页码表: {PAGE_NUMBERS_JSON} ({len(page_numbers)} 页)")
+else:
+    # 内部提取: 从 spotting coords 找每页页脚最底数字
+    for key in spot_lines:
+        lines = spot_lines[key]; polys = spot_coords.get(key, [])
+        candidates = []
+        for i, l in enumerate(lines):
+            t = l.strip()
+            if not t or len(t) > 8: continue
+            if i >= len(polys) or not polys[i]: continue
+            y = min(p[1] for p in polys[i]) / SCALE
+            if y < PH_PT * 0.55: continue  # only bottom half
+            m = re.match(r'[·•‧]?\s*(\d{1,4})\s*[·•‧]?', t)
+            if m:
+                candidates.append((y, m.group(1)))
+            elif t.isdigit() and len(t) <= 4:
+                candidates.append((y, t))
+        if candidates:
+            candidates.sort(key=lambda x: -x[0])  # lowest on page first
+            page_numbers[key] = candidates[0][1]
 START_PAGE = 1
 if page_numbers:
     vals = sorted(int(v) for v in page_numbers.values())
@@ -1133,6 +1139,8 @@ for key in sorted(spot_lines.keys(), key=int):
 
     # ══ TOC page rendering: use Y-grouping to pair text + page numbers ══
     if key in toc_page_keys:
+        # TOC 页不在正文页码体系,隐藏页脚页码
+        result.append('\\thispagestyle{empty}')
         toc_entries = group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD_PX)
 
         # Render TOC title "目录" (centered, heiti) if present
@@ -1169,10 +1177,13 @@ for key in sorted(spot_lines.keys(), key=int):
         all_tex.append(''.join(result) + '\\par\\newpage')
         continue
 
-    # Set page number to source value
+    # Set page number to source value; 前言区(无src_pn)不显示页脚页码
     src_pn = page_numbers.get(key, '')
     if src_pn:
         result.append('\\setcounter{page}{' + src_pn + '}')
+    else:
+        # 无印刷页码(封面/CIP/目录/总序),隐藏页脚页码
+        result.append('\\thispagestyle{empty}')
 
     # ══ Structural heading detection (replaces font classifier) ══
     def detect_heading_signal(t, x_left, line_w_px, page_width_px,
