@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+aiofiles
+PyMuPDF
+PyPDF2
+paddlepaddle
+paddleocr
+opencv-python-headless
+Pillow
+python-dotenv
+openai
+weasyprint
+markdown
