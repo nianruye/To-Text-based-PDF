@@ -14,3 +14,8 @@ ocr_texts.json
 spotting_*.json
 /tmp/
 /tmp/paddle_token
+
+# 运行时数据/产物(不进仓库)
+uploads/
+font_classifier/
+page_numbers*.json
