@@ -44,6 +44,18 @@ def escape_tex(text):
         text = text.replace(char, repl)
     return text
 
+def escape_body(text):
+    """escape_tex, but render PaddleOCR footnote markers $ ^{①} $ as \textsuperscript{①}
+    instead of escaping the $/^ (which would print the marker literally)."""
+    out = []
+    for part in re.split(r'(\$\s*\^\{[^}]+\}\s*\$)', text):
+        m = re.match(r'\$\s*\^\{([^}]+)\}\s*\$', part)
+        if m:
+            out.append(r'\textsuperscript{' + escape_tex(m.group(1)) + '}')
+        else:
+            out.append(escape_tex(part))
+    return ''.join(out)
+
 def is_page_number(t):
     s = t.strip()
     if re.match(r'^[·•‧]?\s*\d{1,4}\s*[·•‧]?$', s): return True
@@ -553,7 +565,11 @@ if body_cjk_list:
     body_cjk_list.sort()
     _median_cjk = body_cjk_list[len(body_cjk_list)//2]
     STRETCH_THRESHOLD = round(_median_cjk * 0.85)
-    STRETCH_UPPER = round(_median_cjk * 1.3)  # 满行1.3倍内才\makebox[s];超过=OCR整段合并→自然换行防截断
+    # 单行实际CJK容量 = linewidth/字号。makebox[s]只应作用于≤单行的近满行(两端对齐)。
+    # 扫描书OCR常把整段合并成一条"行"(median 92+ 远超单行容量~36),此时 threshold>UPPER,
+    # 条件 (threshold<cjk<=UPPER) 永不成立→makebox从不触发,全部走 \par 自然换行,
+    # 避免对超长合并段套 makebox 导致横向溢出截断(用户反馈"长行不换行")。
+    STRETCH_UPPER = round(AVAIL_WIDTH / FONT_SIZE)
 else:
     STRETCH_THRESHOLD = 25
     STRETCH_UPPER = 32
@@ -663,6 +679,8 @@ if has_text_layer and _text_layer_params:
     MARGIN_MM = round(MARGIN_PT * 0.3528, 1)
     print(f"[Text layer override] FONT={FONT_SIZE}pt TARGET={TARGET}pt MARGIN={MARGIN_PT}pt STRETCH={BODY_STRETCH}")
     print(f"[Text layer override] STRETCH_THRESHOLD={STRETCH_THRESHOLD} (full_line≈{_tl_full_line_cjk} CJK, 80%)")
+    # 用文本层字号/边距刷新单行容量(此处 FONT_SIZE/MARGIN_PT 已被覆盖)
+    STRETCH_UPPER = round((PW_PT - 2 * MARGIN_PT) / FONT_SIZE)
 
 print(f"FONT={FONT_SIZE}pt TARGET={TARGET}pt INDENT={INDENT_THRESHOLD_PX:.0f}px STRETCH={BODY_STRETCH}")
 
@@ -767,8 +785,8 @@ for key in content_page_keys:
         gap = body_y - hdr_bot
         if hdr_info['pos'] == 'right': right_gaps.append(gap)
         else: left_gaps.append(gap)
-RIGHT_HDR_GAP = statistics.median(right_gaps) if right_gaps else 38
-LEFT_HDR_GAP = statistics.median(left_gaps) if left_gaps else 40
+RIGHT_HDR_GAP = min(round(FONT_SIZE * 1.4), statistics.median(right_gaps) if right_gaps else 38)
+LEFT_HDR_GAP = min(round(FONT_SIZE * 1.4), statistics.median(left_gaps) if left_gaps else 40)
 # Min header gap floor: half a body line height (dynamic, scales with font size)
 HDR_GAP_MIN = round(FONT_SIZE * 0.6) if FONT_SIZE else 6
 
@@ -801,7 +819,7 @@ for key in content_page_keys:
     if fn_start < len(polys) and polys[fn_start]:
         fn_first_y = min(p[1] for p in polys[fn_start]) / SCALE
     if body_last_y and fn_first_y:
-        page_fn_gap[key] = max(10, fn_first_y - body_last_y)
+        page_fn_gap[key] = max(10, min(round(FONT_SIZE * 1.5), fn_first_y - body_last_y))
 
 FN_GAP_DEFAULT = statistics.median(list(page_fn_gap.values())) if page_fn_gap else 18
 print(f"Footnote gaps: per-page={len(page_fn_gap)} pages, default={FN_GAP_DEFAULT:.0f}pt")
@@ -864,11 +882,16 @@ for key in content_page_keys:
 
 # Compute dynamic params
 FN_FONT_SIZE = round(statistics.median(fn_line_heights) * 0.78) if fn_line_heights else 6
+# 脚注字号封顶为正文的85%。扫描书OCR把整段脚注合并→行高bbox偏大,曾算出11pt(>正文10pt),
+# 既失真(脚注应小于正文)又多占纵向空间致正文溢出/页码重复。
+FN_FONT_SIZE = max(6, min(round(FONT_SIZE * 0.85), FN_FONT_SIZE))
 # In text-layer mode, override footnote font with accurate pt value from the
 # text layer (SCALE-dependent calculation is inaccurate for PDF1).
 if has_text_layer and _text_layer_params:
     FN_FONT_SIZE = _text_layer_params.get('FN_FONT_SIZE', FN_FONT_SIZE)
 FN_BASELINE = round((statistics.median(fn_line_heights) + statistics.median(fn_line_gaps)) if fn_line_heights and fn_line_gaps else FN_FONT_SIZE * 1.5)
+# 扫描书OCR行距偏大,钳到 [1.2,1.6]×字号,避免脚注行距过松多占空间。
+FN_BASELINE = max(round(FN_FONT_SIZE * 1.2), min(round(FN_FONT_SIZE * 1.6), FN_BASELINE))
 if has_text_layer and _text_layer_params:
     # Source FN baseline is ~18pt (verified from text layer analysis).
     # Use tighter baseline than text-layer extraction (which includes
@@ -914,6 +937,9 @@ if fn_cjk_list:
     FN_STRETCH_THRESHOLD = round(fn_cjk_list[len(fn_cjk_list)//2] * 0.85)
 else:
     FN_STRETCH_THRESHOLD = 24
+# 脚注单行容量(扣除脚注缩进)。扫描书脚注OCR整段合并时 threshold>UPPER → makebox禁用,
+# 自然 \par 换行,避免超长脚注行溢出截断。矢量PDF脚注按行OCR时近满行仍两端对齐。
+FN_STRETCH_UPPER = round((AVAIL_WIDTH - FN_INDENT_PT) / FN_FONT_SIZE)
 
 print(f"Footnote params: font={FN_FONT_SIZE}pt baseline={FN_BASELINE}pt indent={FN_INDENT_PT}pt CJKglue={FN_CJK_GLUE}")
 
@@ -991,6 +1017,23 @@ for t, cnt in text_count_by_page.items():
 watermark_fuzzy_keys = set()
 for wt in watermark_texts:
     watermark_fuzzy_keys.add(fuzzy_key(wt))
+# 推广/二维码水印:含特征关键词的【窄】短文本直接判为水印,不看频次。
+# 扫描书OCR常漏识/乱识淡水印(斜向、淡色)→单种文本频次达不到25%阈值,且前缀被乱识
+# (欢迎→政治/物渔/光临),但核心词"关注"/"学习理论"保留。关键判别:水印是页面局部
+# 小图(宽~20%),正文是满宽(>50%),故用"窄行"特征区分,避免误删含"关注"的正文。
+for _wk in spot_lines:
+    _polys = spot_coords.get(_wk, [])
+    for _i, _wl in enumerate(spot_lines[_wk]):
+        _wt = _wl.strip()
+        if not (3 <= len(_wt) <= 30): continue
+        if _wt in _header_texts or is_footnote_start(_wt): continue
+        if _i < len(_polys) and _polys[_i]:
+            _w = max(p[0] for p in _polys[_i]) - min(p[0] for p in _polys[_i])
+            if _w > page_width_px * 0.5: continue  # 满宽=正文,跳过
+        if any(_kw in _wt for _kw in ('关注', '学习理论', '扫码', '扫一扫',
+                                       '公众号', '二维码', '光临', '更多精彩')):
+            watermark_texts.add(_wt)
+            watermark_fuzzy_keys.add(fuzzy_key(_wt))
 if watermark_texts:
     print(f"Watermark filter: {len(watermark_texts)} patterns ({len(watermark_fuzzy_keys)} fuzzy keys)")
 
@@ -1302,9 +1345,9 @@ for key in sorted(spot_lines.keys(), key=int):
                 elif _fb:
                     _font_open = _font_open.rstrip('}') + '\\bfseries' + _font_close
                 if STRETCH_THRESHOLD < cjk_count <= STRETCH_UPPER and not is_toc_page:
-                    result.append('\\makebox[\\linewidth][s]{' + prefix + _font_open + escape_tex(txt) + _font_close + '}\\par')
+                    result.append('\\makebox[\\linewidth][s]{' + prefix + _font_open + escape_body(txt) + _font_close + '}\\par')
                 else:
-                    result.append(prefix + _font_open + escape_tex(txt) + _font_close + '\\par')
+                    result.append(prefix + _font_open + escape_body(txt) + _font_close + '\\par')
         body_buf.clear()
 
     skip_lines = set()
@@ -1336,10 +1379,10 @@ for key in sorted(spot_lines.keys(), key=int):
         # ── Footnote continuation (must be BEFORE heading detection) ──
         if in_fn and not is_footnote_start(t):
             cjk_fn = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
-            if cjk_fn > FN_STRETCH_THRESHOLD:
-                result.append('\\makebox[\\linewidth][s]{' + escape_tex(t) + '}\\par')
+            if FN_STRETCH_THRESHOLD < cjk_fn <= FN_STRETCH_UPPER:
+                result.append('\\makebox[\\linewidth][s]{' + escape_body(t) + '}\\par')
             else:
-                result.append(escape_tex(t) + '\\par')
+                result.append(escape_body(t) + '\\par')
             continue
 
         # ── MD-based heading detection ──
@@ -1719,9 +1762,9 @@ for key in sorted(spot_lines.keys(), key=int):
                     _style_prefix += '\\itshape'
                 # Multi-line headings: preserve separate lines with \\ line breaks
                 if len(heading_lines) > 1:
-                    heading_text = ('\\\\' + chr(10)).join(escape_tex(hl) for hl in heading_lines)
+                    heading_text = ('\\\\' + chr(10)).join(escape_body(hl) for hl in heading_lines)
                 else:
-                    heading_text = escape_tex(heading_lines[0])
+                    heading_text = escape_body(heading_lines[0])
                 _hfontsize = '\\fontsize{' + str(_this_heading_font) + 'pt}{' + str(round(_this_heading_font*1.5)) + 'pt}\\selectfont'
                 if _heading_align == 'right':
                     result.append('\\par\\vspace{10pt}{' + _hfont + _style_prefix + _hfontsize + '\\raggedleft ' + heading_text + '\\par}\\vspace{6pt}\\normalfont\\normalsize')
@@ -1732,7 +1775,7 @@ for key in sorted(spot_lines.keys(), key=int):
             else:
                 heading_text = ''.join(heading_lines)
                 _hfont = '\\rmfamily' if (has_text_layer and not _text_layer_params.get('use_kaiti', True)) else '\\CJKfamily{kaiti}'
-                result.append('{' + _hfont + '\\fontsize{' + str(heading_font_size) + 'pt}{1em}\\selectfont ' + escape_tex(heading_text) + '}\\par\\normalfont\\normalsize')
+                result.append('{' + _hfont + '\\fontsize{' + str(heading_font_size) + 'pt}{1em}\\selectfont ' + escape_body(heading_text) + '}\\par\\normalfont\\normalsize')
             continue
 
         # Footnote
@@ -1750,10 +1793,10 @@ for key in sorted(spot_lines.keys(), key=int):
             in_fn = True
             # ① lines: indented from body left (dynamically computed from source x coords)
             cjk_fn = sum(1 for c in t if ord(c) > 0x2000) + sum(0.52 for c in t if c.isascii() and c.isalpha())
-            if cjk_fn > FN_STRETCH_THRESHOLD:
-                result.append('\\makebox[\\linewidth][s]{\\hspace{' + str(FN_INDENT_PT) + 'pt}' + escape_tex(t) + '}\\par')
+            if FN_STRETCH_THRESHOLD < cjk_fn <= FN_STRETCH_UPPER:
+                result.append('\\makebox[\\linewidth][s]{\\hspace{' + str(FN_INDENT_PT) + 'pt}' + escape_body(t) + '}\\par')
             else:
-                result.append('\\hspace{' + str(FN_INDENT_PT) + 'pt}' + escape_tex(t) + '\\par')
+                result.append('\\hspace{' + str(FN_INDENT_PT) + 'pt}' + escape_body(t) + '\\par')
             continue
 
         # Body — buffer for paragraph grouping
