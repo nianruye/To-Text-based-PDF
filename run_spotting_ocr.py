@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Step 1: Full spotting OCR on 20 pages."""
 
-import json, os, re, sys, time, tempfile, shutil, requests, fitz
+import json, os, re, sys, time, tempfile, shutil, threading, requests, fitz
+from concurrent.futures import ThreadPoolExecutor
 
 TOKEN_FILE = "/tmp/paddle_token"
 INPUT_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
@@ -22,6 +23,7 @@ PAYLOAD = {
 }
 
 BATCH_SIZE = 90  # PaddleOCR-VL API 单次 ≤100 页,留余量防收紧
+PNG_OCR_WORKERS = 8  # 扫描书 PNG 逐页 OCR 并发度(API 限流时调低)
 
 
 def parse_spotting_line(raw_line):
@@ -81,83 +83,125 @@ def needs_png_conversion(filepath):
     return False
 
 
-def process_pdf_via_png(filepath):
-    """Convert PDF pages to PNG, send each to spotting API, merge results.
-    启用版面分析后，提取 block_label 识别标题类型。"""
-    doc = fitz.open(filepath)
-    all_lines, all_coords, all_labels = {}, {}, {}
-
-    for pi in range(doc.page_count):
-        page = doc[pi]
-        pix = page.get_pixmap(dpi=200)
-        png_path = f"/tmp/spotting_page_{pi:03d}.png"
-        pix.save(png_path)
-
-        print(f"Page {pi+1}/{doc.page_count}: uploading PNG {pix.width}x{pix.height}...")
-        with open(png_path, "rb") as f:
-            r = requests.post(JOB_URL, headers=HEADERS, data=PAYLOAD, files={"file": f})
-        r.raise_for_status()
-        job_id = r.json()["data"]["jobId"]
-
-        # Poll
-        while True:
-            rr = requests.get(JOB_URL + "/" + job_id, headers=HEADERS)
-            rr.raise_for_status()
-            state = rr.json()["data"]["state"]
-            if state == "done":
-                jsonl_url = rr.json()["data"]["resultUrl"]["jsonUrl"]
-                break
-            elif state == "failed":
-                raise RuntimeError(f"Page {pi+1} failed: " + rr.json()["data"].get("errorMsg", "unknown"))
-            time.sleep(2)
-
-        # Download and parse (启用版面分析后的新格式)
-        rr = requests.get(jsonl_url)
+def _ocr_png_page(png_path):
+    """上传单页 PNG → 轮询 → 下载 jsonl → 解析版面块。
+    返回 (lines, polys, labels)。保留 PNG 路径原有的 bbox/dict 坐标转换逻辑。"""
+    with open(png_path, "rb") as f:
+        r = requests.post(JOB_URL, headers=HEADERS, data=PAYLOAD, files={"file": f})
+    r.raise_for_status()
+    job_id = r.json()["data"]["jobId"]
+    while True:
+        rr = requests.get(JOB_URL + "/" + job_id, headers=HEADERS)
         rr.raise_for_status()
-        for line in rr.text.strip().split("\n"):
-            line = line.strip()
-            if not line: continue
-            result = json.loads(line)["result"]
-
-            # 从 layoutParsingResults 提取 parsing_res_list
-            lpr_list = result.get("layoutParsingResults", [])
-            if not lpr_list:
-                continue
-            pr = lpr_list[0].get("prunedResult", {})
-            blocks = pr.get("parsing_res_list", [])
-
-            pl, pp, pb = [], [], []  # texts, polys, labels
-            for blk in blocks:
-                label = blk.get("block_label", "text")
-                content = blk.get("block_content", "")
-                poly_pts = blk.get("block_polygon_points") or blk.get("block_bbox")
-
-                if content:
-                    pl.append(content)
-                    pb.append(label)
-                    # 转换 polygon 为标准格式
-                    if poly_pts:
-                        if isinstance(poly_pts, list) and len(poly_pts) >= 4:
-                            # 已经是 polygon 格式
-                            pp.append([[round(c, 1) for c in pt] for pt in poly_pts[:4]])
-                        elif isinstance(poly_pts, dict) or len(poly_pts) == 4 and isinstance(poly_pts[0], (int, float)):
-                            # bbox 格式 [x1, y1, x2, y2]，转换为 polygon
-                            x1, y1, x2, y2 = poly_pts[:4]
-                            pp.append([[round(x1,1), round(y1,1)], [round(x2,1), round(y1,1)],
-                                      [round(x2,1), round(y2,1)], [round(x1,1), round(y2,1)]])
-                        else:
-                            pp.append(None)
+        state = rr.json()["data"]["state"]
+        if state == "done":
+            jsonl_url = rr.json()["data"]["resultUrl"]["jsonUrl"]
+            break
+        elif state == "failed":
+            raise RuntimeError("PNG OCR failed: " + rr.json()["data"].get("errorMsg", "unknown"))
+        time.sleep(2)
+    rr = requests.get(jsonl_url)
+    rr.raise_for_status()
+    pl, pp, pb = [], [], []
+    for line in rr.text.strip().split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        result = json.loads(line)["result"]
+        lpr_list = result.get("layoutParsingResults", [])
+        if not lpr_list:
+            continue
+        pr = lpr_list[0].get("prunedResult", {})
+        blocks = pr.get("parsing_res_list", [])
+        for blk in blocks:
+            label = blk.get("block_label", "text")
+            content = blk.get("block_content", "")
+            poly_pts = blk.get("block_polygon_points") or blk.get("block_bbox")
+            if content:
+                pl.append(content)
+                pb.append(label)
+                if poly_pts:
+                    if isinstance(poly_pts, list) and len(poly_pts) >= 4:
+                        # 已经是 polygon 格式
+                        pp.append([[round(c, 1) for c in pt] for pt in poly_pts[:4]])
+                    elif isinstance(poly_pts, dict) or len(poly_pts) == 4 and isinstance(poly_pts[0], (int, float)):
+                        # bbox 格式 [x1, y1, x2, y2]，转换为 polygon
+                        x1, y1, x2, y2 = poly_pts[:4]
+                        pp.append([[round(x1,1), round(y1,1)], [round(x2,1), round(y1,1)],
+                                  [round(x2,1), round(y2,1)], [round(x1,1), round(y2,1)]])
                     else:
                         pp.append(None)
+                else:
+                    pp.append(None)
+    return pl, pp, pb
 
+
+def _ocr_png_page_with_retry(png_path, retries=2, backoff=5):
+    """单页 PNG OCR 带重试(网络错/API 5xx/failed 状态)。耗尽抛最后异常。"""
+    last = None
+    for attempt in range(retries + 1):
+        try:
+            return _ocr_png_page(png_path)
+        except Exception as e:
+            last = e
+            if attempt < retries:
+                time.sleep(backoff * (attempt + 1))
+    raise last
+
+
+def process_pdf_via_png(filepath):
+    """扫描书路径:渲染每页 PNG → 并发上传 OCR → 合并。
+    主线程串行渲染(fitz 非线程安全),ThreadPoolExecutor 并发上传/轮询/解析。
+    单页失败重试后仍失败则置空 + 记录 + 继续(不因一页废全本)。"""
+    doc = fitz.open(filepath)
+    n = doc.page_count
+
+    # 阶段1: 主线程串行渲染所有页为 PNG(fitz 非线程安全)
+    print(f"Rendering {n} pages @200dpi (serial)...")
+    png_paths = []
+    for pi in range(n):
+        pix = doc[pi].get_pixmap(dpi=200)
+        png_path = f"/tmp/spotting_page_{pi:03d}.png"
+        pix.save(png_path)
+        png_paths.append(png_path)
+        if (pi + 1) % 25 == 0 or pi + 1 == n:
+            print(f"  rendered {pi + 1}/{n}")
+    doc.close()
+
+    # 阶段2: 并发上传/轮询/解析
+    all_lines, all_coords, all_labels = {}, {}, {}
+    failed = []
+    done = [0]
+    lock = threading.Lock()
+
+    def worker(pi):
+        try:
+            pl, pp, pb = _ocr_png_page_with_retry(png_paths[pi])
+        except Exception as e:
+            pl, pp, pb = [], [], []
+            with lock:
+                failed.append((pi, str(e)[:80]))
+        with lock:
             all_lines[str(pi)] = pl
             all_coords[str(pi)] = pp
             all_labels[str(pi)] = pb
+            done[0] += 1
+            if done[0] % 10 == 0 or done[0] == n:
+                print(f"  OCR {done[0]}/{n}")
+        try:
+            os.unlink(png_paths[pi])
+        except OSError:
+            pass
 
-        os.unlink(png_path)
-        print(f"  {len(pl)} lines, titles: {sum(1 for l in pb if 'title' in l)}")
+    print(f"OCR {n} pages (x{PNG_OCR_WORKERS} workers)...")
+    with ThreadPoolExecutor(max_workers=PNG_OCR_WORKERS) as ex:
+        list(ex.map(worker, range(n)))
 
-    doc.close()
+    total = sum(len(v) for v in all_lines.values())
+    titles = sum(sum(1 for l in v if "title" in l) for v in all_labels.values())
+    print(f"PNG OCR done: {n} pages, {total} lines, {titles} titles, {len(failed)} failed")
+    if failed:
+        print(f"⚠️ 失败页(已置空): {failed}")
     return all_lines, all_coords, all_labels
 
 
