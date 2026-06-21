@@ -207,9 +207,11 @@ def is_content_page(key):
         if w > page_width_px * 0.55:
             full_width_lines += 1
             body_text_chars += len(t)
-    # fw>=9 excludes CIP/copyright pages (typically fw<=8) while keeping
-    # sparse content pages (PDF3 page 9 has fw=9, a real content page).
-    return full_width_lines >= 9 and body_text_chars > 100
+    # 正文页: 全宽行≥3 且 文字>100。
+    # 原 ≥9 对矢量文本PDF(每页行多)合适,但对扫描书(每页OCR block少,全宽行仅3-8)
+    # 太严——会把扫描书正文页全判为非正文→整页跳过→丢字78%。
+    # ≥3 + body_text_chars>100 适配扫描书与矢量PDF两类(短封面/CIP因chars<100仍被排除)。
+    return full_width_lines >= 3 and body_text_chars > 100
 
 # ── Detect TOC (table of contents) pages ──
 # TOC pages are often filtered out by is_content_page because entries are short.
@@ -551,8 +553,10 @@ if body_cjk_list:
     body_cjk_list.sort()
     _median_cjk = body_cjk_list[len(body_cjk_list)//2]
     STRETCH_THRESHOLD = round(_median_cjk * 0.85)
+    STRETCH_UPPER = round(_median_cjk * 1.3)  # 满行1.3倍内才\makebox[s];超过=OCR整段合并→自然换行防截断
 else:
     STRETCH_THRESHOLD = 25
+    STRETCH_UPPER = 32
 
 body_widths_pt = []
 for k in content_page_keys:
@@ -592,7 +596,7 @@ for k in content_page_keys:
         s = h / (len(body_ys) * BASE_SKIP)
         body_area_stretches.append(s)
 BODY_STRETCH = round(statistics.median(body_area_stretches), 2) if body_area_stretches else 1.5
-BODY_STRETCH = max(1.4, min(1.8, BODY_STRETCH))
+BODY_STRETCH = max(1.4, min(1.6, BODY_STRETCH))
 
 width_spread = (body_widths_pt[int(len(body_widths_pt)*0.9)] - body_widths_pt[len(body_widths_pt)//10]) / FONT_SIZE if len(body_widths_pt)>10 else 0.1
 CJK_STRETCH = 0  # high stretch so short lines can fill target width
@@ -1123,6 +1127,18 @@ prev_body_text = None
 for key in sorted(spot_lines.keys(), key=int):
     lines = spot_lines[key]; polys = spot_coords.get(key, [])
     result = []
+    # 含\n的block(目录页常被OCR识别为1个大块含多行)展开为独立行,每行复制原poly。
+    # 否则逐block处理时toc/正则只匹配首行、后续行全丢(目录条目丢失)。
+    if any('\n' in l for l in lines):
+        _nl, _np = [], []
+        for _l, _p in zip(lines, polys):
+            _subs = [s for s in _l.split('\n') if s.strip()]
+            if len(_subs) > 1 and _p:
+                for _s in _subs:
+                    _nl.append(_s); _np.append(_p)
+            else:
+                _nl.append(_l); _np.append(_p)
+        lines, polys = _nl, _np
 
     # Detect TOC pages: these should render ragged (no stretch) to avoid
     # ugly justification of "标题 …… 页码" entries with huge inter-char gaps.
@@ -1285,7 +1301,7 @@ for key in sorted(spot_lines.keys(), key=int):
                     _font_open = '{\\bfseries'; _font_close = '}'
                 elif _fb:
                     _font_open = _font_open.rstrip('}') + '\\bfseries' + _font_close
-                if cjk_count > STRETCH_THRESHOLD and not is_toc_page:
+                if STRETCH_THRESHOLD < cjk_count <= STRETCH_UPPER and not is_toc_page:
                     result.append('\\makebox[\\linewidth][s]{' + prefix + _font_open + escape_tex(txt) + _font_close + '}\\par')
                 else:
                     result.append(prefix + _font_open + escape_tex(txt) + _font_close + '\\par')
