@@ -45,13 +45,25 @@ def escape_tex(text):
     return text
 
 def escape_body(text):
-    """escape_tex, but render PaddleOCR footnote markers $ ^{①} $ as \textsuperscript{①}
-    instead of escaping the $/^ (which would print the marker literally)."""
+    """escape_tex, but handle PaddleOCR's LaTeX-style inline markup:
+    - $ ^{x} $ footnote markers → \\textsuperscript{x}
+    - $ \\frac{a}{b} $ and other $...$ math → \\frac{a}{b} becomes a/b, with the
+      $ delimiters stripped, so it renders as plain "a/b" instead of a literal
+      "$\\textbackslash{}frac{1}{3}$" (escaped backslash + braces)."""
     out = []
-    for part in re.split(r'(\$\s*\^\{[^}]+\}\s*\$)', text):
-        m = re.match(r'\$\s*\^\{([^}]+)\}\s*\$', part)
+    for part in re.split(r'(\$[^$]*\$)', text):
+        s = part.strip()
+        m = re.match(r'^\$\s*\^\{([^}]+)\}\s*\$$', s)
         if m:
             out.append(r'\textsuperscript{' + escape_tex(m.group(1)) + '}')
+        elif s.startswith('$') and s.endswith('$') and len(s) >= 2:
+            # Math expression: convert \frac{a}{b} → a/b, strip $ delimiters,
+            # then escape the rest. Keeps output deterministic & safe (no raw
+            # math mode) while avoiding the literal-backslash rendering.
+            inner = s[1:-1]
+            inner = re.sub(r'\\frac\{([^{}]*)\}\{([^{}]*)\}', r'\1/\2', inner)
+            inner = re.sub(r'\\([a-zA-Z]+)', r'\1', inner)  # strip \command backslash
+            out.append(escape_tex(inner))
         else:
             out.append(escape_tex(part))
     return ''.join(out)
@@ -1096,15 +1108,29 @@ def group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD
     # Sort by Y (reading order)
     items.sort(key=lambda x: x[0])
 
-    def _indent_from_x(x_left):
-        indent_px = x_left - BODY_LEFT
-        if indent_px > INDENT_THRESHOLD_PX * 2.5:
-            return 3
-        elif indent_px > INDENT_THRESHOLD_PX * 1.5:
-            return 2
-        elif indent_px > INDENT_THRESHOLD_PX * 0.5:
+    def _indent_from_entry(text):
+        """TOC hierarchy indent (em levels) from the entry's own numbering — NOT
+        from x_left. Scan-book OCR reports every TOC entry at the same x (the
+        source uses numbering like 第一部分/第一章/一 for hierarchy, not
+        indentation), so x-based indent is always 0 and the TOC renders flat.
+        Handles the OCR forms "一 社会历史背景" (space), "一、理论背景" (sep),
+        "（一）xxx" (parens), "1.xxx" (arabic)."""
+        t = text.strip()
+        # 顶级: 第X部分 / 附录 / 导论/绪论/总序/序言/前言/后记/引言/凡例
+        if re.match(r'^第[一二三四五六七八九十百千零\d]+部分', t):
+            return 0
+        if re.match(r'^(附录|导论|绪论|总序|序言|前言|后记|引言|凡例|编者的话)', t):
+            return 0
+        # 一级: 第X章/节/编/篇
+        if re.match(r'^第[一二三四五六七八九十百千零\d]+[章节编篇]', t):
             return 1
-        return 0
+        # 二级: 裸中文/阿拉伯数字 + 分隔符或空格: "一 xxx" / "一、xxx" / "1."
+        if re.match(r'^[（(]?[一二三四五六七八九十\d]+[)）]?[、.．：\s]', t):
+            return 2
+        # 二级: 括号数字直连汉字: "（一）xxx"
+        if re.match(r'^[（(]?[一二三四五六七八九十\d]+[)）][一-鿿]', t):
+            return 2
+        return 1
 
     toc_entries = []
     page_nums = []  # pure page numbers from right column (in Y order)
@@ -1122,7 +1148,7 @@ def group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD
             if m:
                 text = m.group(1).rstrip(' …·.')
                 num = m.group(2)
-                toc_entries.append((_indent_from_x(xl), text, num, yc))
+                toc_entries.append((_indent_from_entry(text), text, num, yc))
         else:
             text_entries.append((yc, xl, t))
 
@@ -1157,7 +1183,7 @@ def group_toc_rows(key, lines, polys, page_width_px, BODY_LEFT, INDENT_THRESHOLD
         # Get corresponding page number (same index in ordered list)
         page_num = page_nums[i][2] if i < len(page_nums) else None
 
-        toc_entries.append((_indent_from_x(x_left_min), merged_text, page_num, yc_group))
+        toc_entries.append((_indent_from_entry(merged_text), merged_text, page_num, yc_group))
 
     # Sort by Y (reading order)
     toc_entries.sort(key=lambda x: x[3])
@@ -1254,6 +1280,12 @@ for key in sorted(spot_lines.keys(), key=int):
         if not (1 < len(t) < 45 and y_pt > HDR_REGION_Y):
             return None, 0
 
+        # Skip OCR-garbled lines (U+FFFD replacement char): never headings.
+        # Scan-book OCR occasionally emits whole garbled lines (e.g. "￿格￿利￿")
+        # that are tall → would be misdetected as coord_heading and rendered huge.
+        if '�' in t:
+            return None, 0
+
         # Skip TOC entries: lines with leader dots + page number
         if is_toc_entry(t):
             return None, 0
@@ -1267,7 +1299,10 @@ for key in sorted(spot_lines.keys(), key=int):
             return 'L2', 2
 
         # L2: Arabic numeral + separator (e.g., 1., 2．)
-        if re.match(r'^[\d]+[.．、]', t):
+        # Exclude bibliography citations: a numbered line wrapping a book title
+        # 《…》 is a publication entry (e.g. "5.《工资、价格和利润》莫斯科版"),
+        # not a section heading. Real numbered headings don't contain 《》.
+        if re.match(r'^[\d]+[.．、]', t) and '《' not in t:
             return 'L2', 2
 
         # L2: 专题X (topic markers)
@@ -1295,7 +1330,7 @@ for key in sorted(spot_lines.keys(), key=int):
         # Skip body fragments ending with sentence punctuation
         if (body_h_avg > 0 and h / body_h_avg > COORD_HEADING_RATIO
                 and line_w_px > MIN_HEADING_WIDTH and len(t) <= 15
-                and not is_body_fragment(t)):
+                and not is_body_fragment(t) and '�' not in t):
             return 'coord_heading', 2
 
         # centered short line: require BOTH centered AND tall (height ratio > 1.1)
@@ -1328,7 +1363,15 @@ for key in sorted(spot_lines.keys(), key=int):
         if cur: paras.append(cur)
         for para in paras:
             for idx, item in enumerate(para):
-                prefix = '\\hspace*{2em}' if item['indent'] else ''
+                # CJK body: indent the first line of each paragraph 2 chars.
+                # Scan-book OCR (not has_text_layer) merges each paragraph into
+                # one block at x≈BODY_LEFT, so the x_left indent signal is lost
+                # and item['indent'] is always False → body renders flush-left.
+                # For scan books, treat every item as a paragraph start (each
+                # merged block = one paragraph). Vector PDFs keep the detected
+                # item['indent'] (real paragraph starts among multi-line paras).
+                _is_para_start = item['indent'] or not has_text_layer
+                prefix = '\\hspace*{2em}' if _is_para_start else ''
                 txt = item['text']
                 cjk_count = item['cjk']
                 # Font style wrapping for non-default fonts
@@ -1431,7 +1474,8 @@ for key in sorted(spot_lines.keys(), key=int):
                 # not full sentences). Excludes body text with OCR height noise.
                 if (ratio > COORD_HEADING_RATIO and 2 <= len(t) <= 15 and y_pt > HDR_REGION_Y
                         and line_width_px > min_heading_width
-                        and not is_toc_entry(t) and not is_body_fragment(t)):
+                        and not is_toc_entry(t) and not is_body_fragment(t)
+                        and '�' not in t):
                     coord_heading = True
                     md_level = max(md_level, 2)  # treat as ## level
 
