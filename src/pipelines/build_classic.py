@@ -960,7 +960,7 @@ for key in sorted(sl.keys(), key=int):
                 _seq_w = len(_seq_txt) * fnt   # 〔X〕占宽(不用\rlap,防文字重叠)
                 _seq_x = (_note_text_x[key] - _seq_w) - MARGIN   # 序号统一在文字列左缘(紧邻文字,不按源x0波动)
                 _offset = _seq_x + _seq_w
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\hspace*{%.1fpt}%s\\makebox[\\dimexpr\\textwidth-%.1fpt\\relax][s]{%s%s}}' % (_seq_x, esc(_seq_txt), _offset, _strut, esc(_rest)) + brk)
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\hspace*{%.1fpt}%s\\makebox[\\dimexpr\\textwidth-%.1fpt\\relax][l]{%s%s}}' % (_seq_x, esc(_seq_txt), _offset, _strut, esc(_rest)) + brk)
             elif _nat_w >= 0.85 * MEASURE:
                 _mb = 'l' if _grid else 's'   # 默认 makebox[s];固定字距靠 CJKglue plus 0em(不拉伸)实现——满行收缩齐右、短行自然 ragged,字距恒定≈字号
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _mb + ']{' + _strut + indent + esc(f['t']) + '}' + brk + '}')
