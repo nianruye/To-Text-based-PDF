@@ -1,5 +1,30 @@
 # Spec 文档索引
 
+## 术语表
+
+| 术语 | 含义 |
+|---|---|
+| **pitch** | 行间距（相邻两行文字基线/中心的垂直距离，pt）。源 pitch 从 OCR spotting y 坐标差中位测量；输出 pitch 从 PDF 行 bbox 测量。pitch 误差 = 输出 vs 源的偏差%，达标率（<3%误差）越高越好 |
+| **行盒高** | 单行文字的总高度（含墨色+空白），LaTeX hbox 不重叠时行距=行盒高 |
+| **墨高重叠** | CJK 古籍排版特征：行间距 < 行盒高（行间墨色微重叠 2pt），LaTeX 默认不重叠 |
+| **spotting** | PaddleOCR-VL 行级 OCR 模式（useLayoutDetection=False），输出每行文字 + bbox |
+| **layout** | PaddleOCR-VL 版面分析模式（useLayoutDetection=True），输出 image/aside_text/number 等 block |
+| **bl（baselineskip）** | LaTeX 行距参数，\fontsize{fnt}{bl} 的第二参数 |
+| **strut** | LaTeX \rule{0pt}{h}，设定 hbox 最小高度（行盒高），不影响文字 |
+| **BODY_FONT** | 正文字号（满行26字 -> 18pt） |
+| **NOTE_FONT** | 注释字号（满行32字 -> 14.7pt） |
+| **cw** | 满行字数（行宽 > 0.8×最大行宽 的行字数中位），用于算字号 |
+| **_note_text_x** | 注释页文字列 x0（续行 x0 中位），序号分列对齐基准 |
+| **_pp（page_pitch）** | 每页源行间距（spotting y 差中位，px->pt） |
+| **_pos_gscale** | 位置还原空白压缩比（top_vs + 段间隙） |
+| **_pos_sscale** | 位置还原行高压缩比（strut） |
+| **POS_FILL** | 填充目标=版心×POS_FILL（默认1.08，留余量防溢出） |
+| **frags** | 多片段行（同行多 poly，如"标题"+"页码"），按源 x 绝对定位 |
+| **figrow** | 书影图块行（is_figrow），按源 y 插入贴图 |
+| **aside** | 边栏旁注（aside_text），竖排 shortstack 渲染 |
+| **verify_geom** | 全局排版测试（pitch/占位/溢出/空白/页数） |
+| **test_cases** | 功能断言测试（具体页 + 具体断言，防回归） |
+
 ## 总 Spec
 - [00_system_architecture.md](00_system_architecture.md) - 系统总体架构（目标/类型/路由/共享基础/技术栈/目录结构/可扩展性）
 
