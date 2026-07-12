@@ -38,6 +38,26 @@ python3 src/test/test_cases.py output/成果_wz2_classic_latest.pdf
 python3 src/test/verify_geom.py output/out.pdf data/wz2/wz2_spotting_coords.json data/wz2/wz2_spotting_lines.json --src-pdf source_pdf/wz2.pdf --json /tmp/verify.json
 ```
 
+## SDD + TDD 开发流程
+
+新功能按以下流程（Spec-Driven + Test-Driven）：
+
+```
+1. Spec    -> 写 spec/<type>/XX_function.md（目标/输入/输出/约束/测试点）-> 用户确认
+2. Test    -> 写 src/test/test_cases.py 断言（预期 FAIL，红）
+3. Implement -> 实现代码（使测试 PASS，绿）
+4. Verify  -> 全部测试 PASS + verify_geom 无回归
+```
+
+### 示例：新增"注释序号分列"功能
+
+```
+1. spec/ancient/03_note_sequence_alignment.md（已写）
+2. test_cases.py 加 test_p15_seq_x0（预期 FAIL）
+3. build_classic.py 实现 _note_text_x + 序号分列
+4. python3 src/test/test_cases.py -> 17 PASS 0 FAIL ✓
+```
+
 ## Spec 规范
 
 新增功能/类型时：
