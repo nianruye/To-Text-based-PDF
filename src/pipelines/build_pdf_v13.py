@@ -39,10 +39,12 @@ def normalize_text(text):
     return s
 
 def escape_tex(text):
-    for char, repl in [('\\', r'\textbackslash{}'), ('{', r'\{'), ('}', r'\}'),
+    text = text.replace('\\', '\x00')  # 占位反斜杠，防 \textbackslash{} 的 {} 被后续 {/} 规则二次转义
+    for char, repl in [('{', r'\{'), ('}', r'\}'),
                        ('&', r'\&'), ('%', r'\%'), ('#', r'\#'),
                        ('$', r'\$'), ('_', r'\_'), ('~', r'\~{}'), ('^', r'\^{}')]:
         text = text.replace(char, repl)
+    text = text.replace('\x00', r'\textbackslash{}')
     return text
 
 def escape_body(text):
@@ -136,9 +138,6 @@ def is_heading_by_md(text, headings_set):
     clean = re.sub(r'\$\s*\^\{[^}]+\}\s*\$', '', text).strip()
     # Normalize: remove spaces, normalize quotes
     norm = re.sub(r'\s+', '', clean)
-    norm = norm.replace('“', '“').replace('”', '”')
-    norm = norm.replace('‘', '‘').replace('’', '’')
-    norm = norm.replace('＂', '＂')
     for h_text, level in headings_set:
         h_norm = re.sub(r'\s+', '', h_text)
         h_norm = h_norm.replace('“', '“').replace('”', '”')

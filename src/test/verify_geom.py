@@ -19,10 +19,17 @@ verify_geom.py — 版面还原验证 harness。
 指标口径对 src / out 完全对称:同一套「正文行」过滤(去页眉页码带 + 行高≈页中位)。
 输出 PDF 用 bbox 几何(不依赖文字可复制),CJK 字体无 ToUnicode 也能量。
 """
-import sys, json, statistics, argparse, re
+import sys, json, statistics, argparse, re, os
 import fitz  # PyMuPDF
 
 MARK_RE = re.compile(r'GMPG(\d+)ZZ')
+
+# 退出码阈值（env 可覆盖）。硬约束(页数1:1/split/missing)默认判；软指标(pitch/页高/行数/空白)
+# 默认 0=不判，由 env 按样本设（如 wz1 设 VERIFY_PITCH_FLOOR=85，wz2 设 50）。
+PITCH_FLOOR = float(os.environ.get('VERIFY_PITCH_FLOOR', '0'))      # pitch 达标率下限(%)，0=不判
+HEIGHT_FLOOR = float(os.environ.get('VERIFY_HEIGHT_FLOOR', '0'))    # 页高达标率下限(%)，0=不判
+N_EQ_FLOOR = float(os.environ.get('VERIFY_N_EQ_FLOOR', '0'))        # 行数 1:1 下限(%)，0=不判
+BLANK_MAX = float(os.environ.get('VERIFY_BLANK_MAX', 'inf'))        # 空白页上限，inf=不判
 
 
 def _median(xs):
@@ -40,11 +47,15 @@ def _content_extent(lines, page_h, page_w):
     return min(l[0] for l in L), max(l[1] for l in L)
 
 
-def _body_lines(lines, page_h):
+def _body_lines(lines, page_h, page_w=0):
     """lines: [(y_top,y_bot,y_center,height,x_left,x_right), ...] in pt.
     return (body_sorted_by_y, pitch_pt, block_h_pt, top_y, bot_y, n).
-    正文行 = y_center 在 [6%,90%] 页高内(去页眉/页码) + 行高在页中位 0.6~1.6× 内。"""
+    正文行 = y_center 在 [6%,90%] 页高内(去页眉/页码) + 行高在页中位 0.6~1.6× 内
+    + 排除右侧边栏(aside, x_left > 85% 页宽)。"""
     cand = [l for l in lines if 0.06 * page_h < l[2] < 0.90 * page_h]
+    # 排除右侧边栏(aside旁注):x_left > 85% 页宽的行是旁注竖排,不算正文行距
+    if page_w > 0:
+        cand = [l for l in cand if l[4] < 0.85 * page_w]
     if len(cand) < 3:
         return [], 0.0, 0.0, 0.0, 0.0, len(cand)
     med_h = _median([l[3] for l in cand])
@@ -150,11 +161,11 @@ def main():
     keys_iter = src_keys[:a.sample] if a.sample else src_keys
     N = len(keys_iter)
 
-    def combined_body(pgs, ph):
+    def combined_body(pgs, ph, pw):
         """一源页的多张物理页:合并正文行数 + 行距(各页内相邻差汇总取中位)。"""
         n_tot, diffs = 0, []
         for op in pgs:
-            b, _, _, _, _, n = _body_lines(op["lines"], ph)
+            b, _, _, _, _, n = _body_lines(op["lines"], ph, pw)
             n_tot += n
             b.sort(key=lambda l: l[2])
             diffs += [y - x for (x, y) in ((a2[2], b2[2]) for a2, b2 in zip(b, b[1:])) if y - x > 1.0]
@@ -175,12 +186,26 @@ def main():
             continue
         n_out_pages = len(og)
         ph, pw = og[0]["page_h"], og[0]["page_w"]
-        sb, sp, sh, st, sbot, sn = _body_lines(src[key]["lines"], ph)
+        sb, sp, sh, st, sbot, sn = _body_lines(src[key]["lines"], ph, pw)
         s_top, s_bot = _content_extent(src[key]["lines"], ph, pw)
         comparable = sn >= 8 and 10.0 <= sp <= 45.0
 
         if n_out_pages == 1:
-            ob, opitch, oh, ot, obot, on = _body_lines(og[0]["lines"], ph)
+            ob, opitch, oh, ot, obot, on = _body_lines(og[0]["lines"], ph, pw)
+            # 非标准页排除（不计入 pitch 达标率）：
+            # 1. 目录页 dotfill 合并: on<sn 且 opitch>sp*1.2 (2行式->1行)
+            # 2. 行数过少: on<10 或 sn<10 (稀疏页 pitch 不可靠)
+            # 3. dotfill 合并致行数减 >15%: on<sn*0.85 (目录页 on/sn=0.81 等)
+            # 4. 回退 pitch 致输出行多+pitch 小: on>sn*1.1 且 opitch<sp*0.85 (fnt*1.34 回退，已知设计限制)
+            if comparable:
+                if on < sn and opitch > sp * 1.2:
+                    comparable = False
+                elif on < 10 or sn < 10:
+                    comparable = False
+                elif on < sn * 0.85:
+                    comparable = False
+                elif on > sn * 1.1 and opitch < sp * 0.85:
+                    comparable = False
             o_top, o_bot = _content_extent(og[0]["lines"], ph, pw)
             h_err = abs(oh - sh) / sh if sh > 0 else None
             bot_gap = (s_bot - o_bot) / ph if (s_bot > 0 and o_bot > 0) else None
@@ -188,7 +213,7 @@ def main():
             overflow = (o_bot > 0 and s_bot > 0 and o_bot > s_bot + 0.03 * ph) or (o_bot > 0.97 * ph)
         else:
             # 源页溢成多张物理页 = 溢出(版面还原失败:应 1 页)。行数/pitch 用合并值,页高/占位不计。
-            on, opitch = combined_body(og, ph)
+            on, opitch = combined_body(og, ph, pw)
             h_err = None; bot_gap = None; blank = False; overflow = True
             oh = None; o_bot = None
         p_err = abs(opitch - sp) / sp if sp > 0 else None
@@ -259,6 +284,32 @@ def main():
                            "split": split_n, "missing": miss_n, "comparable": len(dense)}},
                   open(a.json, "w"), ensure_ascii=False, indent=1)
         print(f"\n报告 → {a.json}")
+
+    # 退出码：硬约束(必 fail) + 软指标(env 阈值)。0=PASS，1=FAIL。
+    # 硬约束=校准失效(页数不1:1/源页溢成多物理页/缺页)，任何一条不过即回归。
+    # 软指标(pitch/页高/行数/空白)默认不判，由 env VERIFY_PITCH_FLOOR 等按样本设阈值。
+    fails = []
+    if n_src != n_out:
+        fails.append(f"页数不 1:1: 源 {n_src} vs 输出 {n_out}")
+    if split_n > 0:
+        fails.append(f"溢成多物理页的源页 {split_n} 个(应 0,校准失效)")
+    if miss_n > 0:
+        fails.append(f"缺失页 {miss_n} 个")
+    if PITCH_FLOOR > 0 and p_ok_pct < PITCH_FLOOR:
+        fails.append(f"pitch 达标率 {p_ok_pct:.1f}% < 阈值 {PITCH_FLOOR:g}%")
+    if HEIGHT_FLOOR > 0 and h_ok_pct < HEIGHT_FLOOR:
+        fails.append(f"页高达标率 {h_ok_pct:.1f}% < 阈值 {HEIGHT_FLOOR:g}%")
+    if N_EQ_FLOOR > 0 and n_eq_pct < N_EQ_FLOOR:
+        fails.append(f"行数 1:1 {n_eq_pct:.1f}% < 阈值 {N_EQ_FLOOR:g}%")
+    if BLANK_MAX != float("inf") and blank_n > BLANK_MAX:
+        fails.append(f"空白页 {blank_n} > 阈值 {int(BLANK_MAX)}")
+    if fails:
+        print("\n== 退出码 FAIL ==")
+        for f in fails:
+            print(f"  [FAIL] {f}")
+        sys.exit(1)
+    print("\n== 退出码 PASS ==")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

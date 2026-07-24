@@ -1,0 +1,13 @@
+{
+  "pipeline": "build_classic",
+  "source": "wz2.pdf",
+  "note": "复杂注释排版样本（极端案例），783页，夹注/旁注/墨高重叠/案注/附录。不代表古籍平均复杂度，指标不作唯一判据，后续应补简单古籍对照（当前 build_classic 仅有 wz2 一个测试文件）",
+  "date": "2026-07-17",
+  "metrics": {
+    "pitch_ok_pct": 58.8,
+    "pages": 783,
+    "overflow_pages": 0,
+    "blank_pages": 87,
+    "bot_gap_median": 3.8
+  }
+}

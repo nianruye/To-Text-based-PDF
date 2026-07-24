@@ -1,0 +1,15 @@
+# Ruff 配置：只检查 E（pycodestyle errors）+ F（pyflakes），不检查格式
+# 项目风格豁免（E501 长行 / E701,E702 一行多语句 / E741 模糊变量名 l/I/O）：
+#   这些是项目既有风格（注释密集 + 单行 if:return），逐步收紧而非一次阻断 CI
+# 真正拦截的：F 规则（pyflakes 真 bug）+ E401/E713（可 autofix）
+
+[lint]
+select = ["E", "F"]
+ignore = [
+    "E501",   # 行太长（852 个，注释密集，后续统一 line-length）
+    "E701",   # 一行多语句（if x: return y 风格，347 个）
+    "E702",   # 分号多语句（314 个）
+    "E741",   # 模糊变量名 l/I/O（94 个，循环计数器既有风格）
+]
+
+exclude = ["archive", ".mineru", "data", ".pytest_cache"]

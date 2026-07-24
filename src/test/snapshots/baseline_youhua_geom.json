@@ -1,0 +1,13 @@
+{
+  "pipeline": "build_geom",
+  "source": "优化前.pdf",
+  "note": "现代书籍简单排版基准，20页。页数少、指标波动大，作辅助对照",
+  "date": "2026-07-17",
+  "metrics": {
+    "pitch_ok_pct": 65.0,
+    "pages": 20,
+    "overflow_pages": 0,
+    "blank_pages": 8,
+    "bot_gap_median": 6.0
+  }
+}

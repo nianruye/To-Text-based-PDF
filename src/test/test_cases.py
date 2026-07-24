@@ -70,7 +70,7 @@ def test_no_overflow(pdf):
     n = len(pdf)
     assert n == 783, f'页数={n}, 应=783(0溢出)'
 
-def test_pitch_rate(pdf, coords_path=None, lines_path=None, src_pdf=None):
+def test_pitch_rate(pdf):
     """pitch达标率>50%(需verify_geom数据,简化:测p11/p26/p51 pitch合理)"""
     p11 = _get_pitch(pdf, 10)
     p26 = _get_pitch(pdf, 25)
@@ -222,6 +222,45 @@ def test_p11_pagenum(pdf):
                     assert txt == '1', f'p11 页码={txt}, 应=1'
 
 # ============================================================
+# 07 正文+注释混排页(p37)
+# ============================================================
+
+def test_p37_mixed_font(pdf):
+    """p37 正文17.3+注释14.6混排(非全注释字号)"""
+    lines = _get_lines(pdf, 36)
+    body_sz = [l[4] for l in lines if 17 < l[4] < 18 and len(l[5]) > 10]
+    note_sz = [l[4] for l in lines if 14 < l[4] < 15 and len(l[5]) > 5]
+    assert body_sz, 'p37 无正文字号17pt行(混排正文被降)'
+    assert note_sz, 'p37 无注释字号14.6行'
+
+def test_p37_no_dotfill(pdf):
+    """p37 内容页无dotfill误判(余而补不足不应有...)"""
+    pg = pdf[36]
+    for blk in pg.get_text('dict')['blocks']:
+        for ln in blk.get('lines', []):
+            txt = ''.join(s['text'] for s in ln.get('spans', []))
+            if re.search(r'\.{5,}|…{3,}', txt):
+                assert False, f'p37 内容页dotfill误判: {txt[:20]!r}'
+
+def test_p37_indent(pdf):
+    """p37 正文段首缩进(x0>90)"""
+    lines = _get_lines(pdf, 36)
+    body = [l for l in lines if 17 < l[4] < 18 and len(l[5]) > 10]
+    assert body, 'p37 无正文行'
+    indented = [l for l in body if l[0] > 90]
+    assert indented, f'p37 正文段首无缩进(x0>90), x0={[l[0] for l in body[:3]]}'
+
+def test_p37_no_overflow_line(pdf):
+    """p37 无行溢出版心(*力耕长行 x1<=545)"""
+    pg = pdf[36]
+    for blk in pg.get_text('dict')['blocks']:
+        for ln in blk.get('lines', []):
+            x0, y0, x1, y1 = ln['bbox']
+            if y1 - y0 > 1 and 50 < x0 < 540:
+                txt = ''.join(s['text'] for s in ln.get('spans', []))[:15]
+                assert x1 <= 545, f'p37 行溢出版心 x1={x1:.0f}: {txt!r}'
+
+# ============================================================
 # 运行
 # ============================================================
 
@@ -249,6 +288,11 @@ TESTS = [
     # 06 旁注/页码
     ('06 p11_aside', test_p11_aside_completion),
     ('06 p11_pagenum', test_p11_pagenum),
+    # 07 正文+注释混排页(p37)
+    ('07 p37_mixed_font', test_p37_mixed_font),
+    ('07 p37_no_dotfill', test_p37_no_dotfill),
+    ('07 p37_indent', test_p37_indent),
+    ('07 p37_no_overflow_line', test_p37_no_overflow_line),
 ]
 
 def run_all(pdf_path):

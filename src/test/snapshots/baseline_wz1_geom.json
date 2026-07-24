@@ -1,0 +1,13 @@
+{
+  "pipeline": "build_geom",
+  "source": "wz1.pdf",
+  "note": "现代学术著作基准，222页，脚注+标题层级。现代书籍管线主力样本",
+  "date": "2026-07-17",
+  "metrics": {
+    "pitch_ok_pct": 89.5,
+    "pages": 222,
+    "overflow_pages": 0,
+    "blank_pages": 14,
+    "bot_gap_median": 2.2
+  }
+}

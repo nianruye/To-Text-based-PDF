@@ -8,8 +8,8 @@
 
 | 类型 | 特征 | 管线 | 当前状态 |
 |---|---|---|---|
-| **古籍（刻本/印本）** | CJK 墨高重叠、夹注本双规制、旁注竖排、校注标记 | `build_classic.py` | ✅ 已实现 |
-| **现代书籍** | 段落缩进、脚注、页眉页码、标题层级 | `build_geom.py` | ✅ 已实现（wz1） |
+| **古籍（刻本/印本）** | CJK 墨高重叠、夹注本双规制、旁注竖排、校注标记 | `src/pipelines/build_classic.py` | ✅ 已实现 |
+| **现代书籍** | 段落缩进、脚注、页眉页码、标题层级 | `src/pipelines/build_geom.py` | ✅ 已实现（wz1） |
 | **学术论文** | 公式、表格、图表标题、参考文献、摘要 | 待建 | 🔜 规划中 |
 | **合同** | 条款编号、表格、签章区域、固定格式 | 待建 | 🔜 规划中 |
 | **标书** | 复杂表格、目录、附件、多层标题 | 待建 | 🔜 规划中 |
@@ -68,15 +68,16 @@
 
 ## 各类型专属逻辑
 
-### 古籍（build_classic.py）
+### 古籍（`src/pipelines/build_classic.py`）
 - **墨高重叠**：\\[-2pt]（行距=行盒-2，模拟 CJK 行间距<行盒高）
 - **字号分类**：正文/注释/前言三类（序号位置识别）
 - **注释序号分列**：_note_text_x + 序号统一 x0
 - **aside 旁注**：竖排 shortstack + 目录补全
 - **CJKglue**：base 0.15em（字距不挨字）
-- 详见：[01-07 分部 Spec](README.md)
+- **附录排版**：标题分开/小标题识别/案注小字/段间留白/缩进对齐（见 [appendix_layout.md](ancient/appendix_layout.md)）
+- 详见：[ancient/01-08 分部 Spec](ancient/README.md)
 
-### 现代书籍（build_geom.py）
+### 现代书籍（`src/pipelines/build_geom.py`）
 - **\linespread**：小字生效（pitch=fnt×1.2×linespread）
 - **脚注**：① 分界线 + 小字
 - **页眉共识**：OCR 拆分校正
@@ -127,24 +128,7 @@
 
 ## 文件结构
 
-```
-/opt/test/
-├── build_geom.py              # 现代书籍管线
-├── build_classic.py           # 古籍管线
-├── fit_positional.py          # 现代两趟校准
-├── fit_positional_classic.py  # 古籍两趟校准
-├── verify_geom.py             # 通用测试
-├── run_spotting_ocr.py        # OCR 数据生成
-├── spec/                      # Spec 文档
-│   ├── 00_system_architecture.md  # 本文件（总 Spec）
-│   ├── README.md                  # 古籍分部索引
-│   ├── 01-07_*.md                 # 古籍分部 Spec
-│   ├── 10_modern.md               # 现代书籍分部（待写）
-│   ├── 20_paper.md                # 论文分部（待写）
-│   ├── 30_contract.md             # 合同分部（待写）
-│   └── 40_bid.md                  # 标书分部（待写）
-└── 数据文件（spotting/layout/coords）
-```
+代码已迁移到 `src/` 下，见 [规范化目录结构](#规范化目录结构)。
 
 ## 设计原则
 
@@ -255,8 +239,8 @@
 ├── spec/                          # Spec 文档
 │   ├── 00_system_architecture.md  # 总 Spec
 │   ├── README.md                  # 索引
-│   ├── 01-07_*.md                 # 古籍分部
-│   ├── 10_modern.md               # 现代分部（待写）
+│   ├── ancient/                   # 古籍分部（01-08_*.md）
+│   ├── modern/                    # 现代分部（待写）
 │   └── ...
 ├── output/                        # 输出 PDF
 │   ├── 成果_wz1_rerun8_lay.pdf

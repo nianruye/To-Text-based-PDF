@@ -1,0 +1,12 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip python3-opencv libgl1 libglib2.0-0 && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir \
+    'paddlepaddle==2.6.1' 'paddleocr==2.7.0.3' 'numpy<2' \
+    'opencv-python-headless<4.10' shapely pyclipper scikit-image imgaug \
+    lmdb visualdl tqdm
+RUN find /usr/local/lib/python3.10/dist-packages/paddleocr -name 'rec_postprocess.py' \
+    -exec sed -i 's/result_list.append((text, np.mean(conf_list).tolist()))/result_list.append((text, np.mean(conf_list).tolist(), conf_list.tolist()))/g' {} \;
+WORKDIR /opt/test

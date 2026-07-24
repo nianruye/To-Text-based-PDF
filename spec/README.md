@@ -1,5 +1,49 @@
 # Spec 文档索引
 
+## Spec 状态账本
+
+每条 spec 有四种状态：governance / planned / implemented / archived。PR 合并前必须更新状态（见 [AGENTS.md](../AGENTS.md) spec 对账规则）。
+
+### governance（治理契约，跨管线公共约定）
+
+| spec | 说明 |
+|---|---|
+| [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约：argv / env / JSON / GMPG / DPI / 命名 + 验收标准 + 实现锚点 + 兼容影响矩阵 |
+
+### planned（已规划，待实现）
+
+| spec | 说明 | 关联 issue |
+|---|---|---|
+| `/tmp/seg2_line.*` 路径分离 | geom/classic 临时文件分 build_name，消除并发冲突 | AGENTS.md #10 |
+| `_esc_chars` 两方分叉统一 | geom/classic 转义规则是否统一（v13 已 archived，不参与） | AGENTS.md #11 |
+| ~~geom `page_pitch` inner 过滤~~ | ~~与 classic 统一~~ | **不修**（实测 pitch 89.9%->15.4%，保守策略正确） |
+
+### implemented（已实现，行为已锁定）
+
+| spec | 说明 |
+|---|---|
+| [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约（6 条契约 + 验收 + 锚点 + 兼容） |
+| [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
+| [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
+| [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
+| [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
+| [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
+| [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
+| [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
+| [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（12 函数契约） |
+| [src/test/invariants/INVARIANTS_SPEC.md](../src/test/invariants/INVARIANTS_SPEC.md) | 特征不变量 spec（13 不变量） |
+| [architecture_audit.md](architecture_audit.md) | 架构审计（7 点 + 竖排能力缺口，基于 Step 1-6 + 9 bug 修复后代码） |
+
+### archived（已归档/已修）
+
+| 条目 | 说明 |
+|---|---|
+| verify_geom 无退出码 | 已修（verify_geom.py L274-298 加退出码） |
+| fit_positional/classic 97 行重复 | 已修（合并到 fit_common.py 90+3+3 行） |
+| build_pdf_v13.py | src/ 内孤立（零调用），未接入共享模块，无 invariants/verify_geom 保护。12 项独有功能作为参考实现存档，不再维护。如需独有能力，开 issue 提取逻辑 |
+
+---
+
 ## 术语表
 
 | 术语 | 含义 |
@@ -33,16 +77,27 @@
 | 类型 | 目录 | 状态 | 说明 |
 |---|---|---|---|
 | 古籍 | [ancient/](ancient/) | ✅ 已实现 | CJK 墨高重叠、夹注本双规制、旁注竖排、校注标记 |
-| 现代书籍 | [modern/](modern/) | ✅ 已实现 | 段落缩进、脚注、页眉页码、标题层级 |
+| 现代书籍 | [modern/](modern/) | ✅ 已实现 | 段落缩进、脚注、页眉页码、标题层级、目录页 |
 | 论文 | [paper/](paper/) | 🔜 待建 | 公式、表格、图表标题、参考文献 |
 | 合同 | [contract/](contract/) | 🔜 待建 | 条款编号、签章区域、固定格式 |
 | 标书 | [bid/](bid/) | 🔜 待建 | 复杂表格、多层目录、附件 |
+
+## 设计文档（docs/superpowers/）
+
+历史设计 doc（深入分析，非规范）：
+- [docs/superpowers/specs/2026-06-12-structural-heading-font-design.md](../docs/superpowers/specs/2026-06-12-structural-heading-font-design.md) - 标题检测与字体分配设计
+- [docs/superpowers/plans/2026-06-12-structural-heading-font.md](../docs/superpowers/plans/2026-06-12-structural-heading-font.md) - 标题检测实施计划
+
+**文档分工**：
+- `spec/` = 设计规范（目标/输入/输出/约束/测试点，SDD）
+- `docs/` = 项目总览/使用说明（PROJECT_SUMMARY 等）
+- `docs/superpowers/` = 深入设计分析（历史设计 doc）
 
 ## 文档类型
 
 | 类型 | 特征 | 管线 | 当前指标 |
 |---|---|---|---|
-| 古籍 | 墨高重叠、夹注、旁注 | `src/pipelines/build_classic.py` | 783页 pitch 57% 0溢出 |
+| 古籍 | 墨高重叠、夹注、旁注 | `src/pipelines/build_classic.py` | 783页 pitch 59.1% 0溢出 |
 | 现代书籍 | 段落、脚注、标题 | `src/pipelines/build_geom.py` | 222页 pitch 95% 0溢出 |
 
 ## 运行命令

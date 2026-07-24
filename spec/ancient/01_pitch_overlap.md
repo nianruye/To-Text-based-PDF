@@ -27,6 +27,22 @@
 - 不影响正文/注释字号分类
 - \\[-2pt] 在 makebox 后（不在 group 内），生效
 
+## 已知限制: CJK lineskip 偏移
+
+CJK 字体（Noto Serif CJK JP）的 depth ≈ 字号×0.20（如 14.7pt→2.88pt），使 hbox 总高(strut+CJKdepth) > baselineskip。
+LaTeX 在 `\par` 后检测到此条件，触发 `\lineskip`（默认 1pt）代替 `\baselineskip`，导致 pitch 偏大 ~2pt。
+
+**影响范围**: 注释页/前言页（字号 14.7pt, src_pitch 27-28pt），输出 pitch 偏大 +1.8pt（5-8% 误差），约 188 页。
+**正文页影响小**: 正文 17.4pt 的 CJK depth 3.48pt，但 src_pitch 35pt 远大于行盒高，不触发 lineskip。
+
+**尝试过的修复**:
+1. 减小 strut → 不触发 lineskip → 但行盒高度降低 → 两趟校准估高偏低 → 大量空白页
+2. 增大 bl → baselineskip > hbox_total → 但 \par 后间距=baselineskip 偏大 → 大量溢出
+3. `\lineskip=0pt` → 触发后间距=0 → pitch 偏小 → 空白页
+4. `\lineskiplimit=-\maxdimen` → 强制 baselineskip → 行重叠严重
+
+**结论**: 这是 LaTeX CJK 排版的固有限制，当前 60% pitch 达标率（<3%误差）、中位误差 1.4% 已是合理水平。后续可考虑将 `\par` 改为 `\\[-2pt]`（段落内换行）来绕过此限制。
+
 ## 测试点
 - p11 pitch≈35pt（源 35.1）
 - p26 pitch≈28pt（源 28.0，注释页）

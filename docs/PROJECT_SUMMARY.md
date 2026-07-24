@@ -37,7 +37,68 @@ PDF → PaddleOCR-VL-1.6 spotting → 结构化数据（bbox + 文本）
 
 ---
 
-## 最新进展（Session d82040a5, 07-02 ~ 07-04）
+## 最新进展（Session 附录排版, 2026-07-14）
+
+### 附录区排版修复（基于 PaddleOCR-VL md 参考）
+
+用户反馈附录排版乱，提供 `wz2.pdf_by_PaddleOCR-VL-1.6.md`（PaddleOCR-VL 扫描结果）作参考。修复 7 处：
+
+1. **附录标题分开**（`build_classic.py:919`）：`\rlap` 多片段标题防重叠--frags 按 x0 排序 + 逐片段推开保证 0.8 字宽最小间距。"附录一佚文" -> "附录一"+"佚文"（间隙 0->29pt）。
+
+2. **附录五标题丢失修复**（`build_classic.py:690`）：紧邻合并条件 `gap<阈值` 改 `0<gap<阈值`（gap<0 是分立元素不合并）；is_appendix 用 re.search 查 t+frags；frags 渲染前 sorted 按 x0。
+
+3. **LAYOUT_HEADINGS 小标题识别**（`build_classic.py:773`）：开 `LAYOUT_HEADINGS=1` 用 PaddleOCR-VL paragraph_title 识别标题。is_head 改 `(_lay_lvl is not None) or is_head_heur`（layout 优先，回退启发式防 p11 正文标题丢失）。section 字号强制比正文大 12%。识别 63 个附录小标题（司马迁史记/四库全书总目提要等）。
+
+4. **案注小字 + 续行识别**（`build_classic.py:798`）：案注段首 FONT_SM(12.2pt，源行高比 0.72)；状态机 _in_an 识别案注续行（gap<45pt 用小字，gap>45pt 退出=新引文段）。
+
+5. **案注->引文段间留白**（`build_classic.py:932`）：bl 判断 `PF>13` 改 `fnt>13`--小字用 bl=fnt×1.34(16.3) 防 \baselineskip 吞 \vspace（bl≈vspace 时 LaTeX 行距 max 主导）。p586 间隔 30->60pt（≈源 62pt）。
+
+6. **附录缩进 + 右对齐**（`build_classic.py:996/1028`）：引文/案注/续行缩进 2em（x0=99 对齐）；满行 [s] 两端对齐齐右，段末短行 [l] 左对齐 ragged（不拉伸字距，古籍标准）。
+
+7. **is_subhead_cn 防误判**（`build_classic.py:768`）：加 _prev_terminal（上一行句末结尾才识别，防"三省注"续行误判）和 _sh_rest[0] not in 标点（防"一,涂本"列举误判）。
+
+### 指标对比
+
+| 指标 | v24（修复前）| 当前（07-14）|
+|---|---|---|
+| 页数 | 783 | 783 |
+| 溢出 | 0 | 0 |
+| pitch 达标（误差<3%）| 60.5% | 59.1% |
+| 页高误差<5% | 82.6% | 84.7% |
+| 底部占位<8%偏差 | 80.6% | 87.0% |
+| 空白页 | 145 | 97 |
+| 测试 | 17/17 | 17/17 |
+
+pitch 略降 0.8%（小标题 16.4pt 行混入测量），但底部占位+6.4%、空白页-48，整体改善。
+
+### 构建参数
+
+```bash
+cd /opt/test && LAYJSON=data/wz2/wz2.pdf_by_PaddleOCR-VL-1.6.json \
+  PAGE_FONT=1 POSITIONAL=1 PER_PAGE_PITCH=1 LAYOUT_HEADINGS=1 \
+  python3 src/calibration/fit_positional_classic.py \
+  data/wz2/wz2_spotting_lines.json data/wz2/wz2_spotting_coords.json \
+  output/成果_wz2_classic_latest.pdf source_pdf/wz2.pdf
+```
+
+**关键**：LAYJSON 必须用 PaddleOCR-VL 文件（aside_text 1337 非空，有旁注内容）；不能用 `pp_doclayout_wz2.json`（aside_text 1209 全空，旁注不渲染、test 06 失败）。
+
+### Spec
+
+新增 [spec/ancient/appendix_layout.md](../spec/ancient/appendix_layout.md)（附录排版 spec：标题分开/小标题/案注小字/续行/段间留白/缩进对齐）。
+
+### 附录区三层字号
+
+| 层级 | 字号 | 示例 |
+|---|---|---|
+| 附录标题 | 30-36pt | 附录一 佚文 |
+| 引文 | 17.3pt（正文页）/ 15.1pt（注释页）| 惜芳草者耗禾稼... |
+| 小标题 | 16.4pt | 司马迁史记、四库全书总目提要 |
+| 案注 | 12.2pt | 案：此事见于说苑尊贤篇... |
+
+---
+
+## 历史进展（Session d82040a5, 07-02 ~ 07-04）
 
 ### 已完成的工作
 
