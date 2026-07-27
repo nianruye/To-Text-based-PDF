@@ -440,49 +440,56 @@ if _PPSCORE_FILE and os.path.exists(_PPSCORE_FILE):
     _low = sum(1 for v in _ppocrv6_scores.values() for _, s, _ in v if s < 0.85)
     print(f"[PP-OCRv6 score] 加载 {len(_ppocrv6_scores)} 页, 低分(<0.85) {_low} 行(整行贴图)")
 
-# 逐字 score(PP-OCRv4 容器跑,检测行内单字识错古字)
-_CHARSCORE_FILE = os.environ.get('CHARSCORE_FILE', '')
-_char_scores_data = {}
-_CHARS_LOW_THRESH = 0.35   # 逐字 score 阈值(<此值=识错古字;0.35平衡:323字 p68:3 p470:0)
-_CHARS_PUNCTS = set('·.…,。；：、！？）】》」』""\'\'%.;:!)|(【[]{}()《》-…～·\-_#=+*<>/?')
-if _CHARSCORE_FILE and os.path.exists(_CHARSCORE_FILE):
-    _char_scores_data = json.load(open(_CHARSCORE_FILE, encoding='utf-8'))
-    _low_chars = 0
-    for v in _char_scores_data.values():
-        for _, text, _, cs in v:
-            for c, s in zip(text, cs):
-                if s < _CHARS_LOW_THRESH and c.strip() and c not in _CHARS_PUNCTS and ord(c) > 0x2e80:
-                    _low_chars += 1
-    print(f"[逐字score] 加载 {len(_char_scores_data)} 页, 低字(<{_CHARS_LOW_THRESH}) {_low_chars} 字(单字贴图)")
+# VL vs PP-OCRv6 wordbox 对比(VL有v6无+v6频<20=古字识错),单字贴图
+_VLV6DIFF_FILE = os.environ.get('VLV6DIFF_FILE', '')
+_vl_v6_diff = {}
+if _VLV6DIFF_FILE and os.path.exists(_VLV6DIFF_FILE):
+    _vl_v6_diff = json.load(open(_VLV6DIFF_FILE, encoding='utf-8'))
+    _diff_total = sum(len(v) for v in _vl_v6_diff.values())
+    print(f"[VL vs v6] 加载 {len(_vl_v6_diff)} 页, {_diff_total} 字(单字贴图)")
 
 
 def _esc_with_missing(t, f, key):
-    """esc(t) + 缺字贴图:1)逐字低 score(PP-OCRv4)单字贴图 2)空引号""单字贴图。
-    逐字 score<0.3 的非标点 CJK 字=识错古字,按字符偏移剪源图贴回。"""
+    """esc(t) + 缺字贴图:1)VL≠v6单字贴图 2)行级低score整行贴图 3)空引号""单字贴图。"""
     esc_t = esc(t)
     if not SRC:
         return esc_t
-    # 1) 逐字低 score 单字贴图(PP-OCRv4 行内低 score 字)
-    if _char_scores_data:
-        import os
-        _od = '/tmp/missing_chars'; os.makedirs(_od, exist_ok=True)
-        for _poly, _text, _ls, _cs in _char_scores_data.get(key, []):
-            _ys = [p[1] for p in _poly]
-            if not (min(_ys) - 10 <= f.get('y0', 0) <= max(_ys) + 10):
-                continue   # VL 行 y 不在此 PP-OCRv4 行 poly 内
-            # 找低 score 非标点字
-            for _ci, (_c, _s) in enumerate(zip(_text, _cs)):
-                if _s < _CHARS_LOW_THRESH and _c.strip() and _c not in _CHARS_PUNCTS and ord(_c) > 0x2e80:
+    import os
+    _od = '/tmp/missing_chars'; os.makedirs(_od, exist_ok=True)
+    # 1) VL≠v6 单字贴图(VL有v6无+v6频<20=古字识错,用v6 word_box精确定位)
+    if _vl_v6_diff:
+        for _ci, _vl_c, _wb, _poly in _vl_v6_diff.get(key, []):
+            if _ci < len(t) and t[_ci] == _vl_c:   # VL 行第 _ci 字仍是要替换的字
+                try:
+                    # 用 v6 word_box 剪源图(精确单字位置)
+                    _xs = [_wb[0], _wb[2]]; _ys = [_wb[1], _wb[3]]
+                    _bbox = [[min(_xs), min(_ys)], [max(_xs), min(_ys)], [max(_xs), max(_ys)], [min(_xs), max(_ys)]]
+                    _img = _mc.crop_row(SRC, int(key), _bbox, _od)   # crop_row 接受 4 点 poly
+                    # 在 esc_t 里找第 _ci 个CJK字替换为图
+                    _cjk_idx = 0
+                    for _j, _ch in enumerate(esc_t):
+                        if ord(_ch) > 0x2e80:
+                            if _cjk_idx == _ci:
+                                esc_t = esc_t[:_j] + '\\raisebox{-2pt}{\\includegraphics[height=%spt]{%s}}' % (f.get('fnt', FONT), _img) + esc_t[_j + len(_ch):]
+                                break
+                            _cjk_idx += 1
+                    else:
+                        continue
+                    return esc_t
+                except Exception:
+                    pass
+    # 2) 行级低 score 整行贴图(PP-OCRv6 行级<0.85=整行识错古字)
+    if _ppocrv6_scores:
+        for _poly, _score, _ in _ppocrv6_scores.get(key, []):
+            if _score < 0.85:
+                _ys = [p[1] for p in _poly]
+                if min(_ys) - 10 <= f.get('y0', 0) <= max(_ys) + 10:
                     try:
-                        _img = _mc.crop_char(SRC, int(key), _poly, _ci, _text, _od)
-                        # 在 esc_t 里找对应字替换(VL/PP-OCRv4 文字可能不同,按位置近似)
-                        # 简化:整行贴图(低字行,古字识错行文字不可靠)
-                        _img2 = _mc.crop_row(SRC, int(key), _poly, _od)
-                        return '\\raisebox{-2pt}{\\includegraphics[height=%spt]{%s}}' % (f.get('fnt', FONT), _img2)
+                        _img = _mc.crop_row(SRC, int(key), _poly, _od)
+                        return '\\raisebox{-2pt}{\\includegraphics[height=%spt]{%s}}' % (f.get('fnt', FONT), _img)
                     except Exception:
                         pass
-                    break   # 一行只贴一次(整行图)
-    # 2) 空引号单字贴图(原有)
+    # 3) 空引号单字贴图(原有)
     miss_t = _mc.detect_missing(t)
     if not miss_t:
         return esc_t
