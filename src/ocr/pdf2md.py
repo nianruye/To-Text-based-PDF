@@ -75,13 +75,51 @@ for pgi in range(len(doc)):
     hrule_y = min(hrules) if hrules else 9999
     page_body = []
     page_footnotes = []
+    header_rows = []
+    ph = pg.rect.height
     for y0, x0, sz, txt in lines:
         if y0 > hrule_y and sz < BODY - 1.5:
             page_footnotes.append(txt)
+        elif y0 < ph * 0.08:
+            header_rows.append(txt)   # 页眉区行: 后置分类(真页眉丢弃 / OCR 错置正文归回上页)
         elif sz < BODY - 2 and y0 < hrule_y:
-            continue   # 页眉(小于正文的小字)
+            continue   # 顶部小字(残留兜底)
         else:
             page_body.append((y0, x0, sz, txt))
+    # 页眉区行分类:
+    #   - 与本页正文首行重复(词典式页眉=本页首词) 或 短行(≤15字, 书名/章名页眉) → 真页眉, 丢弃
+    #   - 其余长行 → OCR 页面分割错置的上页尾段, 归回上一页末尾(插到分页符前)
+    _body_first = page_body[0][3] if page_body else ''
+    _body_texts = [t for _, _, _, t in page_body]
+    for ht in header_rows:
+        if len(ht) <= 15:
+            continue   # 短行=真页眉(书名/章名)
+        # 剥离与正文行重叠的前缀(词典式页眉=本页首词拼在行首, 首词与正文首行重复)
+        _rest = ht
+        for t in _body_texts:
+            _i = 0
+            while _i < min(len(_rest), len(t)) and _rest[_i] == t[_i]:
+                _i += 1
+            if _i >= 8:   # 公共前缀≥8字=真实重叠(非巧合)
+                _rest = _rest[_i:].strip()
+                break
+        if len(_rest) < 8:
+            continue   # 剥完所剩无几=纯页眉
+        # 错置正文(OCR 页面分割把上页尾段划到本页顶部): 归回上一页末尾(分页符前)
+        _pos = len(md_lines)
+        for _i in range(len(md_lines) - 1, -1, -1):
+            if md_lines[_i].strip() == '---':
+                _pos = _i
+                break
+        # 与插入点上一行(同为错置段)做共同后缀去重: 拼接页眉行尾部常与独立错置行重复
+        _nb = md_lines[_pos - 1].strip() if _pos > 0 else ''
+        _k = 0
+        while _k < min(len(_rest), len(_nb)) and _rest[len(_rest) - 1 - _k] == _nb[len(_nb) - 1 - _k]:
+            _k += 1
+        if _k >= 12:
+            _rest = _rest[:len(_rest) - _k].rstrip()
+        if len(_rest) >= 8:
+            md_lines.insert(_pos, _rest)
     prev_x0 = None
     for y0, x0, sz, txt in page_body:
         if sz >= BODY + 8:
