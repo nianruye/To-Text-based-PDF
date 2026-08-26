@@ -2,6 +2,7 @@
 """Step 1: Full spotting OCR on 20 pages."""
 
 import json, os, re, sys, time, tempfile, shutil, threading, requests, fitz
+from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
 
 TOKEN_FILE = "/tmp/paddle_token"
@@ -74,18 +75,44 @@ def extract_from_block(block):
 
 
 def needs_png_conversion(filepath):
-    """Check if PDF has non-bitonal images (JPEG, etc.) that spotting API can't handle."""
-    doc = fitz.open(filepath)
-    for pi in range(min(3, doc.page_count)):
-        for img in doc[pi].get_images(full=True):
-            bpc = img[2]   # bits per component
-            filt = img[8]  # filter/compression
-            if bpc > 1 or (filt and 'DCT' in str(filt)):
-                doc.close()
-                return True
-    doc.close()
-    return False
+    """Check if PDF has embedded non-bitonal illustration images that the
+    spotting API can't handle when uploaded directly.
 
+    判定逻辑:
+    - 整页扫描图(单图覆盖率 >= FULLPAGE_COVERAGE): PDF 直传 OK,VL API 内部
+      会栅格化,实测 wz1-wz4 扫描书直传均正确。不走 PNG 逐页(慢一个量级)。
+    - 文字版 PDF 里嵌的彩色/JPEG 插图(覆盖率 < 阈值): 直传会干扰版面,转 PNG。
+
+    注意: get_images(full=True) 返回 (xref, smask, width, height, bpc,
+    colorspace, alt-cs, name, filter, referencer)。bpc 在索引 4,不是 2
+    (历史 bug: 误把 width 当 bpc,导致任何宽图都误判为需转 PNG)。
+    """
+    FULLPAGE_COVERAGE = 0.90   # 单图覆盖页面 >=90% 视为整页扫描图
+    doc = fitz.open(filepath)
+    try:
+        for pi in range(min(3, doc.page_count)):
+            page = doc[pi]
+            page_area = page.rect.width * page.rect.height
+            for img in page.get_images(full=True):
+                xref = img[0]
+                bpc = img[4]          # bits per component (索引4,非2)
+                filt = img[8]         # filter/compression
+                is_color = bpc > 1 or (filt and 'DCT' in str(filt))
+                if not is_color:
+                    continue          # 二值/灰度图不影响,跳过
+                # 彩色/JPEG 图: 看覆盖率,整页扫描图 → 直传,嵌入插图 → 转 PNG
+                try:
+                    rects = page.get_image_rects(xref)
+                except Exception:
+                    rects = []
+                coverage = 0.0
+                if page_area > 0 and rects:
+                    coverage = max((r.width * r.height) / page_area for r in rects)
+                if coverage < FULLPAGE_COVERAGE:
+                    return True       # 嵌入插图 → 需转 PNG
+        return False                  # 全是整页扫描图(或无彩图) → 直传
+    finally:
+        doc.close()
 
 def _ocr_png_page(png_path):
     """上传单页 PNG → 轮询 → 下载 jsonl → 解析版面块。
@@ -161,24 +188,52 @@ def _ocr_png_page_with_retry(png_path, retries=2, backoff=5):
     raise last
 
 
+def _render_page(args):
+    """multiprocessing worker:独立 fitz.open 渲染单页为 JPEG。
+    fitz 非线程安全但进程安全,每 worker 独立打开文档。"""
+    filepath, pi, out_dir = args
+    import fitz as _fitz
+    from PIL import Image
+    doc = _fitz.open(filepath)
+    pix = doc[pi].get_pixmap(dpi=200)
+    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    jpg_path = f"{out_dir}/spotting_page_{pi:03d}.jpg"
+    img.save(jpg_path, quality=95)
+    doc.close()
+    return jpg_path
+
+
 def process_pdf_via_png(filepath):
-    """扫描书路径:渲染每页 PNG → 并发上传 OCR → 合并。
-    主线程串行渲染(fitz 非线程安全),ThreadPoolExecutor 并发上传/轮询/解析。
+    """扫描书路径:渲染每页 JPEG -> 并发上传 OCR -> 合并。
+    渲染用 multiprocessing.Pool(fitz 进程安全),上传用 ThreadPoolExecutor。
+    OCR_RENDER_SERIAL=1 时回退串行渲染(原行为)。
     单页失败重试后仍失败则置空 + 记录 + 继续(不因一页废全本)。"""
+    import multiprocessing
     doc = fitz.open(filepath)
     n = doc.page_count
-
-    # 阶段1: 主线程串行渲染所有页为 PNG(fitz 非线程安全)
-    print(f"Rendering {n} pages @200dpi (serial)...")
-    png_paths = []
-    for pi in range(n):
-        pix = doc[pi].get_pixmap(dpi=200)
-        png_path = f"/tmp/spotting_page_{pi:03d}.png"
-        pix.save(png_path)
-        png_paths.append(png_path)
-        if (pi + 1) % 25 == 0 or pi + 1 == n:
-            print(f"  rendered {pi + 1}/{n}")
     doc.close()
+
+    # 阶段1: 渲染所有页为 JPEG
+    serial = os.environ.get('OCR_RENDER_SERIAL', '') in ('1', 'true', 'True')
+    if serial:
+        print(f"Rendering {n} pages @200dpi (serial fallback)...")
+        doc = fitz.open(filepath)
+        img_paths = []
+        for pi in range(n):
+            pix = doc[pi].get_pixmap(dpi=200)
+            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            img_path = f"/tmp/spotting_page_{pi:03d}.jpg"
+            img.save(img_path, quality=95)
+            img_paths.append(img_path)
+            if (pi + 1) % 25 == 0 or pi + 1 == n:
+                print(f"  rendered {pi + 1}/{n}")
+        doc.close()
+    else:
+        n_workers = min(multiprocessing.cpu_count(), 8)
+        print(f"Rendering {n} pages @200dpi (x{n_workers} processes)...")
+        with multiprocessing.Pool(n_workers) as pool:
+            img_paths = pool.map(_render_page, [(filepath, pi, "/tmp") for pi in range(n)], chunksize=16)
+        print(f"  rendered {n}/{n}")
 
     # 阶段2: 并发上传/轮询/解析
     all_lines, all_coords, all_labels = {}, {}, {}
@@ -188,7 +243,7 @@ def process_pdf_via_png(filepath):
 
     def worker(pi):
         try:
-            pl, pp, pb = _ocr_png_page_with_retry(png_paths[pi])
+            pl, pp, pb = _ocr_png_page_with_retry(img_paths[pi])
         except Exception as e:
             pl, pp, pb = [], [], []
             with lock:
@@ -201,7 +256,7 @@ def process_pdf_via_png(filepath):
             if done[0] % 10 == 0 or done[0] == n:
                 print(f"  OCR {done[0]}/{n}")
         try:
-            os.unlink(png_paths[pi])
+            os.unlink(img_paths[pi])
         except OSError:
             pass
 
@@ -211,11 +266,10 @@ def process_pdf_via_png(filepath):
 
     total = sum(len(v) for v in all_lines.values())
     titles = sum(sum(1 for l in v if "title" in l) for v in all_labels.values())
-    print(f"PNG OCR done: {n} pages, {total} lines, {titles} titles, {len(failed)} failed")
+    print(f"OCR done: {n} pages, {total} lines, {titles} titles, {len(failed)} failed")
     if failed:
-        print(f"⚠️ 失败页(已置空): {failed}")
+        print(f"\u26a0\ufe0f \u5931\u8d25\u9875(\u5df2\u7f6e\u7a7a): {failed}")
     return all_lines, all_coords, all_labels
-
 
 def split_pdf_batches(filepath):
     """用 fitz 把 filepath 切成 ≤BATCH_SIZE 页的临时 PDF。
@@ -240,8 +294,27 @@ def split_pdf_batches(filepath):
 def _parse_page(lpr):
     """从单个 layoutParsingResults 元素解析一页的 (lines, polys, labels)。
     API 返回的 result.layoutParsingResults 是页数组,每元素=一页。
-    新格式:prunedResult.parsing_res_list(含 block_label)。回退 spotting_res。"""
+    - spotting 行级模式(useLayoutDetection=False): 优先用 spotting_res 的
+      rec_texts+rec_polys(逐行文字+逐行坐标)。parsing_res_list 在此模式下是
+      整页拼接块(label=spotting, 无逐行 poly),不能用——否则整页变1行丢坐标。
+    - layout 版面模式: 用 parsing_res_list(含 block_label 标题分类)。"""
     pr = lpr.get("prunedResult", {}) if isinstance(lpr, dict) else {}
+
+    # spotting 行级模式: 直接取 spotting_res(与 PNG 路径 _ocr_png_page 逻辑一致)
+    if not _USE_LAYOUT:
+        sr = pr.get("spotting_res") or (lpr.get("spotting_res") if isinstance(lpr, dict) else None) or {}
+        pl, pp, pb = [], [], []
+        if isinstance(sr, dict) and sr.get("rec_texts"):
+            rec_polys = sr.get("rec_polys", [])
+            for i, txt in enumerate(sr["rec_texts"]):
+                pl.append(txt)
+                pb.append("text")
+                poly = rec_polys[i] if i < len(rec_polys) else None
+                pp.append([[round(c, 1) for c in pt] for pt in poly[:4]]
+                          if poly and isinstance(poly, list) and len(poly) >= 4 else None)
+        return pl, pp, pb
+
+    # layout 版面模式: parsing_res_list
     blocks = pr.get("parsing_res_list", [])
     pl, pp, pb = [], [], []
     for blk in blocks:
@@ -310,18 +383,45 @@ def _upload_and_parse(pdf_path):
     return lines, coords, labels
 
 
-def _upload_and_parse_with_retry(batch_pdf, retries=3, backoff=10):
-    """单批上传+解析,失败重试(指数退避)。覆盖网络错/API 5xx/state==failed。"""
+def _is_rate_limit(err):
+    """判断异常是否 400/429 限流(VL API 连续提交触发)。requests.HTTPError 带
+    response.status_code;否则按错误消息关键词兜底。"""
+    resp = getattr(err, "response", None)
+    if resp is not None and getattr(resp, "status_code", None) in (400, 429):
+        return True
+    msg = str(err).lower()
+    return any(k in msg for k in ("400", "429", "rate limit", "too many", "限流"))
+
+
+def _upload_and_parse_with_retry(batch_pdf, retries=6, backoff=10):
+    """单批上传+解析,失败重试(指数退避)。覆盖网络错/API 5xx/state==failed。
+    400/429 限流/队列满: 无限重试(固定 RATE_LIMIT_WAIT 间隔),直到挤进共享队列。
+    普通错误: 有限重试(retries 次,backoff*attempt 退避)。"""
     last = None
-    for attempt in range(1, retries + 1):
+    attempt = 0
+    rl_wait = 60           # 限流退避起始(秒),递增: 60→120→300→600 封顶
+    while True:
+        attempt += 1
         try:
             return _upload_and_parse(batch_pdf)
         except Exception as e:
             last = e
-            print(f"  Batch failed (attempt {attempt}/{retries}): {e}")
-            if attempt < retries:
-                time.sleep(backoff * attempt)
+            is_rl = _is_rate_limit(e)
+            if is_rl:
+                # 队列满/限流: 无限重试,退避递增等待平台高峰过去(最多10分钟/次)
+                print(f"  Batch 队列满/限流 (第{attempt}次), {rl_wait}s 后重试...", flush=True)
+                time.sleep(rl_wait)
+                rl_wait = min(rl_wait * 2 if rl_wait < 300 else rl_wait + 300, 600)
+                continue
+            # 普通错误: 有限重试
+            print(f"  Batch failed (attempt {attempt}/{retries}): {e}", flush=True)
+            if attempt >= retries:
+                break
+            wait = backoff * attempt
+            print(f"  retrying in {wait}s...", flush=True)
+            time.sleep(wait)
     raise RuntimeError(f"Batch {batch_pdf} failed after {retries} attempts: {last}")
+
 
 
 def process_pdf(filepath):
@@ -342,13 +442,17 @@ def process_pdf(filepath):
         return bl, bc, bbl
 
     # 多批:切片 → 逐批上传+校验 → 偏移合并
-    print(f"PDF has {n} pages > {BATCH_SIZE}, splitting into batches...")
+    # 批间 sleep 防 VL API 400 限流(连续提交触发),OCR_BATCH_SLEEP 可调/置0关闭
+    BATCH_SLEEP = float(os.environ.get("OCR_BATCH_SLEEP", "15"))
+    print(f"PDF has {n} pages > {BATCH_SIZE}, splitting into batches... (批间 sleep {BATCH_SLEEP}s 防限流)")
     batches, tmp_dir = split_pdf_batches(filepath)
     all_lines, all_coords, all_labels = {}, {}, {}
     total = len(batches)
     try:
         for i, (batch_pdf, batch_start, batch_len) in enumerate(batches, 1):
             print(f"=== Batch {i}/{total}: pages {batch_start}-{batch_start + batch_len - 1} ===")
+            if i > 1 and BATCH_SLEEP > 0:
+                time.sleep(BATCH_SLEEP)
             bl, bc, bbl = _upload_and_parse_with_retry(batch_pdf)
             # 校验:解析页数必须 == 切片页数,否则丢页/多页导致坐标全错
             if len(bl) != batch_len:
