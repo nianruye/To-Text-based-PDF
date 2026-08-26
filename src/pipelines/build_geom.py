@@ -739,7 +739,7 @@ for key in sorted(sl.keys(), key=int):
             continue
         t, x0, h, y0, w = r['t'], r['x0'], r['h'], r['y0'], r['w']
         is_pn = bool(PN_RE.fullmatch(t)) and y0 > page_px_h * 0.80
-        is_hdr = (not is_pn) and len(t) < 30 and (y0 < page_px_h * 0.06 or (y0 < page_px_h * 0.10 and _match_canon_hdr(t)))   # 页眉:顶部6% 或 6-10%匹配共识页眉(覆盖wz3 6%边缘 y0==0.06*pph 漏判,排除扉页非共识)
+        is_hdr = (not is_pn) and bool(CANON_HDRS) and len(t) < 30 and (y0 < page_px_h * 0.06 or (y0 < page_px_h * 0.10 and _match_canon_hdr(t)))   # 页眉:顶部6% 或 6-10%匹配共识页眉(覆盖wz3 6%边缘 y0==0.06*pph 漏判,排除扉页非共识)。CANON_HDRS 空(无共识页眉的书,如 mgfdmg 词典式页眉凑不成共识)=顶部行是紧凑版心的正文首行,不当页眉(否则正文缺行+页眉区乱拼接)
         w_ratio = w / page_px if page_px else 0
         is_wm = (not is_pn) and (not is_hdr) and y0 > page_px_h * 0.95 and w_ratio < 0.50   # 水印:极底部(页码96%之下)+窄行(<50%页宽)。几何判定,不用关键词(OCR乱识+正文含"理论"会误杀)
         if is_pn: continue                       # 页码 → setcounter 页脚
@@ -802,7 +802,7 @@ for key in sorted(sl.keys(), key=int):
             _last_fy1 = None   # 只标紧邻首行(后续行是正文,不居中)
     # 页眉:原始行合并(page_header_raw)→ 共识吸附(OCR 拆分/截断/混噪声,如"第一部分"+"历史考"→"第一部分历史考证"、"与党总…读本"→"马克思…读本")
     _hm = page_header_raw(key)
-    if _hm:
+    if _hm and CANON_HDRS:
         import difflib
         _best, _best_r = _hm, 0.6
         for _can in CANON_HDRS:

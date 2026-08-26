@@ -80,8 +80,8 @@ for pgi in range(len(doc)):
     for y0, x0, sz, txt in lines:
         if y0 > hrule_y and sz < BODY - 1.5:
             page_footnotes.append(txt)
-        elif y0 < ph * 0.08:
-            header_rows.append(txt)   # 页眉区行: 后置分类(真页眉丢弃 / OCR 错置正文归回上页)
+        elif y0 < ph * 0.05:
+            header_rows.append(txt)   # 页眉区行: 后置分类(真页眉丢弃 / OCR 错置正文归回上页)。阈值5%: 紧凑版心书(mgfdmg 正文首行 y≈40pt=6.7%页高)不误划页眉区
         elif sz < BODY - 2 and y0 < hrule_y:
             continue   # 顶部小字(残留兜底)
         else:
