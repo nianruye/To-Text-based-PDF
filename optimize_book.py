@@ -50,6 +50,8 @@ def main():
         sys.exit(2)
     src_pdf = os.path.abspath(args[0])
     book = args[1] if len(args) > 1 else os.path.splitext(os.path.basename(src_pdf))[0]
+    if book.lower().endswith('.pdf'):
+        book = book[:-4]   # 书名带不带 .pdf 都行, 自动去后缀
     only_ocr = '--only-ocr' in flags
     skip_ocr = '--skip-ocr' in flags or only_ocr
 
