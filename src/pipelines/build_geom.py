@@ -1028,10 +1028,14 @@ for key in sorted(sl.keys(), key=int):
         # _pp_applied(per-page 源 pitch 已生效)时跳过 uniform-pitch 收缩:POSITIONAL 按源 y 落位 + ratio 表已控制填充,
         # 此处按 nlines×pitch 估高会误判密集页溢出→把源 pitch(19.3)压成 12-15→pitch 达标率崩。
         # 非 per-page 路径(全局 LINESPREAD)保留收缩:密集页收紧行距防 split(ratio 表 + 收缩协同)。
+        # 行距根因(最小实验铁证): \linespread 包裹时若未设字号,页面 baselineskip=默认10pt×1.2×ls,
+        # 而 ls 按本书字号 PF 反推 → 误差因子 10/PF (wz4: 10/7.7=1.29 → 12.8→16.6; wz1 凑巧 PF≈10 故准)。
+        # 修: 包裹时先声明 \fontsize{PF}, 页面 baselineskip=PF×1.2×ls=源 pitch。
+        _pf_fs = '{\\fontsize{' + str(PF) + 'pt}{' + str(round(PF * 1.2, 1)) + 'pt}'
         if PER_PAGE_PITCH:
-            page_tex = '{\\linespread{' + ('%.3f' % ls_final) + '}\\selectfont ' + page_tex + '}'   # 按页 pitch:每页都包(基准=源 pitch,溢出再收紧)
+            page_tex = _pf_fs + '\\linespread{' + ('%.3f' % ls_final) + '}\\selectfont ' + page_tex + '}'   # 按页 pitch:每页都包(基准=源 pitch,溢出再收紧)
         elif ls_final < _lsb:
-            page_tex = '{\\linespread{' + ('%.3f' % ls_final) + '}\\selectfont ' + page_tex + '}'   # 原行为:仅溢出页收紧
+            page_tex = _pf_fs + '\\linespread{' + ('%.3f' % ls_final) + '}\\selectfont ' + page_tex + '}'   # 原行为:仅溢出页收紧
     pages_tex.append(page_tex)
 
 if os.environ.get('POS_EST_LOG'):
