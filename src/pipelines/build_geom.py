@@ -903,13 +903,20 @@ for key in sorted(sl.keys(), key=int):
             if f['is_head']:
                 frags = f.get('frags')
                 if frags and len(frags) > 1:
-                    # 多片段标题(如"第四部分"+"经典著作选编"分立):各片段按源 x 绝对定位(\rlap 零宽框+hspace,不互相推进)
-                    _tlp = MARGIN * DPI / 72
-                    _parts = []
-                    for _txt, _xpx in frags:
-                        _xrel = max(0.0, (_xpx - _tlp) * 72.0 / DPI)
-                        _parts.append('\\rlap{\\hspace*{' + ('%.1f' % _xrel) + 'pt}{\\CJKfamily{heiti}' + esc(_txt) + '}}')
-                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\noindent ' + ''.join(_parts) + brk + '}')
+                    # 多片段标题连续排版:拼接全部片段文本,按 align 走普通标题渲染。
+                    # 旧:各片段按源 x 绝对定位(\rlap);片段 x0 < 版心左被 max(0,·) 钳到 0,片段间
+                    # 相对间距被压缩 -> 渲染字号下片段宽超出被压的间距 -> 同行字符重叠
+                    # (wz3 p40 章标题 28pt / p47 两片同钳 0 完全重叠 83pt)。
+                    # 章标题("第三章"+"周代之“封建”")本就是连续文字,逐片定位价值低;
+                    # 表格行(帝号|光武…)拼接丢列位但不重叠(列位还原属表格支持,留待后续)。
+                    _ht = ''.join(_txt for _txt, _ in frags)
+                    _nat_w = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in _ht) * fnt   # 自然宽(CJK 1em/拉丁 0.5em)
+                    if _nat_w >= 0.85 * MEASURE:   # 拼接后超宽(表格行多片拼接)-> makebox[s] 收缩齐版心,防溢出/折行变高
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][s]{{\\CJKfamily{heiti}' + _esc_heading(_ht) + '}}' + brk + '}')
+                    elif f.get('align') == 'c':   # 源里居中 -> 居中(读源位置,非统一规则)
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{heiti}' + _esc_heading(_ht) + '}}' + brk + '}')
+                    else:                       # 源里左对齐 -> 左对齐
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{heiti}' + _esc_heading(_ht) + '}' + brk + '}')
                 elif f.get('align') == 'c':   # 源里居中 → 居中(读源位置,非统一规则)
                     body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{heiti}' + _esc_heading(f['t']) + '}}' + brk + '}')
                 else:                       # 源里左对齐 → 左对齐
