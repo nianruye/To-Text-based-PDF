@@ -26,7 +26,7 @@ DPI = 200
 sl = json.load(open(SL, encoding='utf-8'))
 co = json.load(open(CO, encoding='utf-8'))
 
-_G = calibrate(sl, co, DPI)
+_G = calibrate(sl, co, DPI, src_pdf=SRC)
 PAGE_W, PAGE_H = _G['PAGE_W'], _G['PAGE_H']
 cw = _G['cw']; MEASURE_POLY = _G['MEASURE_POLY']; OVERBOUND = _G['OVERBOUND']
 MEASURE = _G['MEASURE']; FONT = _G['FONT']; MARGIN = _G['MARGIN']

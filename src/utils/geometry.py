@@ -11,12 +11,38 @@ import os
 import statistics
 
 
-def calibrate(sl, co, DPI=200):
-    """几何标定。sl/co 为 spotting lines/coords（dict）。返回标定结果 dict。"""
-    # 页面尺寸从 coords 推导（占位 405,633，coords 覆盖；与 OCR 坐标一致，不从 SRC PDF 读）
+def calibrate(sl, co, DPI=200, src_pdf=''):
+    """几何标定。sl/co 为 spotting lines/coords（dict）。返回标定结果 dict。
+
+    src_pdf 提供时按文字覆盖率自适应选页尺寸来源:
+    - 覆盖率 >= PAGE_COVERAGE_THRESHOLD(默认0.95): 用 coords 推导(与 OCR 坐标一致,原行为)
+    - 覆盖率 < 阈值(大边距书,如 wz4 文字仅覆盖72% → coords 推导页框偏小28% → 溢出翻倍):
+      用 src_pdf 实际页尺寸(多页中位,防首页特殊)。
+    行距(BASELINE)仍只依赖 coords 行 y 间距统计,不随页框缩放。
+    """
+    # 页面尺寸从 coords 推导（占位 405,633，coords 覆盖；与 OCR 坐标一致）
     _ymax = max((p[1] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2), default=0)
     _xmax = max((p[0] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2), default=0)
     PAGE_W, PAGE_H = (round(_xmax * 72 / DPI), round(_ymax * 72 / DPI)) if _xmax and _ymax else (405, 633)
+    # 自适应: 大边距书用实际页尺寸
+    if src_pdf:
+        import fitz
+        try:
+            doc = fitz.open(src_pdf)
+            n = doc.page_count
+            idxs = list(range(0, n, max(1, n // 10)))
+            aw = statistics.median(doc[i].rect.width for i in idxs)
+            ah = statistics.median(doc[i].rect.height for i in idxs)
+            doc.close()
+            coverage = PAGE_W / aw if aw > 0 else 1.0
+            thresh = float(os.environ.get('PAGE_COVERAGE_THRESHOLD', '0.95'))
+            if coverage < thresh:
+                print(f"[页尺寸] 来源=src_pdf(覆盖率{coverage:.0%}<{thresh:.0%}), 实际{aw:.0f}x{ah:.0f}pt 替代 coords 推导{PAGE_W}x{PAGE_H}pt", flush=True)
+                PAGE_W, PAGE_H = round(aw), round(ah)
+            else:
+                print(f"[页尺寸] 来源=coords(覆盖率{coverage:.0%}>={thresh:.0%}), {PAGE_W}x{PAGE_H}pt(实际{aw:.0f}x{ah:.0f}pt)", flush=True)
+        except Exception as e:
+            print(f"[页尺寸] src_pdf 读取失败({e}), 回退 coords 推导 {PAGE_W}x{PAGE_H}pt", flush=True)
     widths, chars, heights = [], [], []
     for key in sl:
         polys = co.get(key, [])
