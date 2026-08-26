@@ -25,7 +25,7 @@ def render(out_pdf, est_log=None, ratio_table=None, fill=None, build_name='build
     if fill: env['POS_FILL'] = str(fill)
     import os as _os
     _build = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'pipelines', build_name + '.py')
-    cmd = ['python3', _build, SL, CO, out_pdf]
+    cmd = [sys.executable, _build, SL, CO, out_pdf]   # 与 fit_positional 同解释器(原 'python3' 随 PATH 漂移, 用户环境命中 mineru venv 缺 opencc 致 render 失败)
     if SRC: cmd.append(SRC)
     r = subprocess.run(cmd, env=env, capture_output=True, text=True)
     if not os.path.exists(out_pdf):
