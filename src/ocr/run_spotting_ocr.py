@@ -269,7 +269,7 @@ def process_pdf_via_png(filepath):
     print(f"OCR done: {n} pages, {total} lines, {titles} titles, {len(failed)} failed")
     if failed:
         print(f"\u26a0\ufe0f \u5931\u8d25\u9875(\u5df2\u7f6e\u7a7a): {failed}")
-    return all_lines, all_coords, all_labels
+    return all_lines, all_coords, all_labels, {}
 
 def split_pdf_batches(filepath):
     """用 fitz 把 filepath 切成 ≤BATCH_SIZE 页的临时 PDF。
@@ -365,7 +365,7 @@ def _upload_and_parse(pdf_path):
         time.sleep(5)
     rr = requests.get(jsonl_url)
     rr.raise_for_status()
-    lines, coords, labels = {}, {}, {}
+    lines, coords, labels, markdown = {}, {}, {}, {}
     raw_lines = [l for l in rr.text.strip().split("\n") if l.strip()]
     # jsonl 每行=一个文档;result.layoutParsingResults 是页数组,每元素=一页
     page_counter = 0
@@ -377,10 +377,14 @@ def _upload_and_parse(pdf_path):
             lines[str(page_counter)] = pl
             coords[str(page_counter)] = pp
             labels[str(page_counter)] = pb
+            # markdown 字段(API 原生 md, spotting 模式是简单段落合并): 存阅读版副产品
+            _md = lpr.get("markdown") if isinstance(lpr, dict) else None
+            if isinstance(_md, dict) and isinstance(_md.get("text"), str) and _md["text"].strip():
+                markdown[str(page_counter)] = _md["text"]
             titles = sum(1 for x in pb if "title" in x)
             print(f"  page {page_counter}: {len(pl)} lines, titles: {titles}")
             page_counter += 1
-    return lines, coords, labels
+    return lines, coords, labels, markdown
 
 
 def _is_rate_limit(err):
@@ -436,24 +440,24 @@ def process_pdf(filepath):
     if n <= BATCH_SIZE:
         # 单批:局部 key 即全局 key(batch_start=0),零行为变化
         print(f"Single batch: {n} pages (≤ {BATCH_SIZE})")
-        bl, bc, bbl = _upload_and_parse_with_retry(filepath)
+        bl, bc, bbl, bmd = _upload_and_parse_with_retry(filepath)
         if len(bl) != n:
             raise RuntimeError(f"Parse mismatch: expected {n} pages, got {len(bl)}")
-        return bl, bc, bbl
+        return bl, bc, bbl, bmd
 
     # 多批:切片 → 逐批上传+校验 → 偏移合并
     # 批间 sleep 防 VL API 400 限流(连续提交触发),OCR_BATCH_SLEEP 可调/置0关闭
     BATCH_SLEEP = float(os.environ.get("OCR_BATCH_SLEEP", "15"))
     print(f"PDF has {n} pages > {BATCH_SIZE}, splitting into batches... (批间 sleep {BATCH_SLEEP}s 防限流)")
     batches, tmp_dir = split_pdf_batches(filepath)
-    all_lines, all_coords, all_labels = {}, {}, {}
+    all_lines, all_coords, all_labels, all_markdown = {}, {}, {}, {}
     total = len(batches)
     try:
         for i, (batch_pdf, batch_start, batch_len) in enumerate(batches, 1):
             print(f"=== Batch {i}/{total}: pages {batch_start}-{batch_start + batch_len - 1} ===")
             if i > 1 and BATCH_SLEEP > 0:
                 time.sleep(BATCH_SLEEP)
-            bl, bc, bbl = _upload_and_parse_with_retry(batch_pdf)
+            bl, bc, bbl, bmd = _upload_and_parse_with_retry(batch_pdf)
             # 校验:解析页数必须 == 切片页数,否则丢页/多页导致坐标全错
             if len(bl) != batch_len:
                 raise RuntimeError(
@@ -465,15 +469,18 @@ def process_pdf(filepath):
                 all_lines[gk] = bl[local_k]
                 all_coords[gk] = bc[local_k]
                 all_labels[gk] = bbl[local_k]
+            for local_k in bmd:
+                gk = str(batch_start + int(local_k))
+                all_markdown[gk] = bmd[local_k]
             print(f"  merged {len(bl)} pages → global keys {batch_start}-{batch_start+len(bl)-1}")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-    return all_lines, all_coords, all_labels
+    return all_lines, all_coords, all_labels, all_markdown
 
 
 if __name__ == "__main__":
     print(f"Spotting OCR (layout detection ON): {INPUT_PDF}")
-    lines_data, coords_data, labels_data = process_pdf(INPUT_PDF)
+    lines_data, coords_data, labels_data, markdown_data = process_pdf(INPUT_PDF)
     total = sum(len(v) for v in lines_data.values())
     titles_total = sum(sum(1 for l in v if "title" in l) for v in labels_data.values())
     print(f"Total: {len(lines_data)} pages, {total} lines, {titles_total} titles")
@@ -498,4 +505,11 @@ if __name__ == "__main__":
     with open(out_labels, "w", encoding="utf-8") as f:
         json.dump(labels_data, f, ensure_ascii=False, indent=2)
     print(f"Saved: {out_labels}")
+
+    # 输出 API 原生 markdown(阅读版副产品, 不参与排版)
+    if markdown_data:
+        out_md = base + "_markdown" + ext
+        with open(out_md, "w", encoding="utf-8") as f:
+            json.dump(markdown_data, f, ensure_ascii=False, indent=2)
+        print(f"Saved: {out_md}")
     print("Step 1 complete.")
