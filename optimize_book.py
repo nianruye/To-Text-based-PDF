@@ -119,8 +119,13 @@ json.dump(nc, open("{coords_ll}", "w"), ensure_ascii=False, indent=2)
 
     # ── 3. fit_positional 两趟校准排版 (必须串行!) ──
     print("[3/5] fit_positional 排版 (两趟校准, 串行)...")
+    _fit_env = {}
+    if '--md-layout' in flags and os.path.exists(f'{ddir}/{book}_layout_raw.json'):
+        # LAYOUT_HEADINGS=1: 用 VL 版面标题标签(doc_title/paragraph_title)做权威标题判定
+        _fit_env = {'LAYOUT_HEADINGS': '1', 'LAYJSON': f'{ddir}/{book}_layout_raw.json'}
+        print(f"  [LAYOUT_HEADINGS] 用 VL 版面标题标签判定标题: {_fit_env['LAYJSON']}")
     run([PY, 'src/calibration/fit_positional.py', use_lines, use_coords, out_pdf, src_pdf],
-        timeout=1800)
+        env_extra=_fit_env, timeout=1800)
 
     # ── 4. 验证 ──
     print("[4/5] 验证...")
@@ -137,8 +142,9 @@ json.dump(nc, open("{coords_ll}", "w"), ensure_ascii=False, indent=2)
     # 默认 pdf2md(排版反推, 免费); --md-layout 时用 layout 模式跑一遍出精品 md(知识库用, API 量翻倍)
     if '--md-layout' in flags:
         md_out = f'{odir}/{book}_layout.md'
-        print(f"  [--md-layout] layout 模式跑一遍出精品 md (段落/表格/图片URL, 知识库用, API 量翻倍)...")
-        run([PY, 'src/ocr/run_md_layout.py', src_pdf, md_out], timeout=1800)
+        layjson = f'{ddir}/{book}_layout_raw.json'
+        print(f"  [--md-layout] layout 模式跑一遍出精品 md + LAYJSON (知识库用 + 标题权威判定)...")
+        run([PY, 'src/ocr/run_md_layout.py', src_pdf, md_out, layjson], timeout=1800)
         out_md = md_out
     else:
         run([PY, 'src/ocr/pdf2md.py', out_pdf, out_md])

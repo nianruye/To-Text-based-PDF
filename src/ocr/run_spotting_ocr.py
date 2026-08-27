@@ -6,6 +6,9 @@ from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
 
 TOKEN_FILE = "/tmp/paddle_token"
+
+_LAST_RAW = {}   # 最近一批的每页 prunedResult(局部 key), process_pdf 合并时偏移进 _PAGE_RAW
+_PAGE_RAW = {}   # 全局 key 的每页 prunedResult(layout 原始块, 供 LAYOUT_HEADINGS 标题判定 / run_md_layout 存盘)
 INPUT_PDF = sys.argv[1] if len(sys.argv) > 1 else "/opt/test/优化前.pdf"
 OUT_LINES = sys.argv[2] if len(sys.argv) > 2 else "/opt/test/spotting_lines.json"
 OUT_COORDS = sys.argv[3] if len(sys.argv) > 3 else "/opt/test/spotting_coords.json"
@@ -365,7 +368,7 @@ def _upload_and_parse(pdf_path):
         time.sleep(5)
     rr = requests.get(jsonl_url)
     rr.raise_for_status()
-    lines, coords, labels, markdown = {}, {}, {}, {}
+    lines, coords, labels, markdown, raw = {}, {}, {}, {}, {}
     raw_lines = [l for l in rr.text.strip().split("\n") if l.strip()]
     # jsonl 每行=一个文档;result.layoutParsingResults 是页数组,每元素=一页
     page_counter = 0
@@ -381,9 +384,14 @@ def _upload_and_parse(pdf_path):
             _md = lpr.get("markdown") if isinstance(lpr, dict) else None
             if isinstance(_md, dict) and isinstance(_md.get("text"), str) and _md["text"].strip():
                 markdown[str(page_counter)] = _md["text"]
+            # 原始 prunedResult(块级 parsing_res_list, layout 标题判定用)
+            if isinstance(lpr, dict) and isinstance(lpr.get("prunedResult"), dict):
+                raw[str(page_counter)] = lpr["prunedResult"]
             titles = sum(1 for x in pb if "title" in x)
             print(f"  page {page_counter}: {len(pl)} lines, titles: {titles}")
             page_counter += 1
+    global _LAST_RAW
+    _LAST_RAW = raw
     return lines, coords, labels, markdown
 
 
@@ -443,6 +451,7 @@ def process_pdf(filepath):
         bl, bc, bbl, bmd = _upload_and_parse_with_retry(filepath)
         if len(bl) != n:
             raise RuntimeError(f"Parse mismatch: expected {n} pages, got {len(bl)}")
+        _PAGE_RAW.update(_LAST_RAW)   # 单批: 局部 key = 全局 key
         return bl, bc, bbl, bmd
 
     # 多批:切片 → 逐批上传+校验 → 偏移合并
@@ -472,6 +481,8 @@ def process_pdf(filepath):
             for local_k in bmd:
                 gk = str(batch_start + int(local_k))
                 all_markdown[gk] = bmd[local_k]
+            for _lk, _raw in _LAST_RAW.items():
+                _PAGE_RAW[str(batch_start + int(_lk))] = _raw
             print(f"  merged {len(bl)} pages → global keys {batch_start}-{batch_start+len(bl)-1}")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

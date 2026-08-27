@@ -949,7 +949,12 @@ for key in sorted(sl.keys(), key=int):
                     _pre = ''; _box = '\\makebox[\\textwidth]'
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _pre + _box + '{' + _strut + _ind + esc(_toc[0]) + '\\,\\dotfill\\,' + esc(_toc[1]) + '}' + brk + '}')
                 continue
-            indent = '\\hspace*{2em}' if f.get('is_para_start') else ''
+            # 缩进按源 x0 还原(弃写死 2em): 段首行缩进=源 x0-版心左, 段内行悬挂缩进同源。
+            # 容差 6px(=0.5字@200dpi, OCR x0 噪声)内归 0; 短行自然留白右侧, 与源书一致。
+            _ix_px = f.get('x0', 0) - body_left
+            if _ix_px < 6:
+                _ix_px = 0
+            indent = ('\\hspace*{%.1fpt}' % (_ix_px * 72.0 / DPI)) if _ix_px > 0 else ''
             _nat_w = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in f['t']) * fnt   # 自然字宽(CJK 1em/拉丁 0.5em);用字数非 poly 宽(多片段合并会撑大 poly→短标题误判满行被拉伸)
             _grid = os.environ.get('GRID_PITCH', '') in ('1', 'true', 'True')   # 固定字距(旧 GRID_PITCH 开关,makebox[l]);USE_REGION 改用 CJKglue plus 0em 实现等价固定字距(见前导 _cjk_glue)
             if _nat_w >= 0.85 * MEASURE:
