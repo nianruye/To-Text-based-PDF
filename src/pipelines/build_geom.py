@@ -410,11 +410,13 @@ print(f"[标题字号] 分{tier_size.get('part','—')}pt 大{tier_size.get('tit
 def page_header_raw(key):
     '从原始 OCR 行(未经视觉合并)取页眉:顶部 y<5% 行按 x 合并。避免视觉合并把多片段页眉("第一部分"+"历史考")因负x间隙乱序拼接'
     _frags = []; _cl = co.get(key, [])
+    _pn_local = globals().get('PN_RE') or re.compile(r'^\d+$')   # 单元测试隔离 namespace 无全局 PN_RE
     for _i, _t in enumerate(sl[key]):
         _t = _t.strip()
         if not _t or _i >= len(_cl) or not _cl[_i]: continue
         _ys = [p[1] for p in _cl[_i]]; _xs = [p[0] for p in _cl[_i]]
-        if min(_ys) < page_px_h * 0.10 and len(_t) < 30:
+        # 排除纯数字行(书眉式页码在页顶左右角, 混入拼接致每页不同 → 共识失败, 页眉漏识别)
+        if min(_ys) < page_px_h * 0.10 and len(_t) < 30 and not _pn_local.fullmatch(_t):
             _frags.append((min(_xs), _t))
     _frags.sort()
     return ''.join(_t for _, _t in _frags) if _frags else ''
@@ -739,7 +741,7 @@ for key in sorted(sl.keys(), key=int):
             flow.append({'is_figrow': True, 'figs': r['figs'], 'fnt': FONT, 'is_head': False, 'x0': 0, 'w': 0, 't': '', 'align': 'l', 'y0': r.get('y0', 0)})
             continue
         t, x0, h, y0, w = r['t'], r['x0'], r['h'], r['y0'], r['w']
-        is_pn = bool(PN_RE.fullmatch(t)) and y0 > page_px_h * 0.80
+        is_pn = bool(PN_RE.fullmatch(t)) and (y0 > page_px_h * 0.80 or y0 < page_px_h * 0.10)   # 底部常规页码 + 顶部书眉式页码(源书页码在页眉左右角)
         is_hdr = (not is_pn) and bool(CANON_HDRS) and len(t) < 30 and (y0 < page_px_h * 0.06 or (y0 < page_px_h * 0.10 and _match_canon_hdr(t)))   # 页眉:顶部6% 或 6-10%匹配共识页眉(覆盖wz3 6%边缘 y0==0.06*pph 漏判,排除扉页非共识)。CANON_HDRS 空(无共识页眉的书,如 mgfdmg 词典式页眉凑不成共识)=顶部行是紧凑版心的正文首行,不当页眉(否则正文缺行+页眉区乱拼接)
         w_ratio = w / page_px if page_px else 0
         is_wm = (not is_pn) and (not is_hdr) and y0 > page_px_h * 0.95 and w_ratio < 0.50   # 水印:极底部(页码96%之下)+窄行(<50%页宽)。几何判定,不用关键词(OCR乱识+正文含"理论"会误杀)
@@ -805,11 +807,11 @@ for key in sorted(sl.keys(), key=int):
     _hm = page_header_raw(key)
     if _hm and CANON_HDRS:
         import difflib
-        _best, _best_r = _hm, 0.6
+        _best, _best_r = _hm, 0.0
         for _can in CANON_HDRS:
             _r = difflib.SequenceMatcher(None, _hm, _can).ratio()
             if _r > _best_r: _best_r, _best = _r, _can
-        headers = [_best]
+        headers = [_best] if _best_r >= 0.6 else []   # 无共识匹配(正文首行 y 6-10% 误入拼接, 如 wz4 p5) → 不渲染页眉, 正文行在 flow 正常渲染
     else:
         headers = []
     is_divider = bool(flow) and all(f['is_head'] for f in flow) and not footnotes   # 仅标题无正文/脚注=分隔页(分标题页)→标题垂直居中(源在页中,非顶部)
