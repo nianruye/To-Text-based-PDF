@@ -126,7 +126,7 @@ def main():
     ap.add_argument("src_coords")
     ap.add_argument("src_lines", nargs="?", default="")
     ap.add_argument("--src-pdf", default="")
-    ap.add_argument("--dpi", type=int, default=200)
+    ap.add_argument("--dpi", type=int, default=0, help="0=自动从 coords P95 y 与 --src-pdf 页高反推(coords 尺度随 API 批次漂移 200/142), 显式传值则用该值")
     ap.add_argument("--sample", type=int, default=0, help="只抽前 N 页(0=全书)")
     ap.add_argument("--json", default="")
     ap.add_argument("--tol-height", type=float, default=0.05)
@@ -135,6 +135,22 @@ def main():
 
     coords = json.load(open(a.src_coords, encoding="utf-8"))
     lines = json.load(open(a.src_lines, encoding="utf-8")) if a.src_lines else {}
+    # DPI 自适应: coords 实际尺度(API 批次间 200/142dpi 漂移), P95 y 抗页码/噪声
+    if a.dpi == 0 and a.src_pdf:
+        try:
+            import fitz
+            doc = fitz.open(a.src_pdf)
+            _ah = doc[min(0, doc.page_count - 1)].rect.height
+            doc.close()
+            _ys = [p[1] for _k in coords for _poly in coords.get(_k, []) if _poly for p in _poly if len(p) >= 2]
+            if _ys:
+                a.dpi = round(sorted(_ys)[int(len(_ys) * 0.95)] * 72 / _ah)
+                print(f"[verify] DPI 自适应: {a.dpi} (coords P95 y={sorted(_ys)[int(len(_ys)*0.95)]:.0f}px / 页高{_ah:.0f}pt)")
+        except Exception as e:
+            print(f"[verify] DPI 自适应失败({e}), 用 200")
+            a.dpi = 200
+    if a.dpi == 0:
+        a.dpi = 200
     src = src_pages(coords, lines, a.dpi)
     out = out_pages(a.out_pdf)
 
