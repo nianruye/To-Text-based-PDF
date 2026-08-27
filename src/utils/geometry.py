@@ -37,13 +37,15 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
             doc.close()
         except Exception as e:
             print(f"[页尺寸] src_pdf 读取失败({e})", flush=True)
-    # DPI 自适应: P95 y(抗页码/噪声) 反推真实 dpi
+    # DPI 自适应: max y(页底, 分位法 P95/P99 落在版心底系统性偏低) 反推真实 dpi。
+    # 保护: 剔除 >页高×1.15 的噪声 poly(OCR 偶发越界)后取最大。
     _all_y = [p[1] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2]
     if _all_y and _ah:
-        _ymax95 = sorted(_all_y)[int(len(_all_y) * 0.95)]
-        _dpi_r = round(_ymax95 * 72 / _ah)
+        _cap = _ah * 1.15 * DPI / 72   # 噪声上限(该 DPI 假设下页高 1.15 倍)
+        _ymax_c = max((y for y in _all_y if y <= _cap), default=max(_all_y))
+        _dpi_r = round(_ymax_c * 72 / _ah)
         if abs(_dpi_r - DPI) > 5:
-            print(f"[DPI] 自适应 {DPI}→{_dpi_r} (coords P95 y={_ymax95}px / 页高{_ah:.0f}pt)", flush=True)
+            print(f"[DPI] 自适应 {DPI}→{_dpi_r} (coords max y={_ymax_c}px / 页高{_ah:.0f}pt)", flush=True)
             DPI = _dpi_r
     # 页面尺寸从 coords 推导（占位 405,633，coords 覆盖；与 OCR 坐标一致）
     _ymax = max((p[1] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2), default=0)

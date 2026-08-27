@@ -322,11 +322,11 @@ if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
         if _hb: _head_blocks[str(_pi)] = _hb
     print(f"[标题·layout] 加载 {len(_head_blocks)} 页含标题块(LAYOUT_HEADINGS=1,layout 优先+启发式补充)")
 def _layout_head_level(x0, y0, w, h, key):
-    '该行中心落在某 layout 标题块内 → 返回 # 级别;否则 None。行坐标与块坐标同源(spotting/layout 同批次同尺度), 自适应 DPI 修正后无需额外缩放。±8px 容差兜噪声'
+    '该行中心落在某 layout 标题块内 → 返回 # 级别;否则 None。缩放 _s=DPI/LDPI: 行坐标尺度=自适应 DPI(wz1 200dpi), 块尺度=LDPI≈142 → 1.408; 同批次书(mgfdmg 141/142)≈1。±8px 容差兜噪声'
     if key not in _head_blocks: return None
-    cx, cy = x0 + w/2, y0 + h/2; _tol = 8   # 容差:142dpi 下行距~28px,8px 够不到相邻正文行
+    cx, cy = x0 + w/2, y0 + h/2; _s = DPI/LDPI; _tol = 8   # 容差:142dpi 下行距~28px,8px 够不到相邻正文行
     for _bb, _lvl in _head_blocks[key]:
-        if _bb[0] - _tol <= cx <= _bb[2] + _tol and _bb[1] - _tol <= cy <= _bb[3] + _tol: return _lvl
+        if _bb[0]*_s - _tol <= cx <= _bb[2]*_s + _tol and _bb[1]*_s - _tol <= cy <= _bb[3]*_s + _tol: return _lvl
     return None
 # 边栏旁注(竖排书名/卷名 aside_text):eso-pic 绝对定位贴回边栏。每页清叠加防累积
 _asides = {}   # page_key -> [(content, bbox_142dpi)]

@@ -138,14 +138,20 @@ def main():
     # DPI 自适应: coords 实际尺度(API 批次间 200/142dpi 漂移), P95 y 抗页码/噪声
     if a.dpi == 0 and a.src_pdf:
         try:
-            import fitz
+            import fitz, statistics
             doc = fitz.open(a.src_pdf)
-            _ah = doc[min(0, doc.page_count - 1)].rect.height
+            _n = doc.page_count
+            _idxs = list(range(0, _n, max(1, _n // 10)))
+            _ah = statistics.median(doc[i].rect.height for i in _idxs)   # 与 calibrate 同口径: 采样中位(首页常是封面尺寸不同)
             doc.close()
             _ys = [p[1] for _k in coords for _poly in coords.get(_k, []) if _poly for p in _poly if len(p) >= 2]
             if _ys:
-                a.dpi = round(sorted(_ys)[int(len(_ys) * 0.95)] * 72 / _ah)
-                print(f"[verify] DPI 自适应: {a.dpi} (coords P95 y={sorted(_ys)[int(len(_ys)*0.95)]:.0f}px / 页高{_ah:.0f}pt)")
+                _cap = _ah * 1.15 * 200 / 72   # 与 calibrate 同噪声上限(200dpi 假设口径)
+                _ymx = max((y for y in _ys if y <= _cap), default=max(_ys))
+                a.dpi = round(_ymx * 72 / _ah)
+                if abs(a.dpi - 200) <= 5:
+                    a.dpi = 200   # 与 calibrate 同阈值: 近 200 归 200, 防校验/渲染口径偏差
+                print(f"[verify] DPI 自适应: {a.dpi} (coords max y={_ymx:.0f}px / 页高{_ah:.0f}pt)")
         except Exception as e:
             print(f"[verify] DPI 自适应失败({e}), 用 200")
             a.dpi = 200
