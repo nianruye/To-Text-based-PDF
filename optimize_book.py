@@ -3,7 +3,7 @@
 """通用 PDF 优化(排版还原)一键脚本。
 
 用法:
-    /usr/bin/python3 optimize_book.py <source_pdf> [book_name] [--skip-ocr] [--only-ocr]
+    /usr/bin/python3 optimize_book.py <source_pdf> [book_name] [--skip-ocr] [--only-ocr] [--md-layout]
 
 流程:
     1. OCR (PaddleOCR-VL spotting 行级) → data/<book>/<book>_spotting_{lines,coords}.json
@@ -133,8 +133,15 @@ json.dump(nc, open("{coords_ll}", "w"), ensure_ascii=False, indent=2)
     print(f"check_overlap 退出码: {ov.returncode} ({'无重叠' if ov.returncode == 0 else '有重叠 — 看上面明细'})")
 
     # ── 5. md 导出 ──
-    print("[5/5] pdf2md 导出...")
-    run([PY, 'src/ocr/pdf2md.py', out_pdf, out_md])
+    print("[5/5] md 导出...")
+    # 默认 pdf2md(排版反推, 免费); --md-layout 时用 layout 模式跑一遍出精品 md(知识库用, API 量翻倍)
+    if '--md-layout' in flags:
+        md_out = f'{odir}/{book}_layout.md'
+        print(f"  [--md-layout] layout 模式跑一遍出精品 md (段落/表格/图片URL, 知识库用, API 量翻倍)...")
+        run([PY, 'src/ocr/run_md_layout.py', src_pdf, md_out], timeout=1800)
+        out_md = md_out
+    else:
+        run([PY, 'src/ocr/pdf2md.py', out_pdf, out_md])
 
     print(f"""
 ╔══════════════════════════════════════╗
