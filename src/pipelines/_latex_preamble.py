@@ -14,7 +14,8 @@ _cjk_glue 按 mode 分发（保留差异，else 分支不同）：
 
 def build_latex(mode, PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex):
     """生成完整 latex 文档字符串。mode='geom'/'classic' 决定 _cjk_glue。"""
-    _xeCJKsetup_PunctStyle = '\\xeCJKsetup{PunctStyle=kaiming}' if USE_REGION else ''
+    # 开明制标点(句逗半角占位, 行尾挤压) - 中文出版规范, 全模式开(原生书观感)
+    _xeCJKsetup_PunctStyle = '\\xeCJKsetup{PunctStyle=kaiming}'
     if USE_REGION:
         _cjk_glue = '\\hskip 0pt plus 0.05em minus 0.5em'
     elif mode == 'classic':
@@ -27,8 +28,8 @@ def build_latex(mode, PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex)
 \\usepackage{{xeCJK}}
 \\usepackage{{graphicx}}
 \\usepackage{{eso-pic}}   # 边栏旁注(竖排)绝对定位贴回
-\\setCJKmainfont{{Noto Serif CJK JP}}
-\\setCJKfamilyfont{{heiti}}{{Noto Sans CJK JP}}   % heiti(黑体)标题字体(注意是 setCJKfamilyfont,非 setCJKfamily--后者会把族名/字体名当文本泄漏)
+\\setCJKmainfont{{Noto Serif CJK SC}}   % SC=简体字形(JP 版部分汉字日式写法)
+\\setCJKfamilyfont{{heiti}}{{Noto Sans CJK SC}}   % heiti(黑体)标题字体(注意是 setCJKfamilyfont,非 setCJKfamily--后者会把族名/字体名当文本泄漏)
 \\renewcommand{{\\CJKglue}}{{{_cjk_glue}}}   % base 0pt;plus 0em(区域化,不拉伸->字距恒定)或 plus 0.5em(默认,拉伸短行);minus 0.4em 让超长满行收缩齐右不溢出旁注
 {_xeCJKsetup_PunctStyle}
 \\setlength{{\\parindent}}{{0pt}}\\setlength{{\\parskip}}{{0pt}}
