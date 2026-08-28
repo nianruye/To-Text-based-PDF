@@ -313,6 +313,14 @@ def _hf(f):
     '按标题档选字体: part/title=章字体, section=节字体'
     return _SUBTITLE_CJK if f.get('tier') == 'section' else _TITLE_CJK
 _PAGE_IMG_PAGES = set(int(x) for x in os.environ.get('PAGE_IMAGE_PAGES', '').split(',') if x.strip())   # 贴图页(封面/扉页/版权页): 直接渲染原扫描图
+_TOC_LEVELS = []
+_toc_rules_f = os.environ.get('TOC_RULES', '')
+if _toc_rules_f and os.path.exists(_toc_rules_f):
+    try:
+        _TOC_LEVELS = [(re.compile(_r['pattern']), _r['level']) for _r in json.load(open(_toc_rules_f)).get('levels', [])]
+        print(f'[TOC_RULES] 目录级别规则 {len(_TOC_LEVELS)} 条: ' + ', '.join(f"{lvl}:{pat.pattern}" for pat, lvl in _TOC_LEVELS))
+    except Exception as _e:
+        print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
 _head_blocks = {}   # page_key -> [(bbox_142dpi, #级别)]
 if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
@@ -779,7 +787,13 @@ for key in sorted(sl.keys(), key=int):
         if is_head and flow and flow[-1].get('is_figrow'):
             is_head = False   # 图块正下方的单行(图说明,常含书名如"《工资、价格和利润》法文版")=非标题 → 降正文(保留居中渲染)
         if is_head:
-            _tier = ('part' if _lay_lvl <= 1 else ('title' if _lay_lvl == 2 else 'section')) if _lay_lvl is not None else _head_level(t, is_big)   # layout 级别→档(1=分/2=大/≥3=节);无 layout 走启发式
+            _tier = None
+            if _TOC_LEVELS:   # 目录规则优先: 编号格式定级别(如 "一、"=part, "1."=section)
+                for _tp, _tlvl in _TOC_LEVELS:
+                    if _tp.match(t):
+                        _tier = _tlvl; break
+            if _tier is None:   # 回退: layout 级别→档; 无 layout 走启发式
+                _tier = ('part' if _lay_lvl <= 1 else ('title' if _lay_lvl == 2 else 'section')) if _lay_lvl is not None else _head_level(t, is_big)
             _rf = (_reg.get(r.get('region'), {}).get('font', FONT) / FONT) if (USE_REGION and r.get('region')) else _pm   # 区域化:标题按其区域字号比缩放(注释区标题也小);否则本页 pm
             head_size = round(tier_size.get(_tier, FONT) * _rf, 1)
         else:

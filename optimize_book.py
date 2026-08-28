@@ -120,6 +120,13 @@ json.dump(nc, open("{coords_ll}", "w"), ensure_ascii=False, indent=2)
     # ── 3. fit_positional 两趟校准排版 (必须串行!) ──
     print("[3/5] fit_positional 排版 (两趟校准, 串行)...")
     _fit_env = {}
+    if '--toc-rules' in flags:
+        # 目录定标题级别: 从目录页 OCR 提取编号规则(章"一、"/节"1.") → 标题级别权威化
+        rules_f = f'{ddir}/{book}_toc_rules.json'
+        run([PY, 'src/tools/extract_toc_rules.py', use_lines, use_coords, f'--out={rules_f}'])
+        if os.path.exists(rules_f):
+            _fit_env['TOC_RULES'] = rules_f
+            print(f"  [TOC_RULES] 目录级别规则 → {rules_f}")
     if '--page-images' in flags:
         # 封面/扉页/版权页整页贴图(原扫描图, 零 OCR 错字/零排版问题)
         pimg_dir = f'{odir}/page_images'
