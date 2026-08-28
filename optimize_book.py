@@ -120,6 +120,14 @@ json.dump(nc, open("{coords_ll}", "w"), ensure_ascii=False, indent=2)
     # ── 3. fit_positional 两趟校准排版 (必须串行!) ──
     print("[3/5] fit_positional 排版 (两趟校准, 串行)...")
     _fit_env = {}
+    if '--page-images' in flags:
+        # 封面/扉页/版权页整页贴图(原扫描图, 零 OCR 错字/零排版问题)
+        pimg_dir = f'{odir}/page_images'
+        run([PY, 'src/tools/make_page_images.py', src_pdf, use_lines, f'--out={pimg_dir}'])
+        pj = json.load(open(f'{pimg_dir}/pages.json'))
+        _fit_env['PAGE_IMAGE_PAGES'] = ','.join(map(str, pj['pages']))
+        _fit_env['PAGE_IMAGE_PREFIX'] = pj['prefix']
+        print(f"  [贴图页] 封面/扉页/版权页 {pj['pages']} 整页贴图(原扫描图)")
     if '--md-layout' in flags and os.path.exists(f'{ddir}/{book}_layout_raw.json'):
         # LAYOUT_HEADINGS=1: 用 VL 版面标题标签(doc_title/paragraph_title)做权威标题判定
         _fit_env = {'LAYOUT_HEADINGS': '1', 'LAYJSON': f'{ddir}/{book}_layout_raw.json'}
