@@ -226,6 +226,30 @@ def _split_heading(t):
         if rest:
             return m.group(1), rest
     return '', t
+def _core_fuzzy(t):
+    '模糊化目录核心: 去数字/字母大小写差异(G/C 等 OCR 错字), 供 fuzzy 匹配'
+    t = re.sub(r'[0-9０-９A-Za-z]', '', t)   # 去数字字母(目录/正文 OCR 不一致重灾区)
+    return re.sub(r'[\s　]+', '', t)
+
+def _core_in_toc_map(core):
+    '核心是否在目录里(精确 + 模糊容错): 目录 OCR 与正文 OCR 常不一致(如"四个G多"vs"四个C多")'
+    if core in toc_map:
+        return True
+    if not toc_map:
+        return False
+    fz = _core_fuzzy(core)
+    if len(fz) < 3:
+        return False
+    import difflib
+    for _k in toc_map:
+        _kf = _core_fuzzy(_k)
+        if len(_kf) < 3:
+            continue
+        r = difflib.SequenceMatcher(None, fz, _kf).ratio()
+        if r >= 0.72:   # 0.72 容错(G/C 单字差在长核心占比小)
+            return True
+    return False
+
 def _esc_heading(t):
     _pre, _rest = _split_heading(t)
     if _pre:
@@ -780,8 +804,10 @@ for key in sorted(sl.keys(), key=int):
         is_tall = h > H_BODY * 1.1   # 比正文高(真标题);前言/版权页居中文字是正文行高→不算标题,按居中正文渲染
         is_subhead = bool(re.match(r'^[（(][一二三四五六七八九十]+[)）]', t.strip())) and w < MEASURE * DPI / 72 * 0.85   # (一)(二) 类三级小标题(行高=正文,靠内容模式识别);加 w_ratio<0.85 排除满宽正文条目(p67 (一)满宽=正文,非标题)
         _sh_pre, _sh_rest = _split_heading(t)
-        is_subhead_cn = bool(_sh_pre) and bool(_sh_rest) and _sh_pre[0] in '一二三四五六七八九十' and len(core) >= 2 and len(t.strip()) < 25 and not re.search(r'[。！？]$', t.strip())   # 中文数字序号小标题(无括号,"一X/二X..."行高仅略>正文,is_tall 1.1×卡不住):短行<25+非句号结尾+core>=2 防"一致/一种"等正文"一"字词误伤;_sh_pre[0]中文数字排除"(010)"电话/阿拉伯序号
-        is_head_heur = ((bool(core) and len(core) >= 2 and core in toc_map) or is_big or (is_centered and is_tall) or is_subhead or is_subhead_cn or (h > H_BODY and len(t.strip()) < 8 and not re.search(r'[。！？]$', t.strip()))) and not TOC_ENTRY_RE.search(t)   # 启发式(目录条目不算标题);LAYOUT_HEADINGS 开时仅作无 layout 书的兜底;居中短行(h>H_BODY+len<8+非句尾)如'序言'也判标题
+        # 中文数字序号小标题: 必须有目录权威命中(toc_map), 否则只是正文首字碰巧是"一二三四"(如"一般人也认为...")
+        # 目录是出版方排的层级权威; 首字模式只起缩小范围作用, 不单独定罪
+        is_subhead_cn = bool(_sh_pre) and bool(_sh_rest) and _sh_pre[0] in '一二三四五六七八九十' and len(core) >= 2 and len(t.strip()) < 25 and not re.search(r'[。！？]$', t.strip()) and _core_in_toc_map(core)
+        is_head_heur = ((bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_big or (is_centered and is_tall) or is_subhead or is_subhead_cn or (h > H_BODY and len(t.strip()) < 8 and not re.search(r'[。！？]$', t.strip()))) and not TOC_ENTRY_RE.search(t)   # 启发式(目录条目不算标题);LAYOUT_HEADINGS 开时仅作无 layout 书的兜底;居中短行(h>H_BODY+len<8+非句尾)如'序言'也判标题; toc_map 改模糊匹配(目录/正文 OCR 不一致容错)
         _lay_lvl = _layout_head_level(x0, y0, w, h, key) if USE_LAY_HEAD else None   # layout 版面标签(LAYOUT_HEADINGS=1 时),级别=#数
         is_head = (_lay_lvl is not None) if USE_LAY_HEAD else is_head_heur   # 开关开=layout 独占(层级一致);关=启发式(不影响 wz1 等)
         if is_head and flow and flow[-1].get('is_figrow'):
