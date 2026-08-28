@@ -307,6 +307,13 @@ if SRC:   # 启发式补 LAYJSON 漏检页(只对图页/乱码页跑,防 wz2 注
     if _nb: print(f"[书影带] {_nb} 页从 OCR 推断图块(补 LAYJSON 漏检)")
 # 标题块映射(LAYOUT_HEADINGS=1 启用:用版面模型 doc_title/paragraph_title 标签驱动标题检测,带 # 级别)。默认关,启发式兜底——不影响未开启的书(wz1 等)
 USE_LAY_HEAD = os.environ.get('LAYOUT_HEADINGS', '') in ('1', 'true', 'True')
+_TITLE_CJK = 'song' if os.environ.get('FONT_TITLE', 'hei') == 'song' else 'heiti'   # 章标题字体: hei=黑体(默认) / song=宋体(源书章标题为宋体时, 如 mgfdmg)
+_SUBTITLE_CJK = 'song' if os.environ.get('FONT_SUBTITLE', 'hei') == 'song' else 'heiti'   # 节标题字体: hei=黑体(默认, mgfdmg 节标题黑体) / song=宋体
+def _hf(f):
+    '按标题档选字体: part/title=章字体, section=节字体'
+    return _SUBTITLE_CJK if f.get('tier') == 'section' else _TITLE_CJK
+_PAGE_IMG_PAGES = set(int(x) for x in os.environ.get('PAGE_IMAGE_PAGES', '').split(',') if x.strip())   # 贴图页(封面/扉页/版权页): 直接渲染原扫描图
+_PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
 _head_blocks = {}   # page_key -> [(bbox_142dpi, #级别)]
 if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
     try: _ld
@@ -729,6 +736,10 @@ for key in sorted(sl.keys(), key=int):
         _vstack = '\\shortstack{' + '\\\\\\\\'.join(_chars) + '}'
         _y_bot = PAGE_H - _cy2   # \put 原点在页左下,旁注 bbox 底
         body.append('\\AddToShipoutPictureFG{\\put(%.1f,%.1f){\\fontsize{%spt}{%spt}\\selectfont %s}}' % (_cx1, _y_bot, FONT_SM, round(FONT_SM*1.6,1), _vstack))   # baselineskip×1.6:竖排字间留空(源 aside 字间有空,默认×1.05 太紧)
+    if int(key) in _PAGE_IMG_PAGES:   # 贴图页: 原扫描图 shipout 背景整页铺满(含边距, 不占流不溢出), 估高=页高
+        _pos_est[str(int(key))] = PAGE_H
+        body.append('\\AddToShipoutPictureBG{\\includegraphics[width=%.1fpt,height=%.1fpt]{%s%d.png}}' % (PAGE_W, PAGE_H, _PAGE_IMG_PREFIX, int(key)))
+        body.append('\\thispagestyle{empty}\\par\\null\\newpage'); pages_tex.append('\n'.join(body)); continue
     if not rows:
         body.append('\\null'); body.append('\\par\\newpage'); pages_tex.append('\n'.join(body)); continue
     h_body = H_BODY   # 用全局正文行高(单页全标题时 per-page 中位会失真)
@@ -775,7 +786,7 @@ for key in sorted(sl.keys(), key=int):
             head_size = _reg.get(r.get('region'), {}).get('font', PF) if USE_REGION else PF   # 区域化:正文用其区域字号(混合页正文大字/注释小字各拿对的);否则本页 PF
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
-        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc})
+        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc})
     # 分行目录(wz2):标题行 + 紧随的纯页码行 配对成目录条目(源标题/页码分两行,与 wz1 同行格式不同)。≥5 对=目录页
     _npairs = sum(1 for i in range(len(flow)-1) if (not PN_RE.fullmatch(flow[i]['t'].strip())) and PN_RE.fullmatch(flow[i+1]['t'].strip()))
     if _npairs >= 5:
@@ -915,15 +926,15 @@ for key in sorted(sl.keys(), key=int):
                     _ht = ''.join(_txt for _txt, _ in frags)
                     _nat_w = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in _ht) * fnt   # 自然宽(CJK 1em/拉丁 0.5em)
                     if _nat_w >= 0.85 * MEASURE:   # 拼接后超宽(表格行多片拼接)-> makebox[s] 收缩齐版心,防溢出/折行变高
-                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][s]{{\\CJKfamily{heiti}' + _esc_heading(_ht) + '}}' + brk + '}')
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][s]{{\\CJKfamily{' + _hf(f) + '}' + _esc_heading(_ht) + '}}' + brk + '}')
                     elif f.get('align') == 'c':   # 源里居中 -> 居中(读源位置,非统一规则)
-                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{heiti}' + _esc_heading(_ht) + '}}' + brk + '}')
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{' + _hf(f) + '}' + _esc_heading(_ht) + '}}' + brk + '}')
                     else:                       # 源里左对齐 -> 左对齐
-                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{heiti}' + _esc_heading(_ht) + '}' + brk + '}')
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{' + _hf(f) + '}' + _esc_heading(_ht) + '}' + brk + '}')
                 elif f.get('align') == 'c':   # 源里居中 → 居中(读源位置,非统一规则)
-                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{heiti}' + _esc_heading(f['t']) + '}}' + brk + '}')
+                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{' + _hf(f) + '}' + _esc_heading(f['t']) + '}}' + brk + '}')
                 else:                       # 源里左对齐 → 左对齐
-                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{heiti}' + _esc_heading(f['t']) + '}' + brk + '}')
+                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{' + _hf(f) + '}' + _esc_heading(f['t']) + '}' + brk + '}')
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _esc_with_missing(f['t'], f, key) + '}' + brk + '}')
