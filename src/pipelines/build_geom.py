@@ -820,7 +820,9 @@ for key in sorted(sl.keys(), key=int):
             is_head = False   # 图块正下方的单行(图说明,常含书名如"《工资、价格和利润》法文版")=非标题 → 降正文(保留居中渲染)
         if is_head:
             _tier = None
-            if _TOC_LEVELS:   # 目录规则优先: 编号格式定级别(如 "一、"=part, "1."=section)
+            if is_subhead or is_subhead_cn:
+                _tier = 'section'   # (一)(二)/一X 小标题模式 → 节档(三级, 宋体); 防 LAYJSON 命中(_lay_lvl=2→title档)与兜底(section档)同层不同字体
+            elif _TOC_LEVELS:   # 目录规则: 编号格式定级别(如 "一、"=part, "1."=section)
                 for _tp, _tlvl in _TOC_LEVELS:
                     if _tp.match(t):
                         _tier = _tlvl; break
