@@ -802,7 +802,7 @@ for key in sorted(sl.keys(), key=int):
         _char_w_pt = (w * 72.0 / DPI) / max(len(t.strip()), 1)   # 估测每字 pt 宽(poly 宽/字数):正文≈FONT,大标题≈22pt
         is_big = h > H_BODY * 1.5 and (bool(r.get('frags')) or _char_w_pt > FONT * 1.8)   # 超大行高→大标题;但排除 OCR poly 高度膨胀的长正文行(如参考文献 h~80px 触发>1.8,但字宽≈正文 10pt=非大字)。多片段标题(第X部分+名)或字宽>正文1.8倍才算
         is_tall = h > H_BODY * 1.1   # 比正文高(真标题);前言/版权页居中文字是正文行高→不算标题,按居中正文渲染
-        is_subhead = bool(re.match(r'^[（(][一二三四五六七八九十]+[)）]', t.strip())) and w < MEASURE * DPI / 72 * 0.85   # (一)(二) 类三级小标题(行高=正文,靠内容模式识别);加 w_ratio<0.85 排除满宽正文条目(p67 (一)满宽=正文,非标题)
+        is_subhead = bool(re.match(r'^[（(][一二三四五六七八九十]+[)）]', t.strip())) and (w < MEASURE * DPI / 72 * 0.85 or len(t.strip()) <= max(cw - 3, 6))   # (一)(二) 类三级小标题(行高=正文,靠内容模式识别); 宽判据排满宽正文, 字数判据(cw-3)保留长三级标题(24字"(一)《工资...》英文版最初在伦敦出版"行宽 96% 版心但非满行正文)
         _sh_pre, _sh_rest = _split_heading(t)
         # 中文数字序号小标题: 必须有目录权威命中(toc_map), 否则只是正文首字碰巧是"一二三四"(如"一般人也认为...")
         # 目录是出版方排的层级权威; 首字模式只起缩小范围作用, 不单独定罪
@@ -810,9 +810,10 @@ for key in sorted(sl.keys(), key=int):
         is_head_heur = ((bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_big or (is_centered and is_tall) or is_subhead or is_subhead_cn or (h > H_BODY and len(t.strip()) < 8 and not re.search(r'[。！？]$', t.strip()))) and not TOC_ENTRY_RE.search(t)   # 启发式(目录条目不算标题);LAYOUT_HEADINGS 开时仅作无 layout 书的兜底;居中短行(h>H_BODY+len<8+非句尾)如'序言'也判标题; toc_map 改模糊匹配(目录/正文 OCR 不一致容错)
         _lay_lvl = _layout_head_level(x0, y0, w, h, key) if USE_LAY_HEAD else None   # layout 版面标签(LAYOUT_HEADINGS=1 时),级别=#数
         if USE_LAY_HEAD:
-            # layout 优先 + 目录兜底: 旧 LAYJSON 缺块/块 label 标错(text)/坐标偏差都会漏标题,
-            # 目录(toc_map)是独立权威(出版方排的层级), 命中即补判; 视觉启发式(is_big/居中)不放宽(防 mgfdmg 正文误判回归)
-            is_head = (_lay_lvl is not None) or (bool(core) and len(core) >= 2 and _core_in_toc_map(core))
+            # layout 优先 + 目录兜底 + (一)(二)模式兜底: 旧 LAYJSON 缺块/块 label 标错(text)/坐标偏差都会漏标题;
+            # 目录(toc_map)是独立权威(出版方排的层级), 但三级标题(如"(一)19世纪...")常不在源书目录(目录只列到二级) →
+            # 只能靠 (一)(二) 强模式信号(带括号序号+非满宽, 误判风险低); 视觉启发式(is_big/居中)不放宽(防 mgfdmg 正文误判回归)
+            is_head = (_lay_lvl is not None) or (bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_subhead
         else:
             is_head = is_head_heur
         if is_head and flow and flow[-1].get('is_figrow'):
