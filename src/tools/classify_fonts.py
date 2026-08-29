@@ -14,18 +14,26 @@ API_URL = "https://api.deepseek.com/chat/completions"
 MODEL = "deepseek-v4-flash-vision-exp"
 
 PROMPT = (
-    "这是扫描书中「{cat}」文字的 N 个裁剪样本（横向拼接，每段上方有红色标签）。"
+    "这是扫描书中「{cat}」文字的 1 个裁剪样本（图上半）。"
+    "下半是本书正文的一行参照文字。"
+    "请对比上半与下半的笔画风格，判断上半的中文字体类别，只回答一个词：song(宋体) / hei(黑体) / fangsong(仿宋) / kai(楷体) / 其他请写具体类别名。"
+    "判断依据：横细竖粗+三角顿角且与下半风格一致=宋体；笔画等粗无衬线=黑体；字形清瘦棱角硬朗=仿宋；有毛笔笔意、起收笔回锋、转折圆转=楷体。"
+    "若上半与下半同体，回答下半的类别即可。"
+)
+BODY_PROMPT = (
+    "这是扫描书中「正文」文字的 1 个裁剪样本。"
     "请判断这些文字使用的中文字体类别，只回答一个词：song(宋体) / hei(黑体) / fangsong(仿宋) / kai(楷体) / 其他请写具体类别名。"
     "判断依据：横细竖粗+三角顿角=宋体；笔画等粗无衬线=黑体；字形清瘦棱角硬朗=仿宋；有毛笔笔意=楷体。"
 )
 
-def classify(api_key, img_path, cat, n):
+def classify(api_key, img_path, cat, n, is_body=False):
     b64 = base64.b64encode(open(img_path, "rb").read()).decode()
     import urllib.request
+    _prompt = BODY_PROMPT if is_body else PROMPT.format(cat=cat, n=n)
     body = json.dumps({
         "model": MODEL,
         "messages": [{"role": "user", "content": [
-            {"type": "text", "text": PROMPT.format(cat=cat, n=n)},
+            {"type": "text", "text": _prompt},
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
         ]}],
         "temperature": 0,
@@ -73,13 +81,32 @@ def main():
         by_cat.setdefault(info["cat"], []).append((path, info))
 
     # 3) 逐类逐图调视觉 API, 按类投票
+    #    先分类 body(无参照), 然后其他类别带 body 参照行上下拼图对比(视觉模型单独看分不清印刷楷/宋, 对比才准)
     result = {}
     votes = {}
-    for cat, items in by_cat.items():
+    _cats = sorted(by_cat.keys(), key=lambda c: 0 if c == "body" else 1)
+    body_ref = None   # (img_path, norm) 正文参照
+    for cat in _cats:
+        items = by_cat[cat]
         v = []
         for idx, (path, info) in enumerate(items):
+            _img_path = path
+            is_body = (cat == "body")
+            if not is_body and body_ref is not None:
+                # 上半=样本, 下半=正文参照, 上下拼图
+                try:
+                    im_a = Image.open(path).convert("RGB")
+                    im_b = Image.open(body_ref[0]).convert("RGB")
+                    W = max(im_a.width, im_b.width)
+                    canvas = Image.new("RGB", (W, im_a.height + im_b.height + 20), "white")
+                    canvas.paste(im_a, (0, 0))
+                    canvas.paste(im_b, (0, im_a.height + 20))
+                    _img_path = os.path.join(out_dir, f"_cmp_{cat}_{idx}.png")
+                    canvas.save(_img_path)
+                except Exception:
+                    pass
             try:
-                ans = classify(api_key, path, cat, len(items))
+                ans = classify(api_key, _img_path, cat, len(items), is_body=is_body)
             except Exception as e:
                 ans = f"ERR:{e}"
             a = ans.strip().lower()
@@ -90,6 +117,8 @@ def main():
             else: norm = a.split()[0] if a and not a.startswith("err") else "unknown"
             v.append(norm)
             print(f"  [{cat}/{idx}] p{info['page']} {info['text'][:14]}... → {norm}")
+            if is_body and body_ref is None and norm != "unknown":
+                body_ref = (path, norm)
         from collections import Counter
         c = Counter(x for x in v if x != "unknown")
         votes[cat] = dict(c)
