@@ -44,11 +44,13 @@ def main():
     with open(OUT_MD, 'w', encoding='utf-8') as f:
         f.write(body)
     print(f"[md_layout] 完成: {len(markdown_data)} 页 → {OUT_MD} ({len(body)}字)", flush=True)
-    # LAYJSON: 每页 prunedResult(block_label/block_bbox 原始块), build_geom LAYOUT_HEADINGS 用
+    # LAYJSON: 按页序 list, 每元素 = {"prunedResult": {...}} (与 wz1 旧 LAYJSON / build_geom
+    # enumerate(_ld) 契约一致: _pg.get('prunedResult',{}).get('parsing_res_list') 取块级标签)
     if OUT_LAYJSON:
+        _lay = [{"prunedResult": r._PAGE_RAW[str(i)]} for i in range(len(r._PAGE_RAW))]
         with open(OUT_LAYJSON, 'w', encoding='utf-8') as f:
-            json.dump(r._PAGE_RAW, f, ensure_ascii=False)
-        print(f"[md_layout] LAYJSON: {len(r._PAGE_RAW)} 页 → {OUT_LAYJSON}", flush=True)
+            json.dump(_lay, f, ensure_ascii=False)
+        print(f"[md_layout] LAYJSON: {len(_lay)} 页 → {OUT_LAYJSON}", flush=True)
 
 
 if __name__ == '__main__':
