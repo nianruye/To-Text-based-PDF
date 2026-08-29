@@ -363,7 +363,7 @@ if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
 def _layout_head_level(x0, y0, w, h, key):
     '该行中心落在某 layout 标题块内 → 返回 # 级别;否则 None。缩放 _s=DPI/LDPI: 行坐标尺度=自适应 DPI(wz1 200dpi), 块尺度=LDPI≈142 → 1.408; 同批次书(mgfdmg 141/142)≈1。±8px 容差兜噪声'
     if key not in _head_blocks: return None
-    cx, cy = x0 + w/2, y0 + h/2; _s = DPI/LDPI; _tol = 8   # 容差:142dpi 下行距~28px,8px 够不到相邻正文行
+    cx, cy = x0 + w/2, y0 + h/2; _s = DPI/LDPI; _tol = 16   # 16px: 旧 LAYJSON 块 bbox(142dpi 估算)与行坐标经缩放后有 ±10px 系统偏差, 8 太紧致边缘漏判   # 容差:142dpi 下行距~28px,8px 够不到相邻正文行
     for _bb, _lvl in _head_blocks[key]:
         if _bb[0]*_s - _tol <= cx <= _bb[2]*_s + _tol and _bb[1]*_s - _tol <= cy <= _bb[3]*_s + _tol: return _lvl
     return None
@@ -809,7 +809,12 @@ for key in sorted(sl.keys(), key=int):
         is_subhead_cn = bool(_sh_pre) and bool(_sh_rest) and _sh_pre[0] in '一二三四五六七八九十' and len(core) >= 2 and len(t.strip()) < 25 and not re.search(r'[。！？]$', t.strip()) and _core_in_toc_map(core)
         is_head_heur = ((bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_big or (is_centered and is_tall) or is_subhead or is_subhead_cn or (h > H_BODY and len(t.strip()) < 8 and not re.search(r'[。！？]$', t.strip()))) and not TOC_ENTRY_RE.search(t)   # 启发式(目录条目不算标题);LAYOUT_HEADINGS 开时仅作无 layout 书的兜底;居中短行(h>H_BODY+len<8+非句尾)如'序言'也判标题; toc_map 改模糊匹配(目录/正文 OCR 不一致容错)
         _lay_lvl = _layout_head_level(x0, y0, w, h, key) if USE_LAY_HEAD else None   # layout 版面标签(LAYOUT_HEADINGS=1 时),级别=#数
-        is_head = (_lay_lvl is not None) if USE_LAY_HEAD else is_head_heur   # 开关开=layout 独占(层级一致);关=启发式(不影响 wz1 等)
+        if USE_LAY_HEAD:
+            # layout 优先 + 目录兜底: 旧 LAYJSON 缺块/块 label 标错(text)/坐标偏差都会漏标题,
+            # 目录(toc_map)是独立权威(出版方排的层级), 命中即补判; 视觉启发式(is_big/居中)不放宽(防 mgfdmg 正文误判回归)
+            is_head = (_lay_lvl is not None) or (bool(core) and len(core) >= 2 and _core_in_toc_map(core))
+        else:
+            is_head = is_head_heur
         if is_head and flow and flow[-1].get('is_figrow'):
             is_head = False   # 图块正下方的单行(图说明,常含书名如"《工资、价格和利润》法文版")=非标题 → 降正文(保留居中渲染)
         if is_head:
@@ -844,7 +849,12 @@ for key in sorted(sl.keys(), key=int):
     if sum(1 for f in flow if f['is_head']) > 4:   # 一页>4标题 = 列表页(目录/编委/索引),非散文→全降级正文(否则每条标题字号+间距撑爆页)
         for f in flow: f['is_head'] = False; f['fnt'] = FONT
     if sum(1 for f in flow if (TOC_ENTRY_RE.search(f['t']) or (f.get('frags') and any(_t.strip().isdigit() for _t,_ in f['frags'])))) > 5:   # 目录页:多条带页码 → 全降级(章节标题也按 title+dotfill+页码 渲染)
-        for f in flow: f['is_head'] = False; f['fnt'] = FONT
+        # 层级字号: 部分/附录/导论(0档)大, 章(1档)中, 节/一/二(2档)小 → 还原源目录父子层级
+        for f in flow:
+            f['is_head'] = False
+            _lvl = _toc_level(f['t'].strip())
+            f['fnt'] = round(FONT * (1.22 if _lvl == 0 else (1.12 if _lvl == 1 else 1.0)), 1)
+            f['toc_hei'] = (_lvl == 0)   # 一级(部分/导论)黑体(源书设计), 章/节宋体
     # figrow 正下方的短行(书影版本说明/图说明)→ 居中:LAYJSON figure_title 只覆盖部分页,用"图底 150px 内紧邻短行"兜底
     _last_fy1 = None
     for f in flow:
@@ -993,15 +1003,23 @@ for key in sorted(sl.keys(), key=int):
                     _nums = [_t for _t, _ in f['frags'] if _t.strip().isdigit()]
                     _titles = [_t for _t, _ in f['frags'] if not _t.strip().isdigit()]
                     if _nums and _titles: _toc = (' '.join(_titles), _nums[-1])
-            if _toc and sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt > MEASURE * 0.75:
-                _toc = None   # "标题"过长(>75%版心)→ 非真目录条目(内容页被 ……数字 误检),改走正文 makebox[s](收缩不溢出);真目录标题短(篇名)不受影响
+            if _toc and sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt > MEASURE * 0.98:
+                _toc = None   # "标题"过长(≈满版心)→ 非真目录条目(内容页行尾……数字误检),改走正文 makebox[s]; 目录长条目(24字)保留 dotfill(靠 [s] 收缩点线不溢出)
             if _toc:   # 目录条目:整体左移 _toc_shift(匹配源绝对宽度)+ 按源 x0 相对缩进 + 标题 + 点引导(\dotfill)+ 页码右
                 _ind = '\\hspace*{' + ('%.1f' % max(0, (f.get('x0', 0) - _toc_ref) * 72 / DPI)) + 'pt}'
                 if _toc_shift > 0.5:
-                    _pre = '\\noindent\\hspace*{-' + ('%.1f' % _toc_shift) + 'pt}'; _box = '\\makebox[\\dimexpr\\textwidth+' + ('%.1f' % _toc_shift) + 'pt\\relax]'
+                    _pre = '\\noindent\\hspace*{-' + ('%.1f' % _toc_shift) + 'pt}'; _box = '\\makebox[\\dimexpr\\textwidth+' + ('%.1f' % _toc_shift) + 'pt\\relax][s]'
                 else:
-                    _pre = ''; _box = '\\makebox[\\textwidth]'
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _pre + _box + '{' + _strut + _ind + esc(_toc[0]) + '\\,\\dotfill\\,' + esc(_toc[1]) + '}' + brk + '}')
+                    _pre = ''; _box = '\\makebox[\\textwidth][s]'
+                # [s]: dotfill 是 leader 可收缩到 0 → 长标题时点线消失但页码保留行尾; 短标题时点线正常展开
+                _toc_title = esc(_toc[0]).replace(' ', '\\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
+                if f.get('toc_hei'):
+                    _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
+                _tfnt = fnt
+                _nat = sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt
+                if _nat > MEASURE * 0.82:
+                    _tfnt = round(fnt * (MEASURE * 0.82) / _nat, 1)   # 超长条目(如 24 字)缩字号让位页码, 行高(bl)不变保行距统一
+                body.append('{\\fontsize{' + str(_tfnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _pre + _box + '{' + _strut + _ind + _toc_title + '\\,\\dotfill\\,' + esc(_toc[1]) + '}' + brk + '}')
                 continue
             # 缩进按源 x0 还原(弃写死 2em): 段首行缩进=源 x0-版心左, 段内行悬挂缩进同源。
             # 容差 6px(=0.5字@200dpi, OCR x0 噪声)内归 0; 短行自然留白右侧, 与源书一致。
