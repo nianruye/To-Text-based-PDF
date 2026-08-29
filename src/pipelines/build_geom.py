@@ -331,8 +331,9 @@ if SRC:   # 启发式补 LAYJSON 漏检页(只对图页/乱码页跑,防 wz2 注
     if _nb: print(f"[书影带] {_nb} 页从 OCR 推断图块(补 LAYJSON 漏检)")
 # 标题块映射(LAYOUT_HEADINGS=1 启用:用版面模型 doc_title/paragraph_title 标签驱动标题检测,带 # 级别)。默认关,启发式兜底——不影响未开启的书(wz1 等)
 USE_LAY_HEAD = os.environ.get('LAYOUT_HEADINGS', '') in ('1', 'true', 'True')
-_TITLE_CJK = 'song' if os.environ.get('FONT_TITLE', 'hei') == 'song' else 'heiti'   # 章标题字体: hei=黑体(默认) / song=宋体(源书章标题为宋体时, 如 mgfdmg)
-_SUBTITLE_CJK = 'song' if os.environ.get('FONT_SUBTITLE', 'hei') == 'song' else 'heiti'   # 节标题字体: hei=黑体(默认, mgfdmg 节标题黑体) / song=宋体
+_FONT_FAM = {'hei': 'heiti', 'song': 'song', 'kai': 'kai'}
+_TITLE_CJK = _FONT_FAM.get(os.environ.get('FONT_TITLE', 'hei'), 'heiti')   # 章标题字体: hei=黑体(默认) / song=宋体(mgfdmg) / kai=楷体
+_SUBTITLE_CJK = _FONT_FAM.get(os.environ.get('FONT_SUBTITLE', 'hei'), 'heiti')   # 节标题字体: hei=黑体(默认) / song=宋体 / kai=楷体(wz1 三级标题)
 def _hf(f):
     '按标题档选字体: part/title=章字体, section=节字体'
     return _SUBTITLE_CJK if f.get('tier') == 'section' else _TITLE_CJK

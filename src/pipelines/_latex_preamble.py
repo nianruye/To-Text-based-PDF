@@ -30,7 +30,8 @@ def build_latex(mode, PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex)
 \\usepackage{{eso-pic}}   # 边栏旁注(竖排)绝对定位贴回
 \\setCJKmainfont{{Noto Serif CJK SC}}   % SC=简体字形(JP 版部分汉字日式写法)
 \\setCJKfamilyfont{{heiti}}{{Noto Sans CJK SC}}
-\setCJKfamilyfont{{song}}{{Noto Serif CJK SC}}   % song=宋体标题(FONT_TITLE=song 时)   % heiti(黑体)标题字体(注意是 setCJKfamilyfont,非 setCJKfamily--后者会把族名/字体名当文本泄漏)
+\setCJKfamilyfont{{song}}{{Noto Serif CJK SC}}   % song=宋体标题(FONT_TITLE=song 时)
+\setCJKfamilyfont{{kai}}{{AR PL KaitiM GB}}   % kai=楷体标题(FONT_TITLE/FONT_SUBTITLE=kai 时, 如 wz1 三级标题)
 \\renewcommand{{\\CJKglue}}{{{_cjk_glue}}}   % base 0pt;plus 0em(区域化,不拉伸->字距恒定)或 plus 0.5em(默认,拉伸短行);minus 0.4em 让超长满行收缩齐右不溢出旁注
 {_xeCJKsetup_PunctStyle}
 \\setlength{{\\parindent}}{{0pt}}\\setlength{{\\parskip}}{{0pt}}
