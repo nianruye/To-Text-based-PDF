@@ -492,6 +492,52 @@ try:
         _tocI = set(range(min(_mark), max(_mark) + 1))   # 标记页间全收(偶页无"目录"书眉)
         _tocI = {i for i in _tocI if i in _all_rows}
     _TOC_PAGE = {str(i) for i in _tocI}
+    # ---- F22 目录页参数自校准(OCR 数据驱动, 替代固定阈值) ----
+    _TOC_CAL = {}
+    try:
+        _toc_rows = {_k: _all_rows[_k] for _k in _tocI}
+        # 1) font_line: 目录页非数字行字号中位(h*FONT/H_BODY 估) ×1.15
+        _fs = []
+        for _k in _tocI:
+            for _t, _poly in _all_rows.get(_k, []):
+                if not _poly or re.search(r'\d', _t): continue
+                _ys = [p[1] for p in _poly]
+                _h = max(_ys) - min(_ys)
+                if min(_ys) < _ph_px * 0.10 or _h <= 0: continue   # 跳页眉
+                _fs.append(_h * FONT / H_BODY if H_BODY else FONT)
+        _toc_font_med = statistics.median(_fs) if len(_fs) >= 3 else FONT
+        _TOC_CAL['font_line'] = round(_toc_font_med * 1.15, 1)
+        # 2) foot_x: 底部 y>80% 数字按 x 桶(5%页宽)聚类, 页脚=按页序连续率最高的桶
+        _buckets = {}
+        for _k in _all_rows:
+            if int(_k) in _tocI: continue
+            for _t, _poly in _all_rows[_k]:
+                if not _poly or not PN_RE.fullmatch(_t.strip()): continue
+                _ys = [p[1] for p in _poly]; _xs = [p[0] for p in _poly]
+                if min(_ys) < _ph_px * 0.80: continue
+                _b = int(min(_xs) / _ph_px * 100 / 5) * 5   # 用页高近似页宽比例
+                _buckets.setdefault(_b, []).append((int(_k), int(re.sub(r'\D', '', _t) or 0)))
+        _best_b, _best_score = None, 0
+        for _b, _seq in _buckets.items():
+            if len(_seq) < 3: continue
+            _seq.sort()
+            _cont = sum(1 for i in range(1, len(_seq)) if 0 < _seq[i][1] - _seq[i-1][1] <= 2)
+            _score = _cont / max(len(_seq) - 1, 1)
+            if _score > _best_score:
+                _best_b, _best_score = _b, _score
+        if _best_b is not None and _best_score >= 0.5:
+            _TOC_CAL['foot_x'] = (max(0, _best_b - 5) / 100.0, min(95, _best_b + 10) / 100.0)   # ±1 桶余量(页脚 x 跨桶边界)
+        else:
+            _TOC_CAL['foot_x'] = (0.15, 0.85)   # 无可靠页脚簇 → 保守默认
+        # 3) title_max: 目录页无数字行长度的 90 分位(下限 10)
+        _tl = [len(_t.strip()) for _k in _tocI for _t, _p in _all_rows.get(_k, [])
+               if _p and not re.search(r'\d', _t) and len(_t.strip()) >= 2]
+        _TOC_CAL['title_max'] = max(10, int(statistics.quantiles(_tl, n=10)[8])) if len(_tl) >= 10 else 14
+        print('[目录校准] font_line=%.1fpt foot_x=%s title_max=%d (条目字号中位 %.1fpt, 桶%d个)' % (
+            _TOC_CAL['font_line'], _TOC_CAL['foot_x'], _TOC_CAL['title_max'], _toc_font_med, len(_buckets)))
+    except Exception as _e:
+        _TOC_CAL = {'font_line': round(FONT * 1.25, 1), 'foot_x': (0.15, 0.85), 'title_max': 14}
+        print('[目录校准] 失败回退默认: %s' % _e)
     _pn_reg = {}   # 正文页 → 页码 int(底部页脚 或 顶部书眉数字, wz4 页码在页顶角)
     for _k in sl:
         _i = int(_k)
@@ -761,7 +807,7 @@ for key in sorted(sl.keys(), key=int):
         if poly:
             xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
             y0 = min(ys)
-            if PN_RE.fullmatch(t) and ((y0 > page_px_h * 0.80 and (key not in _TOC_PAGE or (page_px * 0.15 < min(xs) < page_px * 0.85))) or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):   # F20 目录页也收页脚(x居中; 右缘x>85%是条目页码不收)
+            if PN_RE.fullmatch(t) and ((y0 > page_px_h * 0.80 and (key not in _TOC_PAGE or (page_px * _TOC_CAL['foot_x'][0] < min(xs) < page_px * _TOC_CAL['foot_x'][1]))) or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):   # F20 目录页也收页脚(x居中; 右缘x>85%是条目页码不收)
                 pn_ocr = re.sub(r'[^\d]', '', t)   # OCR 页码: 底部数字(目录页跳过——底部数字是条目页码/wz1"Ⅰ"非页脚) + 顶部书眉式页码(wz4 正文页码在页顶右角)
             if _page_figs and in_figure(min(xs), y0, max(xs)-min(xs), max(ys)-min(ys), key, t):
                 continue   # 落在图块内的 OCR 行 = 图内容(非文字),跳过
@@ -1115,7 +1161,7 @@ for key in sorted(sl.keys(), key=int):
             if not f['is_head'] or key in _TOC_PAGE:
                 _m = re.match(r'^(.*\S)\s*[.·…．]{2,}\s*(\d{1,4})\s*$', f['t'])   # 形态①:一行"title……页码"
                 if _m: _toc = (_m.group(1), _m.group(2))
-                if _toc is None and key in _TOC_PAGE and (re.match(r'^第?[一二三四五六七八九十百千零\d]+(?:部分|编|篇)', f['t'].strip()) or f['t'].strip().endswith(('部分', '编'))) and not re.search(r'\d', f['t']) and len(f['t'].strip()) <= 14:
+                if _toc is None and key in _TOC_PAGE and (re.match(r'^第?[一二三四五六七八九十百千零\d]+(?:部分|编|篇)', f['t'].strip()) or f['t'].strip().endswith(('部分', '编'))) and not re.search(r'\d', f['t']) and len(f['t'].strip()) <= _TOC_CAL.get('title_max', 14):
                     # F19 部/编级标题(wz3"先秦两汉部分""第一编…"): 源书居中大字无页码, 不进 _toc 点线链(防 P1 回填误给页码)
                     body.append('{\\fontsize{' + str(round(fnt * 0.92, 1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + esc(f['t'].strip()) + '}' + brk + '}')
                     continue
@@ -1176,7 +1222,7 @@ for key in sorted(sl.keys(), key=int):
                 if f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
                 _tfnt = fnt
-                if _tfnt > PF * 1.25: _tfnt = PF   # F18 目录条目字号回落: is_head 判标题档(19.5pt)污染, 源书条目是正文小字(poly≈正文)
+                if _tfnt > _TOC_CAL.get('font_line', PF * 1.25): _tfnt = PF   # F18 目录条目字号回落(线=该书目录条目字号中位×1.15, F22 自校准)
                 _nat = sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt
                 if _nat > MEASURE * 0.82:
                     _tfnt = round(fnt * (MEASURE * 0.82) / _nat, 1)   # 超长条目(如 24 字)缩字号让位页码, 行高(bl)不变保行距统一
