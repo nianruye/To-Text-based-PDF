@@ -466,6 +466,86 @@ for _key in sl:
     if _m: _hdr_count[_m] = _hdr_count.get(_m, 0) + 1
 CANON_HDRS = [t for t, c in _hdr_count.items() if c >= 3]
 print(f"[页眉共识] {len(CANON_HDRS)} 个规范页眉")
+# ── 目录页码回填预扫描: 源书目录条目的页码+点线常被 OCR 整批漏识(wz4 p16 "第一章 导论"
+#    等 26 条目无页码无点线、被渲染成正文行) → 从正文页建 "标题core→正文页码" 映射,
+#    渲染时目录页无页码条目 core 命中即补页码+点线。
+#    core=_norm_core: 去空白+剥点线尾数字后套 _heading_core(剥"第X章/一、/(一)/1."前缀),
+#    使目录"第一章 导论:对象和地位"与正文/书眉"第一章导论：对象和地位"归一相等。
+#    原理: 书名页眉=当前章/节名,该标题从起始页到章末逐页重复 → 起始页码=命中页最小值。
+#    目录页 = "目录"标记页首末的连续区间(奇页书眉含"目录",偶页只有页码,区间桥接)。
+#    守卫: 正文命中须在目录区间之后; 页码取登记值(Arabic;前置罗马页无登记→不回填,宁缺勿错);
+#    最早命中页无登记(章起始页常不印页码)→ 用次近登记命中页按 index 差外推。
+def _norm_core(t):
+    tt = re.sub(r'\s+', '', t)                                  # ". . . ."带空格点线先归拢
+    tt = re.sub(r'[.·…]{2,}\d{0,4}$', '', tt)                    # 尾"……46"
+    tt = _t2s.convert(tt)                                        # 繁简归一(OCR 时繁时简"社會/社会")
+    return re.sub(r'[^\w\u4e00-\u9fff]', '', _heading_core(tt))
+
+_TOC_PAGE = set()   # str 页key(主循环守卫/渲染门控用)
+_TOC_PN = {}
+try:
+    _ph_px = page_px_h
+    _all_rows = {int(k): [(t.strip(), poly) for t, poly in zip(sl[k], co.get(k, []))] for k in sl}
+    _mark = [i for i, _ls in _all_rows.items() if any(t.startswith("目录") and len(t) <= 6 for t, _ in _ls[:3])]
+    _tocI = set()
+    if _mark:
+        _tocI = set(range(min(_mark), max(_mark) + 1))   # 标记页间全收(偶页无"目录"书眉)
+        _tocI = {i for i in _tocI if i in _all_rows}
+    _TOC_PAGE = {str(i) for i in _tocI}
+    _pn_reg = {}   # 正文页 → 页码 int(底部页脚 或 顶部书眉数字, wz4 页码在页顶角)
+    for _k in sl:
+        _i = int(_k)
+        if _i in _tocI:
+            continue
+        for t, poly in _all_rows[_i]:
+            if not poly or not PN_RE.fullmatch(t):
+                continue
+            _ys = [p[1] for p in poly]
+            if min(_ys) > _ph_px * 0.80 or (min(_ys) < _ph_px * 0.10 and t.isdigit() and len(t) <= 4):
+                _v = re.sub(r'[^\d]', '', t)
+                if _v:
+                    _pn_reg[_i] = int(_v)
+                    break
+    _core_pages = {}   # core → {页: 原文}
+    for _i, _rows in _all_rows.items():
+        for t, poly in _rows:
+            if not t or not poly:
+                continue
+            if not (0.05 * _ph_px <= min(p[1] for p in poly) <= 0.95 * _ph_px):
+                continue
+            ck = _norm_core(t)
+            if 3 <= len(ck) <= 24:
+                _core_pages.setdefault(ck, {})[_i] = t
+    _tocEnd = max(_tocI) if _tocI else -1
+    for _ck, _pgm in _core_pages.items():
+        if not any(i in _tocI for i in _pgm):
+            continue   # core 必须出现在目录页(否则=正文句子,无回填价值)
+        _bp = sorted(i for i in _pgm if i not in _tocI and i > _tocEnd)
+        if not _bp:
+            continue
+        _reg = [i for i in _bp if i in _pn_reg]
+        if _reg:
+            _pn_min = _pn_reg[_reg[0]]
+            if _bp[0] not in _pn_reg and _bp[0] < _reg[0] <= _bp[0] + 3:
+                _ext = _pn_reg[_reg[0]] - (_reg[0] - _bp[0])   # 章首页不印页码: 按 index 差外推
+                if _ext >= 1:
+                    _pn_min = _ext
+        else:
+            # core 命中页全无页码登记(第一节只在章起页现一次): 用全局页码表(所有页页码
+            # 登记构成 index→pn 单调表)就近反推: 找其后≤4页的任意登记页 j, pn = 登记值-(j-命中页)
+            _hit = _bp[0]
+            _j = next((k for k in sorted(_pn_reg) if _hit <= k <= _hit + 4), None)
+            if _j is None:
+                continue
+            _pn_min = _pn_reg[_j] - (_j - _hit)
+            if _pn_min < 1:
+                continue
+        _TOC_PN[_ck] = _pn_min
+    print(f"[目录回填] 目录页 {sorted(_tocI)} | 标题→页码映射 {len(_TOC_PN)} 条")
+except Exception as _e_tocpn:
+    _TOC_PAGE, _TOC_PN = set(), {}
+    print(f"[目录回填] 预扫描跳过: {type(_e_tocpn).__name__}: {_e_tocpn}")
+
 def _match_canon_hdr(t):
     """文本是否匹配共识页眉(difflib ratio>0.8)。is_hdr 共识兜底用:
     顶部行(0.06-0.10 页高)匹配共识页眉也判页眉(覆盖 wz3 6%边缘页眉 y0==0.06*pph 漏判),
@@ -681,8 +761,8 @@ for key in sorted(sl.keys(), key=int):
         if poly:
             xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
             y0 = min(ys)
-            if PN_RE.fullmatch(t) and y0 > page_px_h * 0.80:
-                pn_ocr = re.sub(r'[^\d]', '', t)   # OCR 检测到的页码(底部数字)→ 直接用,无需外部表/offset
+            if PN_RE.fullmatch(t) and (y0 > page_px_h * 0.80 and key not in _TOC_PAGE or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):
+                pn_ocr = re.sub(r'[^\d]', '', t)   # OCR 页码: 底部数字(目录页跳过——底部数字是条目页码/wz1"Ⅰ"非页脚) + 顶部书眉式页码(wz4 正文页码在页顶右角)
             if _page_figs and in_figure(min(xs), y0, max(xs)-min(xs), max(ys)-min(ys), key, t):
                 continue   # 落在图块内的 OCR 行 = 图内容(非文字),跳过
             if (min(xs) > page_px * 0.90 or max(xs) < page_px * 0.10) and not PN_RE.fullmatch(t.strip()):
@@ -712,17 +792,23 @@ for key in sorted(sl.keys(), key=int):
         if _m:
             p = _m[-1]
             yov = min(r['y0']+r['h'], p['y0']+p['h']) - max(r['y0'], p['y0'])
-            if min(r['h'], p['h']) > 0 and yov > 0.5 * min(r['h'], p['h']):   # y 范围重叠>50% → 同一视觉行
+            _dig = PN_RE.fullmatch(r['t'].strip()) and (r['y0'] + r['h'] / 2) >= p['y0'] and (r['y0'] + r['h'] / 2) <= p['y0'] + p['h']   # 页码数字行中心落在上一行区间
+            if (min(r['h'], p['h']) > 0 and yov > 0.5 * min(r['h'], p['h'])) or _dig:
                 gap = r['x0'] - (p['x0'] + p['w'])
                 if 'frags' not in p: p['frags'] = [(p['t'], p['x0'])]   # 记各片段原始(文字,x0px),渲染时按源 x 绝对定位
-                if gap < H_BODY * 0.3:   # 紧邻 = OCR 拆分 -> 文本合并
-                    if gap < 0:  # r 在 p 左侧(y 略低但 x 更左) -> 前插保阅读序
-                        p['frags'][-1] = (r['t'] + p['frags'][-1][0], r['x0'])
-                    else:
-                        p['frags'][-1] = (p['frags'][-1][0] + r['t'], p['frags'][-1][1])
-                    p['t'] = p['frags'][-1][0]   # 同步更新文本,防单片段渲染丢字
-                else:                      # 大间隙 = 分立元素 -> 单独片段
+                if 0 <= gap < H_BODY * 0.3:   # 右邻紧邻 = OCR 拆分同一元素 -> 文本合并(保留片段 x)
+                    _ft9, _fx9 = p['frags'][-1]
+                    p['frags'][-1] = (_ft9 + r['t'], _fx9)
+                    p['t'] = ''.join(_ft10 for _ft10, _ in p['frags'])   # 同步更新文本,防单片段渲染丢字
+                elif -H_BODY * 0.3 <= gap < 0:   # 左邻紧邻(y 略低但 x 稍左) -> 前插保阅读序
+                    _ft9, _fx9 = p['frags'][0]
+                    p['frags'][0] = (r['t'] + _ft9, r['x0'])
+                    p['frags'].sort(key=lambda z: z[1])
+                    p['t'] = ''.join(_ft10 for _ft10, _ in p['frags'])
+                else:                      # 大间隙(正或负) = 分立元素/分列 -> 单独片段(作者列、标题列各占一片)
                     p['frags'].append((r['t'], r['x0']))
+                    p['frags'].sort(key=lambda z: z[1])
+                    p['t'] = ''.join(_ft10 for _ft10, _ in p['frags'])
                 nx0 = min(p['x0'], r['x0']); nx1 = max(p['x0']+p['w'], r['x0']+r['w'])
                 p['x0'] = nx0; p['w'] = nx1-nx0; p['y0'] = min(p['y0'], r['y0']); p['h'] = max(p['h'], r['h'])
                 continue
@@ -838,6 +924,17 @@ for key in sorted(sl.keys(), key=int):
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
         flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc})
+    if key in _TOC_PAGE:   # 目录页:游离纯数字行(与标题行 y 不重叠未并片)→ 追加为上一条目页码片段; 上条已有数字片段则丢弃(防孤行落在版心外)
+        _nf7 = []
+        for _f7 in flow:
+            if PN_RE.fullmatch(_f7['t'].strip()) and _nf7 and not _f7.get('is_head'):
+                _p7 = _nf7[-1]
+                _fr7 = _p7.get('frags') or [(_p7['t'].strip(), _p7.get('x0', 0))]
+                if not any(_t7.strip().isdigit() for _t7, _ in _fr7):
+                    _p7['frags'] = _fr7 + [(_f7['t'].strip(), _f7.get('x0', 0))]
+                continue
+            _nf7.append(_f7)
+        flow = _nf7
     # 分行目录(wz2):标题行 + 紧随的纯页码行 配对成目录条目(源标题/页码分两行,与 wz1 同行格式不同)。≥5 对=目录页
     _npairs = sum(1 for i in range(len(flow)-1) if (not PN_RE.fullmatch(flow[i]['t'].strip())) and PN_RE.fullmatch(flow[i+1]['t'].strip()))
     if _npairs >= 5:
@@ -864,6 +961,7 @@ for key in sorted(sl.keys(), key=int):
     # figrow 正下方的短行(书影版本说明/图说明)→ 居中:LAYJSON figure_title 只覆盖部分页,用"图底 150px 内紧邻短行"兜底
     _last_fy1 = None
     for f in flow:
+        if key in _TOC_PAGE: break   # F13 目录页跳过 figcaption 兜底(防页码并入污染行被当图说明位移 x0)
         if f.get('is_figrow'):
             _last_fy1 = max(fb[1][3]*200/LDPI for fb in f['figs']) if f.get('figs') else None
         elif _last_fy1 is not None and f.get('y0') is not None:
@@ -882,7 +980,12 @@ for key in sorted(sl.keys(), key=int):
     else:
         headers = []
     is_divider = bool(flow) and all(f['is_head'] for f in flow) and not footnotes   # 仅标题无正文/脚注=分隔页(分标题页)→标题垂直居中(源在页中,非顶部)
-    _toc_ref = min((f['x0'] for f in flow if _is_toc_entry(f) and f.get('x0', 0) > 0), default=0)   # 目录条目最左 x0(层级缩进基准)
+    if key in _TOC_PAGE:   # F14b 目录页缩进基准=全部非数字片段最左 x0(作者粘连行/回填行 frags 常缺, 逐片段取不到则退回行 x0)
+        _rc14 = [_fr14[1] for _f14 in flow for _fr14 in (_f14.get('frags') or []) if not _fr14[0].strip().isdigit() and _fr14[1] > 0]
+        _rc14 += [_f14['x0'] for _f14 in flow if not _f14.get('frags') and _f14.get('x0', 0) > 0 and not _f14['t'].strip().isdigit() and _norm_core(_f14['t']) not in ('目录', '') and not _f14['t'].strip().startswith('政治的逻辑') and re.search(r'[\u4e00-\u9fff]', _f14['t']) and not _f14['t'].strip().endswith(('。', '，', '、', '！', '？'))]
+        _toc_ref = min(_rc14) if _rc14 else 0
+    else:
+        _toc_ref = min((f['x0'] for f in flow if _is_toc_entry(f) and f.get('x0', 0) > 0), default=0)
     _toc_shift = max(0.0, (body_left_px - _toc_ref) * 72.0 / DPI) if _toc_ref > 0 else 0.0   # 目录整体左移量(源目录从 ~52px 起,正文边距 128px → 左移 ~27pt 匹配源绝对位置)
     # 页眉(顶部小字,居中 + 下方分界线)
     for t in headers:
@@ -970,7 +1073,7 @@ for key in sorted(sl.keys(), key=int):
             else:
                 bl = round(fnt*1.2, 1); _strut = ''
             brk = ' \\\\' if j < len(para)-1 else ''
-            if f['is_head']:
+            if f['is_head'] and key not in _TOC_PAGE:   # 目录页无标题:全行走 _toc 点线(防 toc_map 误判条目为正文标题)
                 frags = f.get('frags')
                 if frags and len(frags) > 1:
                     # 多片段标题连续排版:拼接全部片段文本,按 align 走普通标题渲染。
@@ -1002,15 +1105,45 @@ for key in sorted(sl.keys(), key=int):
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _cmb + ']{' + _esc_with_missing(f['t'], f, key) + '}' + brk + '}')
                 continue
             _toc = None
-            if not f['is_head']:
+            if not f['is_head'] or key in _TOC_PAGE:
                 _m = re.match(r'^(.*\S)\s*[.·…．]{2,}\s*(\d{1,4})\s*$', f['t'])   # 形态①:一行"title……页码"
                 if _m: _toc = (_m.group(1), _m.group(2))
-                elif f.get('frags'):   # 形态②:title 片段 + 页码片段(分开的同 y poly,合并后成多片段)
+                if _toc is None and _TOC_PN and key in _TOC_PAGE:   # 形态⓪回填:页码整批漏识的目录行(无点线无数字片段),core 命中标题→页码表 → 登记为点线条目
+                    _ck0 = _norm_core(f['t'])
+                    if _ck0 in _TOC_PN: _toc = (f["t"].strip(), str(_TOC_PN[_ck0]))
+                if _toc is None and f.get('frags'):   # 形态②:title 片段 + 页码片段(分开的同 y poly,合并后成多片段)
                     _nums = [_t for _t, _ in f['frags'] if _t.strip().isdigit()]
                     _titles = [_t for _t, _ in f['frags'] if not _t.strip().isdigit()]
-                    if _nums and _titles: _toc = (' '.join(_titles), _nums[-1])
-            if _toc and sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt > MEASURE * 0.98:
+                    if _nums and _titles: _toc = (' '.join(_titles), ''.join(_t.strip() for _t in _nums))   # 多位页码常被切成两片(5|6) → 拼接还原
+                    elif key in _TOC_PAGE and len(f['frags']) >= 2:
+                        _tm = re.search(r'(\d{1,4})\s*$', f['frags'][-1][0])   # 形态③:尾片段带尾页码(前置条目"作者 页码")
+                        if _tm:
+                            _titles = [_t.strip() for _t, _ in f['frags'][:-1]] + [f['frags'][-1][0][:_tm.start()].strip()]
+                            _titles = [_t for _t in _titles if _t]
+                            if _titles: _toc = (' '.join(_titles), _tm.group(1))
+                    elif len(f['frags']) >= 2 and re.search(r'\d{1,4}\s*$', f['frags'][-1][0].strip()) and len(f['frags'][0][0].strip()) <= 20:
+                        # 尾栏形态:"推荐序言"+[作者页码片段]"刘星汉""曹沛霖 1" → 标题=最左片段,页码列=其余片段(作者+页码,点线后右对齐)
+                        _toc = (f['frags'][0][0].strip(), ' '.join(_t.strip() for _t, _ in f['frags'][1:]))
+                if _toc is None and key in _TOC_PAGE:   # 形态④兜底:目录页 标题+尾数字(点线漏识) → 剥尾数字当页码("推荐序言刘星汉曹沛霖 1")
+                    _tm4 = re.search(r'(\d{1,4})\s*$', f['t'])
+                    if _tm4:
+                        _tl4 = f['t'][:_tm4.start()].rstrip(' \u3000.·…．')
+                        if _tl4 and _norm_core(_tl4) not in ('目录',):
+                            _toc = (_tl4, _tm4.group(1))
+                            _fr12 = [fr for fr in (f.get('frags') or []) if fr[1] < f.get('x0', 0) + 1e9]
+                            _pg12 = [fr for fr in _fr12 if fr[0].strip().isdigit()]
+                            _t12f = [fr for fr in _fr12 if not fr[0].strip().isdigit()]
+                            if len(_pg12) == 1 and len(_t12f) >= 1:   # F12 页码片段不撑左界: x0 复位标题最左, frags 精确=(标题,x)(页码,x)
+                                _tx12 = min(fr[1] for fr in _t12f)
+                                f['x0'] = _tx12
+                                f['frags'] = [_fr12b for _fr12b in _fr12 if _fr12b[0].strip()]   # F12 保留原始片段(标题/作者各自 x0), 仅剔空; 作者拆列由 F15c 按 x0 间隙处理
+            if _toc: _toc = (re.sub(r'[\s.·…．]{2,}\d{0,4}$', '', _toc[0]).strip() or _toc[0], _toc[1])   # 标题去尾点线/尾数字(回填/游离点线残留;[s] 框内可伸缩点线会把页码顶出裁切)
+            if _toc and key not in _TOC_PAGE and sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt > MEASURE * 0.98:
                 _toc = None   # "标题"过长(≈满版心)→ 非真目录条目(内容页行尾……数字误检),改走正文 makebox[s]; 目录长条目(24字)保留 dotfill(靠 [s] 收缩点线不溢出)
+            if _toc and _norm_core(_toc[0]) == '目录':   # F12b "目录"标题行: 居中, 非条目
+                _mt17 = ('\\enspace'.join(list(_toc[0].strip()))) if len(_toc[0].strip()) == 2 else esc(_toc[0])   # F17 源书"目　录"字间空格(OCR 常丢)补 enspace
+                body.append('\\fontsize{' + str(round(fnt*1.22,1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + _mt17 + '}}')
+                continue
             if _toc:   # 目录条目:整体左移 _toc_shift(匹配源绝对宽度)+ 按源 x0 相对缩进 + 标题 + 点引导(\dotfill)+ 页码右
                 _ind = '\\hspace*{' + ('%.1f' % max(0, (f.get('x0', 0) - _toc_ref) * 72 / DPI)) + 'pt}'
                 if _toc_shift > 0.5:
@@ -1018,7 +1151,16 @@ for key in sorted(sl.keys(), key=int):
                 else:
                     _pre = ''; _box = '\\makebox[\\textwidth][s]'
                 # [s]: dotfill 是 leader 可收缩到 0 → 长标题时点线消失但页码保留行尾; 短标题时点线正常展开
-                _toc_title = esc(_toc[0]).replace(' ', '\\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
+                if key in _TOC_PAGE and f.get('frags') and len([_fr for _fr in f['frags'] if _fr[0].strip()]) >= 2:   # F15c 作者右挂: 距行首 x0>4字宽的片段(作者名)移到右列 → 源格式 推荐序言……刘星汉 曹沛霖 1
+                    _fs15 = [_fr for _fr in f['frags'] if _fr[0].strip()]
+                    _xL15 = min(_fr[1] for _fr in _fs15)
+                    # 独立右挂列判据: 片段距行左缘 >= 30% 版心宽(作者列离标题远) 或 距页右缘 < 40% 版心宽(右挂页码块)
+                    _bw15 = body_right_px - body_left_px
+                    _rf15 = [_fr for _fr in _fs15 if (_fr[1] - _xL15) >= _bw15 * 0.30 or (body_right_px - _fr[1]) < _bw15 * 0.40]
+                    _lf15 = [_fr for _fr in _fs15 if _fr not in _rf15]
+                    if _lf15 and _rf15 and sum(len(_fr[0]) for _fr in _lf15) <= 14:   # 左列须像标题(≤14字), 否则不动(整行都是作者级长文本)
+                        _toc = (' '.join(_fr[0].strip() for _fr in _lf15), '　'.join(_fr[0].strip() for _fr in _rf15))   # 右列(作者+页码)片段间全角空格, xeCJK 吞半角
+                _toc_title = esc(_toc[0]).replace(' ', '\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
                 if f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
                 _tfnt = fnt
