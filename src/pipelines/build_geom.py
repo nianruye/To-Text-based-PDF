@@ -761,7 +761,7 @@ for key in sorted(sl.keys(), key=int):
         if poly:
             xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
             y0 = min(ys)
-            if PN_RE.fullmatch(t) and (y0 > page_px_h * 0.80 and key not in _TOC_PAGE or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):
+            if PN_RE.fullmatch(t) and ((y0 > page_px_h * 0.80 and (key not in _TOC_PAGE or (page_px * 0.15 < min(xs) < page_px * 0.85))) or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):   # F20 目录页也收页脚(x居中; 右缘x>85%是条目页码不收)
                 pn_ocr = re.sub(r'[^\d]', '', t)   # OCR 页码: 底部数字(目录页跳过——底部数字是条目页码/wz1"Ⅰ"非页脚) + 顶部书眉式页码(wz4 正文页码在页顶右角)
             if _page_figs and in_figure(min(xs), y0, max(xs)-min(xs), max(ys)-min(ys), key, t):
                 continue   # 落在图块内的 OCR 行 = 图内容(非文字),跳过
@@ -836,7 +836,10 @@ for key in sorted(sl.keys(), key=int):
     else:
         _pm = 1.0
     PF = round(FONT * _pm, 1)   # 本页正文字号(PAGE_FONT 关时=FONT)
-    _pn_ocr_use = _filter_pn_ocr(pn_ocr, _prev_pn)
+    if key in _TOC_PAGE:
+        _pn_ocr_use = pn_ocr   # F21 目录页页码独立序列(1 起), 不过单调性过滤(正文→目录突变会被误杀)
+    else:
+        _pn_ocr_use = _filter_pn_ocr(pn_ocr, _prev_pn)
     pn = _lay_numbers.get(key) or pn_ext or _pn_ocr_use   # layout number > 外部表 > OCR页码(单调性过滤后,弃目录页误识)
     if pn and str(pn).isdigit():
         _prev_pn = int(pn)   # 更新跨页页码(供下页单调性判定)
@@ -1112,6 +1115,10 @@ for key in sorted(sl.keys(), key=int):
             if not f['is_head'] or key in _TOC_PAGE:
                 _m = re.match(r'^(.*\S)\s*[.·…．]{2,}\s*(\d{1,4})\s*$', f['t'])   # 形态①:一行"title……页码"
                 if _m: _toc = (_m.group(1), _m.group(2))
+                if _toc is None and key in _TOC_PAGE and (re.match(r'^第?[一二三四五六七八九十百千零\d]+(?:部分|编|篇)', f['t'].strip()) or f['t'].strip().endswith(('部分', '编'))) and not re.search(r'\d', f['t']) and len(f['t'].strip()) <= 14:
+                    # F19 部/编级标题(wz3"先秦两汉部分""第一编…"): 源书居中大字无页码, 不进 _toc 点线链(防 P1 回填误给页码)
+                    body.append('{\\fontsize{' + str(round(fnt * 0.92, 1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + esc(f['t'].strip()) + '}' + brk + '}')
+                    continue
                 if _toc is None and _TOC_PN and key in _TOC_PAGE:   # 形态⓪回填:页码整批漏识的目录行(无点线无数字片段),core 命中标题→页码表 → 登记为点线条目
                     _ck0 = _norm_core(f['t'])
                     if _ck0 in _TOC_PN: _toc = (f["t"].strip(), str(_TOC_PN[_ck0]))
@@ -1169,6 +1176,7 @@ for key in sorted(sl.keys(), key=int):
                 if f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
                 _tfnt = fnt
+                if _tfnt > PF * 1.25: _tfnt = PF   # F18 目录条目字号回落: is_head 判标题档(19.5pt)污染, 源书条目是正文小字(poly≈正文)
                 _nat = sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt
                 if _nat > MEASURE * 0.82:
                     _tfnt = round(fnt * (MEASURE * 0.82) / _nat, 1)   # 超长条目(如 24 字)缩字号让位页码, 行高(bl)不变保行距统一
