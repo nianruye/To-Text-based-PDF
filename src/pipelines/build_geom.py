@@ -1073,6 +1073,10 @@ for key in sorted(sl.keys(), key=int):
             else:
                 bl = round(fnt*1.2, 1); _strut = ''
             brk = ' \\\\' if j < len(para)-1 else ''
+            if key in _TOC_PAGE and _norm_core(f['t']) == '目录':   # F17a 目录页大标题(源书「目　录」字间空格+居中; is_head 行绕过 _toc 块)
+                _m17 = '\enspace'.join(list(_norm_core(f['t'])))
+                body.append('{\fontsize{' + str(round(f['fnt']*1.22,1)) + 'pt}{' + str(round(f['fnt']*1.22*1.3,1)) + 'pt}\selectfont \centerline{' + _m17 + '}' + brk + '}')
+                continue
             if f['is_head'] and key not in _TOC_PAGE:   # 目录页无标题:全行走 _toc 点线(防 toc_map 误判条目为正文标题)
                 frags = f.get('frags')
                 if frags and len(frags) > 1:
@@ -1140,6 +1144,7 @@ for key in sorted(sl.keys(), key=int):
             if _toc: _toc = (re.sub(r'[\s.·…．]{2,}\d{0,4}$', '', _toc[0]).strip() or _toc[0], _toc[1])   # 标题去尾点线/尾数字(回填/游离点线残留;[s] 框内可伸缩点线会把页码顶出裁切)
             if _toc and key not in _TOC_PAGE and sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt > MEASURE * 0.98:
                 _toc = None   # "标题"过长(≈满版心)→ 非真目录条目(内容页行尾……数字误检),改走正文 makebox[s]; 目录长条目(24字)保留 dotfill(靠 [s] 收缩点线不溢出)
+
             if _toc and _norm_core(_toc[0]) == '目录':   # F12b "目录"标题行: 居中, 非条目
                 _mt17 = ('\\enspace'.join(list(_toc[0].strip()))) if len(_toc[0].strip()) == 2 else esc(_toc[0])   # F17 源书"目　录"字间空格(OCR 常丢)补 enspace
                 body.append('\\fontsize{' + str(round(fnt*1.22,1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + _mt17 + '}}')
