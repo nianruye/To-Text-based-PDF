@@ -1126,6 +1126,9 @@ for key in sorted(sl.keys(), key=int):
                 _m17 = '\\enspace{}'.join(list(_norm_core(f['t'])))
                 body.append('{\\fontsize{' + str(round(f['fnt']*1.22,1)) + 'pt}{' + str(round(f['fnt']*1.22*1.3,1)) + 'pt}\selectfont \centerline{' + _m17 + '}' + brk + '}')
                 continue
+            if f['is_head'] and key in _TOC_PAGE and re.search(r'[·…．⋯]{2,}\s*\d{1,4}\s*$', f['t']):   # F26 目录页 is_head 行含点线尾数字 → 降目录条目渲染(非标题)
+                f['is_head'] = False
+                if os.environ.get('TOC_DBG'): print('F26DBG p%s %r' % (key, f['t'][:30]))
             if f['is_head'] and key not in _TOC_PAGE:   # 目录页无标题:全行走 _toc 点线(防 toc_map 误判条目为正文标题)
                 frags = f.get('frags')
                 if frags and len(frags) > 1:
@@ -1152,14 +1155,14 @@ for key in sorted(sl.keys(), key=int):
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _esc_with_missing(f['t'], f, key) + '}' + brk + '}')
                 continue
             _wr = (f['w'] / page_px) if page_px else 1   # 行宽占版心比
-            if (not f['is_head']) and f.get('align') == 'c' and f.get('region') != 'note' and _wr >= 0.70:   # 仅"正文区满宽居中段"(前言/版权,w_ratio≥0.70)居中;**注释区行永不居中**(注释应左对齐ragged),短行(<0.70)也跳过→makebox[l]。修注释段末/中行被 is_centered 误判居中
+            if (not f['is_head']) and key not in _TOC_PAGE and f.get('align') == 'c' and f.get('region') != 'note' and _wr >= 0.70:   # F28 目录页不走居中正文段(条目被吞, 应走 _toc 点线); 仅"正文区满宽居中段"(前言/版权,w_ratio≥0.70)居中;**注释区行永不居中**(注释应左对齐ragged),短行(<0.70)也跳过→makebox[l]。修注释段末/中行被 is_centered 误判居中
                 _cnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in f['t']) * fnt   # 自然字宽
                 _cmb = 'c' if _cnat < MEASURE * 0.90 else 's'   # 仅明显窄于版心(≤90%)才居中;否则 [s] 收缩——[c] 居中长内容会两侧均等溢出(x0 负、x1 超)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _cmb + ']{' + _esc_with_missing(f['t'], f, key) + '}' + brk + '}')
                 continue
             _toc = None
             if not f['is_head'] or key in _TOC_PAGE:
-                _m = re.match(r'^(.*\S)\s*[.·…．]{2,}\s*(\d{1,4})\s*$', f['t'])   # 形态①:一行"title……页码"
+                _m = re.match(r'^(.*\S)\s*[.·…．⋯]{2,}\s*(\d{1,4})\s*$', f['t'])   # 形态①:一行"title……页码"
                 if _m: _toc = (_m.group(1), _m.group(2))
                 if _toc is None and key in _TOC_PAGE and (re.match(r'^第?[一二三四五六七八九十百千零\d]+(?:部分|编|篇)', f['t'].strip()) or f['t'].strip().endswith(('部分', '编'))) and not re.search(r'\d', f['t']) and len(f['t'].strip()) <= _TOC_CAL.get('title_max', 14):
                     # F19 部/编级标题(wz3"先秦两汉部分""第一编…"): 源书居中大字无页码, 不进 _toc 点线链(防 P1 回填误给页码)
@@ -1194,7 +1197,7 @@ for key in sorted(sl.keys(), key=int):
                                 _tx12 = min(fr[1] for fr in _t12f)
                                 f['x0'] = _tx12
                                 f['frags'] = [_fr12b for _fr12b in _fr12 if _fr12b[0].strip()]   # F12 保留原始片段(标题/作者各自 x0), 仅剔空; 作者拆列由 F15c 按 x0 间隙处理
-            if _toc: _toc = (re.sub(r'[\s.·…．]{2,}\d{0,4}$', '', _toc[0]).strip() or _toc[0], _toc[1])   # 标题去尾点线/尾数字(回填/游离点线残留;[s] 框内可伸缩点线会把页码顶出裁切)
+            if _toc: _toc = (re.sub(r'[\s.·…．⋯]{2,}\d{0,4}$', '', _toc[0]).strip() or _toc[0], _toc[1])   # 标题去尾点线/尾数字(回填/游离点线残留;[s] 框内可伸缩点线会把页码顶出裁切)
             if _toc and key not in _TOC_PAGE and sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt > MEASURE * 0.98:
                 _toc = None   # "标题"过长(≈满版心)→ 非真目录条目(内容页行尾……数字误检),改走正文 makebox[s]; 目录长条目(24字)保留 dotfill(靠 [s] 收缩点线不溢出)
 
