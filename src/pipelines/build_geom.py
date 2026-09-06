@@ -1104,7 +1104,7 @@ for key in sorted(sl.keys(), key=int):
     prev_y = [None]   # 页级上一行 y0(跨段位置还原:段间 \vspace 用)
     def flush():
         if not para: return
-        if USE_POS and prev_y[0] is not None and para[0].get('y0', 0) > prev_y[0] and not os.environ.get('REGION_LAYOUT','') in ('1','true','True'):
+        if USE_POS and key not in _TOC_PAGE and prev_y[0] is not None and para[0].get('y0', 0) > prev_y[0] and not os.environ.get('REGION_LAYOUT','') in ('1','true','True'):   # F29 目录页无段间 vspace(条目连续, 源书目录行距均匀)
             _gap = (para[0]['y0'] - prev_y[0]) * 72.0 / DPI - round(para[0]['fnt']*1.2, 1)   # 段间位置还原(非区域化):距上段末行的源 y 间隙(\\ 只给 fnt×1.2,补差值)。REGION_LAYOUT 时跳过——strut 已给均匀行距=源,源段间无额外间隙,再加 vspace 会叠加→溢页
             _gap = max(0.0, min(_gap, para[0]['fnt']*2.5)) * _pos_gscale   # ×gscale:溢出页按比例收段间隙
             if _gap > 0.5: body.append('\\vspace{%.1fpt}' % _gap)
@@ -1206,6 +1206,14 @@ for key in sorted(sl.keys(), key=int):
                 body.append('\\fontsize{' + str(round(fnt*1.22,1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + _mt17 + '}}')
                 continue
             if _toc:   # 目录条目:整体左移 _toc_shift(匹配源绝对宽度)+ 按源 x0 相对缩进 + 标题 + 点引导(\dotfill)+ 页码右
+                if key in _TOC_PAGE:   # F29 目录页行距统一: 全行同距(源书目录视觉均匀); bl 优先=源目录页 pitch(_pp 紧凑), 缺失回退正文公式
+                    if USE_POS and _pp:
+                        bl = round((_pp - 2.0) * _pos_sscale, 1)
+                    elif USE_POS:
+                        bl = round(PF * 1.34 * _pos_sscale, 1)
+                    else:
+                        bl = round(PF * 1.2, 1)
+                    _strut = '\\rule{0pt}{%.1fpt}' % round(bl - PF * 0.13, 1)
                 _ind = '\\hspace*{' + ('%.1f' % max(0, (f.get('x0', 0) - _toc_ref) * 72 / DPI)) + 'pt}'
                 if _toc_shift > 0.5:
                     _pre = '\\noindent\\hspace*{-' + ('%.1f' % _toc_shift) + 'pt}'; _box = '\\makebox[\\dimexpr\\textwidth+' + ('%.1f' % _toc_shift) + 'pt\\relax][s]'
@@ -1271,7 +1279,7 @@ for key in sorted(sl.keys(), key=int):
             body.append('\\par\\noindent' + ''.join(_parts) + '\\par')   # 一行内并排,预留最大图高(图把后续文字推到图后)
             prev_y[0] = max(fb[1][3]*200/LDPI for fb in f['figs'])   # 图底源 y(200dpi)作下段基准,防 \vspace 跨图高重复
             _i += 1; continue
-        f['is_para_start'] = f['x0'] > body_left + indent_thr and not f['is_head']
+        f['is_para_start'] = key not in _TOC_PAGE and f['x0'] > body_left + indent_thr and not f['is_head']   # F30 目录页行连续(缩进条目不断段, 免 \par 段距)
         _en_ratio = sum(1 for c in f['t'] if ord(c) < 128 and c.isalpha()) / max(len(f['t']), 1)
         if (not f['is_head']) and _en_ratio > 0.4:   # 英文为主的行(参考文献等):合成可换行段落,不套 makebox,允许 xelatex 断词(避免溢出)
             if para: flush(); para = []
@@ -1282,7 +1290,7 @@ for key in sorted(sl.keys(), key=int):
             body.append('{\\fontsize{' + str(f['fnt']) + 'pt}{' + str(_bl) + 'pt}\\selectfont ' + ' '.join(esc(_t) for _t in _en) + '}\\par')
             prev_y[0] = _en_y   # 英文段末行 y0(位置还原基准,防下段/figrow \vspace 跨英文段重复计入→溢出)
             _i += 1; continue
-        if (f['is_para_start'] or (f['is_head'] and not f.get('is_cont'))) and para:
+        if (f['is_para_start'] or (key not in _TOC_PAGE and f['is_head'] and not f.get('is_cont'))) and para:   # F30 目录页 is_head 行不断段
             flush(); para = []
         para.append(f)
         _i += 1
