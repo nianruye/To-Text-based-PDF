@@ -12,16 +12,54 @@ import sys, os, json, re, subprocess
 
 CPYRIGHT_RE = re.compile(r'(ISBN|出版社|出版发行|印数|定价|版次|第1版|责任编辑|封面设计|登记证号|开本|印刷)')
 
-def detect_pages(sl, max_scan=10):
-    """检测前 max_scan 页中版权特征页; 返回 0 到最后一个特征页的连续页号列表(含封面/扉页)"""
-    hit = -1
-    for pk in range(min(max_scan, len(sl))):
-        text = "".join(sl.get(str(pk), []))
-        if CPYRIGHT_RE.search(text):
-            hit = pk
-    if hit < 0:
-        hit = min(2, len(sl) - 1)   # 默认前 3 页(封面/扉页/版权)
-    return list(range(hit + 1))
+def detect_pages(sl, co=None, max_scan=8):
+    """设计页候选检测(F31): 连续前缀逐页判定。
+    设计页特征(OCR 数据驱动): 行宽中位 < 0.5×页宽 且 (行数<12 或 行首x标准差>6%页宽 或 字号变异>2.5×中位)。
+    遇第一个非设计页停止(设计页总是书前连续区: 封面/封底/扉页/版权/名单)。
+    可选 co=coords 精判; 无 co 时回退版权特征词(旧逻辑)。"""
+    import statistics
+    keys = sorted(sl.keys(), key=int)
+    if co is None:
+        # 回退: 旧版权特征词逻辑(不推荐, 无 coords 时用)
+        hit = -1
+        for pk in range(min(max_scan, len(sl))):
+            text = "".join(sl.get(str(pk), []))
+            if CPYRIGHT_RE.search(text):
+                hit = pk
+        if hit < 0:
+            hit = min(2, len(sl) - 1)
+        return list(range(hit + 1))
+    cands = []
+    for k in keys[:max_scan]:
+        txts = sl.get(k, []); polys = co.get(k, [])
+        lines = [(t.strip(), p) for t, p in zip(txts, polys) if t.strip() and p and isinstance(p, list)]
+        if not lines:
+            cands.append(int(k)); continue
+        try:
+            page_w = max(max(pp[0] for pp in p) for _, p in lines)
+        except Exception:
+            cands.append(int(k)); continue
+        ws = [max(pp[0] for pp in p) - min(pp[0] for pp in p) for _, p in lines]
+        x0s = [min(pp[0] for pp in p) for _, p in lines]
+        hs = [max(pp[1] for pp in p) - min(pp[1] for pp in p) for _, p in lines]
+        n = len(lines)
+        med_w = statistics.median(ws)
+        try: x0_std = statistics.pstdev(x0s)
+        except Exception: x0_std = 0
+        try: medh = statistics.median(hs)
+        except Exception: medh = 1
+        reasons = []
+        if med_w < 0.5 * page_w: reasons.append('窄行宽%.2f' % (med_w/page_w))
+        if n < 12: reasons.append('行少%d' % n)
+        if x0_std > 0.06 * page_w: reasons.append('行首散%.2f' % (x0_std/page_w))
+        if medh and max(hs) > 2.5 * medh: reasons.append('字号变异')
+        hit = (med_w < 0.5 * page_w) and (n < 12 or x0_std > 0.06 * page_w or (medh and max(hs) > 2.5 * medh))
+        print('  p%d: 行%d 行宽%.2f 行首散%.2f %s → %s' % (int(k), n, med_w/page_w if page_w else 0, x0_std/page_w if page_w else 0, '; '.join(reasons), '设计页' if hit else '文字页'))
+        if hit:
+            cands.append(int(k))
+        else:
+            break
+    return cands
 
 def main():
     src_pdf, lines_f = sys.argv[1], sys.argv[2]
@@ -36,8 +74,13 @@ def main():
 
     sl = json.load(open(lines_f))
     if pages is None:
-        pages = detect_pages(sl)
-        print(f"[自动检测] 版权特征页 → 贴图页 {pages}")
+        co = None
+        if len(sys.argv) > 3:
+            for a in sys.argv[3:]:
+                if a.startswith("--coords"):
+                    co = json.load(open(a.split("=")[1]))
+        pages = detect_pages(sl, co)
+        print(f"[自动检测] 设计页候选 → 贴图页 {pages}")
 
     import fitz
     doc = fitz.open(src_pdf)
