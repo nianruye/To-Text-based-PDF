@@ -7,10 +7,17 @@
 
 | 类别 | 标签 | 含义 | 处理流程 |
 |---|---|---|---|
-| 局部 bug | `local-bug` | 单文件内部逻辑错误，不影响其他文件的行为契约 | fix 分支 -> 改代码 -> 跑 146 测试 -> verify_geom |
+| 局部 bug | `local-bug` | 单文件内部逻辑错误，不影响其他文件的行为契约 | fix 分支 -> 改代码 -> 跑 201 测试 -> verify_geom（竖排则 verify_vert） |
 | 设计变更 | `design-change` | 改变管线行为（转义规则/临时文件路径/字号公式等） | 先写/改 spec -> spec 确认 -> 测试更新 -> 实现 -> baseline diff |
 | 公共接口或兼容影响 | `api-compat` | 改变 argv 顺序/env 默认值/JSON 结构/GMPG 格式/tmp 路径等跨文件契约 | 必须更新 spec/governance/PIPELINE_BEHAVIOR.md -> 全链验证（两条管线 + verify + baseline） |
 | 多 issue 同根因 | `root-cause` | 多个表面 issue 源于同一耦合机制 | 先分析根因（coupling_analysis.md）-> 统一方案 -> 分步实施 |
+
+**竖排（`build_vert.py`）适用同一分类**，差异三点：
+
+1. 回归口径不同：竖排不做 pitch/坐标类校验（竖排的「行」是列），改用 `verify_vert.py`（页数 1:1 / 字符量 / 越界）——见 §3。
+2. 竖排验证**只能本地跑**（CI 无法执行，理由见 §3 备注），所以竖排 PR 的验证证据必须由提交者在本地跑出并贴进 PR 描述。
+3. 竖排与横排**零代码耦合**（不 import `src/utils/*`、env 命名空间不相交、临时文件不重名、不用 GMPG），横竖互不波及；
+   但竖排的 argv/env/产物命名属跨管线契约，改动要更新 `spec/governance/PIPELINE_BEHAVIOR.md` 的「竖排管线（build_vert.py）」章节。
 
 ## 2. 分支命名
 
@@ -25,12 +32,24 @@
 
 | 层 | 命令 | 何时跑 | 拦什么 |
 |---|---|---|---|
-| unit 133 | `/usr/bin/python3 -m pytest src/test/unit -v` | 每次 commit | 转义契约 + 纯函数 |
+| unit 188 | `/usr/bin/python3 -m pytest src/test/unit -v` | 每次 commit | 转义契约 + 纯函数 |
 | invariants 13 | `/usr/bin/python3 -m pytest src/test/invariants -v` | 每次 commit | 结构不变量 |
-| verify_geom 退出码 | `VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py <out.pdf> <coords> <lines>` | PR 合并前 | pitch/溢出/缺页回归 |
+| verify_geom 退出码 | `VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py <out.pdf> <coords> <lines>` | PR 合并前（横排） | pitch/溢出/缺页回归 |
+| verify_vert 退出码 | `/usr/bin/python3 src/test/verify_vert.py <out.pdf> <coords.json> <lines.json> --src-pdf source_pdf/<book>.pdf` | PR 合并前（竖排，**本地跑**） | 页数 1:1 / 逐页字符量 / 越界（文本 span + 矢量图形）/ 页幅回归 |
 | baseline diff | 重跑快照 -> diff `src/test/snapshots/baseline_*.json` | 重构后 | 量化指标漂移 |
 
 > 系统有两个 python：`python3` 命中 mineru venv（无 fitz），`/usr/bin/python3` 有 fitz/opencc/xelatex。测试必须用 `/usr/bin/python3`。
+
+**竖排验证（verify_vert）备注**：
+
+- **实测证据（2026-10-15，wz6 全书 231 页）**：
+  `/usr/bin/python3 src/test/verify_vert.py output/wz6/wz6_vert_full.pdf data/wz6/wz6_spotting_coords.json data/wz6/wz6_spotting_lines.json --src-pdf source_pdf/wz6.pdf`
+  -> 退出码 0（PASS）：页数 231 = 231（1:1）/ 字符量 68016÷69998 = 97.2%（非预期差异页 0，整页丢失 0）/ 越界 span 0 + 矢量 0 / 页幅相对差 0.00%。
+  同一命令对**重跑产物**（`build_vert.py` 重跑 11 秒生成）同样 PASS，且逐页文本与 `output/wz6/wz6_vert_full.pdf` 全等（复现性）。
+- **不进 CI**：竖排验证的输入（`output/` 产物 + `data/wz6` OCR 数据）按仓库策略不入库，重建还需 upLaTeX 栈（`texlive-lang-japanese`）与 58MB 源 PDF，
+  与现有「不依赖 xelatex/GPU 的最小 CI」定位不符 -> 竖排 PR 由提交者**本地**跑此命令并把输出贴进 PR 描述。
+  评估详情与备选方案见 [docs/vert_governance_report.md](docs/vert_governance_report.md) 第三节；契约见 [spec/governance/PIPELINE_BEHAVIOR.md](spec/governance/PIPELINE_BEHAVIOR.md)「竖排管线」。
+- **不能用 `build_vert.py` 的退出码当门禁**：该脚本全文无 `sys.exit`，编译失败也只打印 `[失败]` 后正常结束（退出码 0）。门禁只看 `verify_vert.py` 的退出码。
 
 ## 4. spec 对账规则
 
@@ -39,27 +58,33 @@
 1. **新功能**：先写 `spec/<type>/XX_function.md`（状态 planned）-> 实现 -> 状态改 implemented
 2. **bug 修复**：关联 `spec/governance/PIPELINE_BEHAVIOR.md` 的相关契约 -> 修 -> 若行为变了则更新契约
 3. **重构**：关联 `spec/governance/PIPELINE_BEHAVIOR.md` -> 确认行为不变 -> spec 状态不改
+4. **竖排改动**（`src/pipelines/build_vert.py` / `src/test/verify_vert.py`）：关联对应分部 spec `spec/vertical/<分部>.md`
+   （01 engine / 02 tate_layout / 03 marginalia / 04 frame_lines / 05 pagenum_sequence / 06 derot）；
+   若动了 argv / env / 产物命名，同时更新 `spec/governance/PIPELINE_BEHAVIOR.md` 的「竖排管线（build_vert.py）」章节（契约 V1-V8）。
+   注意分部 spec 的实现锚点是**行号**，改 `build_vert.py` 后要同步 `spec/vertical/README.md` 的锚点表。
 
 ### PR 合并前 spec 对账清单
 
 - [ ] PR 关联了至少一条 spec（spec 文件路径写在 PR 描述）
 - [ ] spec 状态已更新（planned -> implemented / implemented 不变 / archived）
-- [ ] 146 测试全绿（unit 133 + invariants 13）
-- [ ] verify_geom 退出码 PASS（硬约束：页数 1:1 / split 0 / missing 0；或说明为何 FAIL 可接受）
+- [ ] 201 测试全绿（unit 188 + invariants 13）
+- [ ] 横排改动：verify_geom 退出码 PASS（硬约束：页数 1:1 / split 0 / missing 0；或说明为何 FAIL 可接受）
+- [ ] 竖排改动：verify_vert 退出码 PASS（硬约束：页数 1:1 / 整页丢失 0 / 越界 0；本地跑，输出贴 PR 描述）
 - [ ] baseline diff 无意外漂移（或说明漂移可接受 + 对照 CURRENT_BEHAVIOR_SPEC.md 判断）
-- [ ] 如改了公共接口（argv/env/JSON/GMPG/路径）：`spec/governance/PIPELINE_BEHAVIOR.md` 已更新
-- [ ] 如改了 `src/utils/` 共享模块：两条管线都验证（不只验一条）
-- [ ] 如改了 GMPG 格式：渲染端 + 校验端 + 校准端三方同步验证
+- [ ] 如改了公共接口（argv/env/JSON/GMPG/路径）：`spec/governance/PIPELINE_BEHAVIOR.md` 已更新（横排契约 1-6 / 竖排 V1-V8）
+- [ ] 如改了 `src/utils/` 共享模块：两条横排管线都验证（不只验一条）；竖排不 import `src/utils/`，不在影响面内
+- [ ] 如改了 GMPG 格式：渲染端 + 校验端 + 校准端三方同步验证（竖排不参与 GMPG）
 
 ## 5. 完成定义（DoD）
 
 一个 issue/PR 算"完成"需满足：
 
-1. 代码改完 + 146 测试全绿
-2. verify_geom 退出码 PASS（硬约束：页数 1:1 / split 0 / missing 0）
-3. spec 状态已更新（spec/README.md 状态账本）
-4. PR 描述含：改了什么 / 为什么 / 影响哪些文件 / 测试结果
-5. 如有 baseline diff：人判断可接受（写在 PR 描述，对照 CURRENT_BEHAVIOR_SPEC.md）
+1. 代码改完 + 201 测试全绿（unit 188 + invariants 13）
+2. 横排改动：verify_geom 退出码 PASS（硬约束：页数 1:1 / split 0 / missing 0）
+3. 竖排改动：verify_vert 退出码 PASS（硬约束：页数 1:1 / 整页丢失 0 / 越界 0；本地跑，命令与输出写进 PR 描述——CI 无法执行，见 §3）
+4. spec 状态已更新（spec/README.md 状态账本）
+5. PR 描述含：改了什么 / 为什么 / 影响哪些文件 / 测试结果
+6. 如有 baseline diff：人判断可接受（写在 PR 描述，对照 CURRENT_BEHAVIOR_SPEC.md）
 
 ## 6. 现有 issue 清单
 
@@ -76,6 +101,9 @@
 | 7 | `fit_common` 临时目录泄漏（`tempfile.mkdtemp` 未 `rmtree`） | fit_common.py L66 | 待修 |
 | 8 | `DPI=200` 死代码（fit_common 定义未引用） | fit_common.py L14 | 待修 |
 | 9 | classic/fit_common docstring 未改名（仍自称 `build_geom.py` / `fit_positional.py`） | build_classic.py L4 / fit_common.py L4 | 待修 |
+| 18 | 竖排 `build_vert.py` **无 PASS/FAIL 退出码**：编译失败/`vert.pdf` 未生成也只打印 `[失败]` 后正常结束（全文无 `sys.exit`） | build_vert.py L918-924 | 待修（门禁临时用 `verify_vert` 退出码兜底；同已归档 #16 家族。**本次源码核对新发现**） |
+| 19 | 竖排页码行合并页丢失（OCR 把「书眉+页码」合成 h≥300 的框 -> `special_rows` 按长行丢弃，p3 无页码渲染） | build_vert.py L106-122 | 待修（见 spec/vertical/03_marginalia.md 已知遗留） |
+| 20 | 竖排 `VERT_TMP` 同名并发冲突（并行两次构建共用 `vert.tex/dvi/pdf`，未按 run 分名） | build_vert.py L16 + L911-920 | 待修（同 #10 家族。**本次源码核对新发现**） |
 
 ### 设计变更（design-change）
 
@@ -84,6 +112,13 @@
 | 10 | `/tmp/seg2_line.*` 并发冲突（geom+classic 同名） | geom L930 + classic L1019 | planned（改路径分 build_name） |
 | ~~7~~ | ~~geom `page_pitch` 方差检查含异常值~~ | ~~geom L129~~ | **不修**（设计差异：实测改 inner 后 pitch 89.9%->15.4%，保守策略对现代书正确） |
 | 11 | `_esc_chars` 两方分叉（geom 删单反斜杠/classic 删双保留单） | `tex_escape.py` | planned（是否统一需 spec 确认） |
+| 21 | 竖排正文列长于版框内框（`\textwidth` 由 OCR 盒长中位拟合 863.7pt，沿文本方向系统性偏松约 8%；实测 p4 正文到 y1171.5 而内框下缘 1113.1） | build_vert.py L80 / spec/vertical/02_tate_layout.md | planned（改动会动全书断列与页数，须重跑基线） |
+| 22 | 竖排列距口径差约 9%（全局列距 47.6pt = OCR 列 x0 差中位 vs 源书版框界行线实测 43.5pt；列块自右向左累积偏移，最左列差约 40pt） | build_vert.py L67 / L76 | planned（应以版框界行线列距重拟合） |
+| 23 | 竖排逐页版面错位（奇/偶页扫描错位：奇页内框顶 290 / 偶页 315.5；列块用全局拟合值 -> 单页偏差 ±18pt 水平 / ±26pt 垂直） | build_vert.py L82-83（TM_pt / OM_pt） | planned（逐页 `\setlength{\textheight}` 位移探针结果自相矛盾，待查 tate 分页语义） |
+| 24 | 竖排界行线 ±1 条（19 页为 10 或 12 条，源书自身缺线/多检一条；未做列距梳状补全） | build_vert.py L651-654 / spec/vertical/04_frame_lines.md | planned |
+| 25 | 竖排 OCR 方向参数 `useDocOrientationClassify` 未验证（无 token；验证通过可重跑受影响页 OCR 从源头消除旋转坐标系，`derot_rows` 作为存量数据还原层保留） | src/tools/test_ocr_orientation.py | 待验证（脚本 + 判据已就绪） |
+| 26 | `verify_vert` 不覆盖版式保真度（页数/字符量/越界拦得住整页丢失与出页，拦不住列位偏移、字号偏差、界行线 ±1 这类渐进退化） | src/test/verify_vert.py | planned（可加「版框内框/界行线 vs 源图墨迹」抽样对照；会依赖 scipy + 源图） |
+| 27 | 竖排文档数字与实测漂移（`spec/vertical/README.md` 记 书眉/页码/边注 107/121/64 与页码纠正 19 处，重跑实测 107/**122**/**65** 与 **18** 处；`build_vert.py` L666 注释写右缘 ≈546pt 而实测与 02 spec 为 563.1pt） | spec/vertical/README.md L66-68 / spec/vertical/05_pagenum_sequence.md L3,L55 / build_vert.py L666 | 待修（文档同步；本次治理任务只记录实测值，未改分部 spec。**本次重跑核对新发现**） |
 
 ### 公共接口或兼容影响（api-compat）
 
@@ -106,6 +141,18 @@
 | 16 | verify_geom 无 PASS/FAIL 退出码 | 已修（verify_geom.py L274-298 加退出码） |
 | 17 | fit_positional/classic 97 行重复 | 已修（合并到 fit_common.py 90+3+3 行） |
 
+**竖排 issue 来源对照**（#18-#27）：
+
+| 来源 | 对应 issue |
+|---|---|
+| `docs/vert_arch_report.md` §四 遗留 1（OCR 方向参数未验证） | #25 |
+| `docs/vert_arch_report.md` §四 遗留 2（验证不覆盖版式保真度） | #26 |
+| `docs/vert_arch_report.md` §四 遗留 5（`build_vert.py` 预存在遗留） | #21 / #22 / #23 / #24 |
+| `spec/vertical/03_marginalia.md` 已知遗留（页码行合并页） | #19 |
+| 本次治理任务源码核对/重跑**新发现** | #18（退出码 0）/ #20（VERT_TMP 并发）/ #27（文档数字漂移） |
+
+> `docs/vert_arch_report.md` 的遗留 3（spec 锚点随行号漂移）已写入本文件 §4 第 4 条；遗留 4（竖排未纳入治理文件）即本次治理任务。
+
 ## 7. Branch Protection 设置指南
 
 仓库 `nianruye/To-Text-based-PDF` 的 master 分支保护设置：
@@ -126,6 +173,7 @@
 - PR 的 CI（lint + test-cases）全绿才能合并
 - 至少 1 人审批
 - 所有 review 评论须标记 resolved
+- **竖排验证不在 CI 状态检查内**（`verify_vert` 只能本地跑，见 §3 备注）-> 竖排 PR 的验证证据靠 PR 描述人工核对
 
 ## 8. Commit 信息规范
 

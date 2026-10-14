@@ -8,7 +8,7 @@
 
 | spec | 说明 |
 |---|---|
-| [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约：argv / env / JSON / GMPG / DPI / 命名 + 验收标准 + 实现锚点 + 兼容影响矩阵 |
+| [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约：**横排**（契约 1-6 = argv / env / JSON / GMPG / DPI / 命名）+ **竖排**（「竖排管线（build_vert.py）」章节 = V1-V9 argv/env/JSON/GMPG-N.A./坐标页幅/产物/差异对照/验收/锚点/实测基线）+ 验收标准 + 实现锚点 + 兼容影响矩阵（含竖排行）+ CI 结论 |
 
 ### planned（已规划，待实现）
 
@@ -22,13 +22,14 @@
 
 | spec | 说明 |
 |---|---|
-| [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约（6 条契约 + 验收 + 锚点 + 兼容） |
+| [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约（横排 6 条契约 + 竖排章节 V1-V9 + 验收 + 锚点 + 兼容影响矩阵含竖排行 + CI 结论） |
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
 | [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot）；验证脚本 `src/test/verify_vert.py` |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
+| [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
 | [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
 | [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（12 函数契约） |
@@ -74,7 +75,8 @@
 | **界行线** | 版框内列间的 1pt 细竖线（源书 12 格 = 13 条等距栅格，列距 43.5pt） |
 | **书眉 / 页码 / 边注** | 竖排的边缘小字：订口侧框外篇名 / 汉字数码页码 / 版心外注文（`*` 开头为题注），eso-pic `\put` 逐字绝对定位 |
 | **derot** | OCR 返回「旋转坐标系」页（整页逆时针 90°）的还原，见 [vertical/06_derot.md](vertical/06_derot.md) |
-| **verify_vert** | 竖排验证脚本（页数 1:1 / 逐页字符量 / 越界 / PASS-FAIL 退出码），对标横排 `verify_geom` |
+| **verify_vert** | 竖排验证脚本（页数 1:1 / 逐页字符量 / 越界 / 页幅 / PASS-FAIL 退出码），对标横排 `verify_geom` |
+| **VERT_\*** | 竖排管线环境变量族（12 个，全 `VERT_` 前缀 -> 与横排 env 命名空间零交集），契约见 [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) V2 |
 
 ## 总 Spec
 - [00_system_architecture.md](00_system_architecture.md) - 系统总体架构（目标/类型/路由/共享基础/技术栈/目录结构/可扩展性）
