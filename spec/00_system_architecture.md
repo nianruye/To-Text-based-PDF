@@ -10,6 +10,7 @@
 |---|---|---|---|
 | **古籍（刻本/印本）** | CJK 墨高重叠、夹注本双规制、旁注竖排、校注标记 | `src/pipelines/build_classic.py` | ✅ 已实现 |
 | **现代书籍** | 段落缩进、脚注、页眉页码、标题层级 | `src/pipelines/build_geom.py` | ✅ 已实现（wz1） |
+| **竖排书（繁体/古籍竖排）** | 列序右起、天头/地脚、界行线、边注 | `src/pipelines/build_vert.py` | ✅ 已实现（wz6 231页） |
 | **学术论文** | 公式、表格、图表标题、参考文献、摘要 | 待建 | 🔜 规划中 |
 | **合同** | 条款编号、表格、签章区域、固定格式 | 待建 | 🔜 规划中 |
 | **标书** | 复杂表格、目录、附件、多层标题 | 待建 | 🔜 规划中 |
@@ -25,6 +26,7 @@
 ```
 文档特征 -> 类型判定:
 - 有〔X〕校注标记 + aside 旁注 + CJK 竖排 -> 古籍
+- 行框普遍纵长（高 > 2.5×宽）+ 列序右起（列 x0 递减）+ 双边版框/界行线 + 汉字数码页码 -> 竖排书
 - 有公式/表格/参考文献 -> 论文
 - 有条款编号(第一条) + 签章 -> 合同
 - 有复杂表格 + 多层目录 -> 标书
@@ -84,6 +86,29 @@
 - **标题层级**：行高 + toc_map + 居中
 - **目录页**：dotfill + 页码右对齐
 
+### 竖排书（`src/pipelines/build_vert.py`）
+
+**与横排的本质差异**：横排是「行流 + `\vspace` 位置还原」，竖排是**列流**（每列独立 `\par` 出列），
+且引擎链、参数语义、验证口径全部另立一套。详见 [vertical/ 分部 Spec](vertical/README.md)。
+
+- **引擎链**：`upLaTeX` + `tarticle.cls`（默认 tate）+ `pxchfon[unicode]` + `Noto Serif CJK TC`（ttc index=3）+ `dvipdfmx`
+  —— 横排的 xelatex + xeCJK 无 tate（bxjscls 无该选项），pTeX/platex 丢繁体字（JIS 编码）；
+  `tarticle.cls` 的 JY1/JT1 报错由 `disablejfam` + JY2 重建 mincho 消除（逐像素 0 差异）
+- **tate 参数语义**：`\textwidth` = 列高、`\textheight` = 列区横向容量、**右缘 = 70 + `\oddsidemargin` + `\textheight`**
+  —— 改 th 必须同步 om；`\par` 必须在 `\fontsize` 组内（组外列距坍缩）；`papersize` = 目标 pt × 1.00375
+- **列容量取「最密页」**（90 分位）而非中位：tate 下累积列数超 `\textheight` 会分页（231 页 → 286 页）
+- **书眉/页码/边注**：eso-pic **带星版** `\AddToShipoutPictureFG*`（无星 = 逐页累积重画）+ `\put` 逐字绝对定位；
+  边缘小字坐标必须**源图墨迹实测**（OCR bbox 偏 18-40pt），字号 = 单字墨高 ÷ ink 比（Noto CJK 实测 0.88），
+  步进取组件顶距中位（自然步进，比「行程÷字数」稳）
+- **版框线**：双边外粗（2.5-4.5pt）+ 空隙 + 内细（0.5-1.5pt）+ 界行线；判据 = 列/行墨覆盖率 + 结构闭合
+  （订口侧外粗线被装订边吞掉 → 只画测到的）；淡线页用「等距栅格拟合」兜底
+- **页码序列纠正**：逐字数码解析 → 分段等差拟合（`value = a*page + c`）→ 偏差 ≥ 2 判误读 → 邻页插值
+  （`PN_TOL=2` 有意放过 ±1，容忍源书合法跳号）
+- **旋转坐标系页**：OCR 把竖排页当横排识别时坐标整体旋转 90°（行框横看 + 超出页宽 2 倍）→
+  `derot_rows` 用源图墨迹字列标定逆/顺时针（残差竞争）+ 中位比例标定文本方向，**只在渲染该页时套用**；
+  源头根治参数 `useDocOrientationClassify` 的验证脚本见 `src/tools/test_ocr_orientation.py`
+- **验证**：`src/test/verify_vert.py`（页数 1:1 / 逐页字符量对照 / span 越界 / PASS-FAIL 退出码）
+
 ### 论文（待建）
 - **公式**：inline_formula -> LaTeX math（或纯文本兜底）
 - **表格**：tabular 结构还原
@@ -105,16 +130,26 @@
 
 ## 测试体系
 
-### 通用测试（verify_geom.py）
+### 通用测试（verify_geom.py，横排）
 - pitch 误差（行距准确度）
 - 页高误差（内容填充度）
 - 占位偏差（底部空白）
 - 溢出（多物理页）
 - 缺失页
 
+### 竖排测试（verify_vert.py，竖排）
+横排的 pitch/页高口径对竖排不可比（竖排的「行」是列），竖排另立三项 1:1 硬指标 + 退出码：
+- 页数 1:1（重建 PDF 页数 vs OCR key 数）
+- 逐页字符量对照（重建每页文本 vs OCR 字数和；差异 > 80 字报警，
+  预期差异页按「该页 OCR 内容特征」自动识别 —— 水印/非中文页、幻觉长行页，不硬编码页号）
+- 全书逐 span + 逐矢量图形 bbox 越界（x∈[0,W] / y∈[0,H]）
+- 页幅对照（可选 `--src-pdf`：输出纸型 vs 源书众数页幅）
+
 ### 类型专属测试
 - **古籍**：序号对齐（x0 统一）、墨高重叠（pitch=源）、aside 补全、校注上标
 - **现代**：段首缩进、脚注分界、标题层级
+- **竖排**：列流（列数/列位/断点）、书眉页码边注墨迹定位、版框线、页码序列纠正、旋转页还原
+  （见 [vertical/README.md](vertical/README.md) 各 spec 的「验收方法」）
 - **论文**：公式渲染、表格结构
 - **合同**：条款编号连续、签章位置
 - **标书**：表格完整性、目录层级
@@ -122,6 +157,7 @@
 ### 测试数据
 - wz1.pdf（古籍单规制，222页）
 - wz2.pdf（古籍夹注本，783页）
+- wz6.pdf（竖排繁体书《毛泽东选集》第二卷，231页）
 - 优化前.pdf（现代简单）
 - 优化前2.pdf（现代多级标题）
 - 论文/合同/标书样本（待收集）
@@ -172,27 +208,32 @@
 ### 渲染层
 | 组件 | 版本 | 用途 |
 |---|---|---|
-| xelatex | TeX Live | PDF 渲染引擎 |
+| xelatex | TeX Live | PDF 渲染引擎（横排：geom/classic） |
 | xeCJK | - | CJK 字体/标点处理 |
 | Noto Serif CJK JP | - | CJK 主字体 |
 | Noto Sans CJK JP | - | heiti 标题字体 |
-| eso-pic | - | shipout 叠加（aside/页码/图） |
+| eso-pic | - | shipout 叠加（aside/页码/图/版框） |
 | graphicx | - | 图片插入 |
+| **upLaTeX + tarticle** | TeX Live | **竖排引擎链**（tarticle 默认 tate；upLaTeX = Unicode 汉字编码，pTeX 会丢繁体字；JY1/JT1 报错修法见 [vertical/01_engine.md](vertical/01_engine.md)） |
+| **pxchfon[unicode]** | - | 竖排字体选择（`\setminchofont[3]` = NotoSerifCJK ttc 的 TC 子字体） |
+| **dvipdfmx** | - | upLaTeX DVI → PDF |
 
 ### 数据处理
 | 组件 | 版本 | 用途 |
 |---|---|---|
 | Python | 3.10 | 主语言 |
-| PyMuPDF (fitz) | - | PDF 读取/渲染/裁图/测量 |
+| PyMuPDF (fitz) | - | PDF 读取/渲染/裁图/测量/ span+矢量 bbox 越界检查 |
 | Pillow (PIL) | - | 图片裁剪 |
+| numpy + scipy.ndimage | - | 竖排源图墨迹连通组件（书眉/页码/边注/版框/旋转页标定） |
 | statistics | stdlib | 中位数/方差（几何标定） |
 | re | stdlib | 正则（校注标记/序号/页码） |
 
 ### 测试
 | 组件 | 用途 |
 |---|---|
-| verify_geom.py | 通用排版测试（pitch/占位/溢出/空白） |
-| fitz get_text | 输出 PDF 行级 bbox 测量 |
+| verify_geom.py | 横排排版测试（pitch/占位/溢出/空白） |
+| verify_vert.py | 竖排验证（页数 1:1/逐页字符量/越界/页幅/pass-fail 退出码） |
+| fitz get_text | 输出 PDF 行级 bbox 测量（dict/rawdict：rawdict 的 span 无 text 键，逐 span 取字用 dict） |
 
 ### 环境
 | 组件 | 版本 | 说明 |
@@ -211,6 +252,7 @@
 │   ├── pipelines/                 # 排版管线
 │   │   ├── build_classic.py       # 古籍管线
 │   │   ├── build_geom.py          # 现代书籍管线
+│   │   ├── build_vert.py          # 竖排书管线（upLaTeX + tarticle）
 │   │   ├── build_paper.py         # 论文管线（待建）
 │   │   ├── build_contract.py      # 合同管线（待建）
 │   │   └── build_bid.py           # 标书管线（待建）
@@ -221,7 +263,8 @@
 │   ├── ocr/                       # OCR 数据生成
 │   │   └── run_spotting_ocr.py
 │   ├── test/                      # 测试
-│   │   └── verify_geom.py
+│   │   ├── verify_geom.py         # 横排验证（pitch/占位/溢出/缺页）
+│   │   └── verify_vert.py         # 竖排验证（页数1:1/字符量/越界）
 │   └── utils/                     # 共享工具（待抽取）
 │       ├── esc.py                 # 文字转义
 │       ├── geometry.py            # 几何标定
@@ -240,7 +283,8 @@
 │   ├── 00_system_architecture.md  # 总 Spec
 │   ├── README.md                  # 索引
 │   ├── ancient/                   # 古籍分部（01-08_*.md）
-│   ├── modern/                    # 现代分部（待写）
+│   ├── modern/                    # 现代分部（footnote/header_pagenum/heading/toc）
+│   ├── vertical/                  # 竖排分部（engine/tate_layout/marginalia/frame_lines/pagenum_sequence/derot）
 │   └── ...
 ├── output/                        # 输出 PDF
 │   ├── 成果_wz1_rerun8_lay.pdf

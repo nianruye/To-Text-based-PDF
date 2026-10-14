@@ -26,6 +26,7 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot）；验证脚本 `src/test/verify_vert.py` |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
@@ -68,6 +69,12 @@
 | **aside** | 边栏旁注（aside_text），竖排 shortstack 渲染 |
 | **verify_geom** | 全局排版测试（pitch/占位/溢出/空白/页数） |
 | **test_cases** | 功能断言测试（具体页 + 具体断言，防回归） |
+| **tate** | 竖排模式（`tarticle.cls` 默认）；`\textwidth`=列高、`\textheight`=列区横向容量 |
+| **列距** | 竖排相邻列的横向间距 = `\fontsize` 第二参数（baselineskip）；源侧 = 相邻列 x0 差中位（wz6 ≈47.6pt） |
+| **界行线** | 版框内列间的 1pt 细竖线（源书 12 格 = 13 条等距栅格，列距 43.5pt） |
+| **书眉 / 页码 / 边注** | 竖排的边缘小字：订口侧框外篇名 / 汉字数码页码 / 版心外注文（`*` 开头为题注），eso-pic `\put` 逐字绝对定位 |
+| **derot** | OCR 返回「旋转坐标系」页（整页逆时针 90°）的还原，见 [vertical/06_derot.md](vertical/06_derot.md) |
+| **verify_vert** | 竖排验证脚本（页数 1:1 / 逐页字符量 / 越界 / PASS-FAIL 退出码），对标横排 `verify_geom` |
 
 ## 总 Spec
 - [00_system_architecture.md](00_system_architecture.md) - 系统总体架构（目标/类型/路由/共享基础/技术栈/目录结构/可扩展性）
@@ -78,6 +85,7 @@
 |---|---|---|---|
 | 古籍 | [ancient/](ancient/) | ✅ 已实现 | CJK 墨高重叠、夹注本双规制、旁注竖排、校注标记 |
 | 现代书籍 | [modern/](modern/) | ✅ 已实现 | 段落缩进、脚注、页眉页码、标题层级、目录页 |
+| 竖排书 | [vertical/](vertical/) | ✅ 已实现 | 列流右起、tate 引擎链、书眉/页码/边注、版框线、页码序列、旋转页还原 |
 | 论文 | [paper/](paper/) | 🔜 待建 | 公式、表格、图表标题、参考文献 |
 | 合同 | [contract/](contract/) | 🔜 待建 | 条款编号、签章区域、固定格式 |
 | 标书 | [bid/](bid/) | 🔜 待建 | 复杂表格、多层目录、附件 |
@@ -99,6 +107,7 @@
 |---|---|---|---|
 | 古籍 | 墨高重叠、夹注、旁注 | `src/pipelines/build_classic.py` | 783页 pitch 59.1% 0溢出 |
 | 现代书籍 | 段落、脚注、标题 | `src/pipelines/build_geom.py` | 222页 pitch 95% 0溢出 |
+| 竖排书 | 列流右起、版框线、边注 | `src/pipelines/build_vert.py` | 231页 1:1 字符量97.2% 越界0 |
 
 ## 运行命令
 
@@ -110,6 +119,15 @@ cd /opt/test && LAYJSON="data/wz2/wz2.pdf_by_PaddleOCR-VL-1.6.json" PAGE_FONT=1 
 # 现代书籍（wz1）
 cd /opt/test && LAYJSON="data/wz1/wz1.pdf_by_PaddleOCR-VL-1.6 .json" PER_PAGE_PITCH=1 PAGENUM_GLOBAL_TABLE=data/wz1/wz1_full_pagenum.json \
   python3 src/calibration/fit_positional.py data/wz1/wz1_spotting_lines.json data/wz1/wz1_spotting_coords.json output/out.pdf source_pdf/wz1.pdf
+
+# 竖排（wz6，繁体竖排书）
+cd /opt/test && /usr/bin/python3 src/pipelines/build_vert.py \
+  data/wz6/wz6_spotting_lines.json data/wz6/wz6_spotting_coords.json \
+  output/wz6/wz6_vert_full.pdf source_pdf/wz6.pdf
+
+# 竖排验证（页数1:1 / 逐页字符量 / 越界 / PASS-FAIL 退出码）
+/usr/bin/python3 src/test/verify_vert.py output/wz6/wz6_vert_full.pdf \
+  data/wz6/wz6_spotting_coords.json data/wz6/wz6_spotting_lines.json --src-pdf source_pdf/wz6.pdf
 
 # 测试
 python3 src/test/test_cases.py output/成果_wz2_classic_latest.pdf
