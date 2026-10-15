@@ -38,6 +38,87 @@ os.makedirs(TMP, exist_ok=True)
 sl = json.load(open(SL)); co = json.load(open(CO))
 keys = sorted(sl.keys(), key=int)
 
+# ---------- 0.5) 纸型基准(纸型无关化 taskN) ----------
+# 背景(taskN): §1/§1.8/§1.9/§1.95/§1.98 里有一批判据是**在 wz6 纸型上实测的绝对量** —— 2x px
+#   (1100px = 550pt)或 pt 区间 —— 只对 595.3x1245.3pt 的开本成立, 换书(开本/字号/列数不同)必失准。
+#   本轮把这批量改成「相对页幅/内框」:
+#     ① 页幅基准 PW_PX/PH_PX: 优先源 PDF 页幅 x2(精确); 无源 PDF 时退化为 OCR 盒并集高分位
+#        (内容不到纸缘 -> 偏小, 日志明示; 该模式下 §1.8/§1.9 本就不渲染, 相对判据只用于正文筛选)。
+#     ② 门限 = **wz6 原值 ÷ wz6 页幅** 的比例 x 本页幅(等价换算: wz6 上反算回原值, 偏差 0);
+#        每个比例可用 VERT_* env 覆盖(别的书要人工微调时用)。换算基准见下方 _WZ6_*。
+#     ③ 有实测内框的书: §1.96a 再用「内框缘」取并集(书眉/页码 = 框外 **或** 页边带内),
+#        无版框书(wz7 类)自动退化为纯页幅比例 —— 版框检测不出时不误检、不崩溃。
+PT_PER_PX = 2.0                     # OCR 坐标 = 2x px(144dpi); pt = px/2 (§0 管线注)
+_WZ6_PW, _WZ6_PH = 1190.6, 2490.6   # wz6 页幅(2x px) = 所有「原绝对值」的换算基准
+# 页面尺寸: 从 src.pdf 精确取(pt)
+page_w = 595.3; page_h = 1244.1
+src_doc = None
+if SRC:
+    import fitz
+    d = fitz.open(SRC)
+    page_w = round(d[0].rect.width, 1); page_h = round(d[0].rect.height, 1)
+    src_doc = d
+
+def _page_px_fallback():
+    """无源 PDF 时的页幅估计: OCR 盒并集的高分位(内容不贴纸缘 -> 偏小; 只用于比例换算)"""
+    xs = sorted(q[0] for k in keys for p in co.get(k, []) or [] for q in p)
+    ys = sorted(q[1] for k in keys for p in co.get(k, []) or [] for q in p)
+    if not xs or not ys: return _WZ6_PW, _WZ6_PH
+    return xs[int(0.995 * (len(xs) - 1))], ys[int(0.995 * (len(ys) - 1))]
+
+if src_doc is not None:
+    PW_PX, PH_PX = round(page_w * PT_PER_PX, 1), round(page_h * PT_PER_PX, 1)
+    _pw_src = '源PDF'
+else:
+    PW_PX, PH_PX = _page_px_fallback()
+    _pw_src = 'OCR盒p99.5(无源PDF, 偏小)'
+PW_PX, PH_PX = float(PW_PX), float(PH_PX)
+
+def _frac(env_name, wz6_px, base_px):
+    """wz6 绝对 px -> 比例(除以 wz6 页幅基准); env 显式给比例则优先。"""
+    v = os.environ.get(env_name)
+    return float(v) if v else wz6_px / base_px
+
+def _sc(frac, axis='w'):
+    """比例 -> 本页幅上的 px 门限。3 位取整: 「比例 x 页幅」的浮点残差(~1e-13)不得把门限推过
+    整数 px 边界(否则 x0=1100 这类边界行的分类会翻转) —— wz6 上反算值与原值逐位相同。"""
+    cur = PW_PX if axis == 'w' else PH_PX
+    return round(frac * cur, 3)
+
+_WZ6_PW_PT, _WZ6_PH_PT = 595.3, 1245.3   # wz6 页幅(pt) = pt 类绝对量(版框几何区间)的换算基准
+def _envfrac(name, frac):
+    """env 给**比例**(相对页宽/页高)时优先, 否则用 wz6 换算出来的比例"""
+    v = os.environ.get(name)
+    return float(v) if v else frac
+def _sc_pt(frac, axis='w'):
+    """比例 -> 本页幅上的 pt 门限(3 位取整, 同 _sc)"""
+    cur = page_w if axis == 'w' else page_h
+    return round(frac * cur, 3)
+def _fp(v_wz6_pt, axis='w'):
+    """wz6 绝对 pt -> 本页同名量(pt), 按页幅比例"""
+    return v_wz6_pt / (_WZ6_PW_PT if axis == 'w' else _WZ6_PH_PT)
+
+def _band_union(band_r_px, band_l_px, in_l_pt, in_r_pt):
+    """页边带并上「实测内框缘」(pt 入参, px 出参)。判据 = 「在版心框外 **或** 在页幅边带内」,
+    故门限取更靠内的那一侧: 右带起点 = min(页幅带, 内框右缘), 左带终点 = max(页幅带, 内框左缘)。
+    wz6 实测: 内框右缘 567.8pt(=1135.6px) > 页幅带 1100px、左缘 45.5pt(=91.0px) < 100px
+      -> 两翼都不生效(分类与原绝对量逐条相同)。"""
+    return (round(min(band_r_px, in_r_pt * 2.0), 3), round(max(band_l_px, in_l_pt * 2.0), 3))
+
+# 页边带 / 长行 / 左边注小字 门限(wz6 原值 -> 页幅比例; env 可覆盖比例)
+EDGE_R_FRAC = _frac('VERT_BAND_R_FRAC', 1100.0, _WZ6_PW)     # 右页边带起点 = 页宽 x 该比例
+EDGE_L_FRAC = _frac('VERT_BAND_L_FRAC', 100.0, _WZ6_PW)      # 左页边带终点 = 页宽 x 该比例
+LONG_H_FRAC = _frac('VERT_LONG_H_FRAC', 300.0, _WZ6_PH)      # 「长行(正文列)」下限 = 页高 x 该比例
+SMALL_FS_FRAC = _frac('VERT_SMALL_FS_FRAC', 55.0, _WZ6_PH)   # 左边注小字步进上限 = 页高 x 该比例
+BAND_R_PX = _sc(EDGE_R_FRAC, 'w')
+BAND_L_PX = _sc(EDGE_L_FRAC, 'w')
+LONG_H_PX = _sc(LONG_H_FRAC, 'h')
+SMALL_FS_PX = _sc(SMALL_FS_FRAC, 'h')
+print('[纸型基准] 页幅 %.1f x %.1f px(2x)=%.1f x %.1f pt [%s]; 页边带 x0>%.1f / x1<%.1f; '
+      '长行 h>=%.1f; 左边注小字步进<%.1f (px, 相对化: 原 wz6 %.0f/%.0f/%.0f/%.0f)' % (
+          PW_PX, PH_PX, PW_PX / 2.0, PH_PX / 2.0, _pw_src, BAND_R_PX, BAND_L_PX,
+          LONG_H_PX, SMALL_FS_PX, 1100.0, 100.0, 300.0, 55.0))
+
 # ---------- 1.0) 挤格标点(任务A: 竖排标点挤格不占格) ----------
 # 源书实测(逐字墨迹反推, 探针 tmp_vert/ascii_ink.py + col_gaps.py, wz6 p10):
 #   句号/逗号挤在**前一字格的右下区**, 下一字仍在「前字格顶 + 1 格」-> 标点不占格。
@@ -423,14 +504,17 @@ else:
 all_rows = {k: col_stats(k) for k in keys}
 
 def is_body_col(x0, x1, y0, y1, t):
-    """v1.1 列分类(wz6 规则): 正文/标题进流; 书眉/页码(x0>1100 且短)与左侧小字边注(x0<100 且小字号)排除"""
+    """v1.1 列分类: 正文/标题进流; 书眉/页码(右页边带内的短行)与左侧小字边注(左页边带内的小字号)排除。
+    门限全部是**相对量**(§0.5): 页边带 = 页宽比例(有实测内框时 §1.96a 再并上内框缘), 长行 = 页高比例,
+    小字 = 页高比例 —— wz6 上与原绝对量(1100/100/300/55 px)数值相同。"""
     h = y1 - y0; L = len(t)
     if '\n' in t: return False      # 竖排列 = 单行; 含换行的 OCR 框是多块合并的残片(全书 7 条:
                                     #   p74 图表图例 194 字/p156 注码列/p97·p159·p199·p223 版心「第二卷·抗日戰爭時期」
                                     #   /p90 二天大) —— 当正文排会撑出整页(实测 p74 因此在 231 页里多出 1 页)
-    if h < 300 or L < 2: return False
-    if x0 > 1100 and h < 300: return False       # 书眉/页码(最右列短行)
-    if x0 < 100 and h / L < 55: return False      # 左侧小字边注
+    if h < LONG_H_PX or L < 2: return False
+    if x0 > BAND_R_PX and h < LONG_H_PX: return False   # 书眉/页码(右页边带内的短行; 长行判据已在前一条
+                                    #   返回, 故本支实际不可达 —— 保留以维持原判据的字面结构)
+    if x0 < BAND_L_PX and h / L < SMALL_FS_PX: return False      # 左侧小字边注
     return True
 
 # 正文列统计(is_body_col 过滤)
@@ -472,17 +556,41 @@ TW_pt = HCOL                       # textwidth = 列高
 TH_pt = round(NCOL*PITCH + 12, 1)  # textheight = 列区横向容量(最大列数×列距+余量)
 TM_pt = round(TTOP - 102, 1)       # topmargin = 天头-102
 OM_pt = round(RIGHT_p - TH_pt - 70, 1)  # 右缘定位拟合: 右缘 = 70 + om + textheight (e10c/exp13/bv 三点回归)
-page_w = 595.3; page_h = 1244.1
-src_doc = None
-# 页面尺寸: 从 src.pdf 精确取
-if SRC:
-    import fitz
-    d = fitz.open(SRC)
-    page_w = round(d[0].rect.width, 1); page_h = round(d[0].rect.height, 1)
-    src_doc = d
+# 页面尺寸/源文档句柄: §0.5 已取(纸型基准需要先用)
 
 print('[竖排拟合] 字号%.1fpt 列距%.1fpt 列高%.1fpt 天头%.1fpt 右缘%.1fpt 列数%d 页%.1f×%.1f' % (
     FS, PITCH, HCOL, TTOP, RIGHT_p, NCOL, page_w, page_h))
+
+# ---------- 1.05) 小字/碎片判据的相对量(纸型无关化 taskN) ----------
+# 下列常数原是 wz6 的 2x px 绝对量(边缘小字组件的尺寸窗/窗口大小/碎片容差), 与开本和字号绑定。
+#   本轮改为**相对 OCR 正文字步进 FS_px**(同一本书里「小字组件」相对正文的量级关系才是稳定的):
+#     ink_extent 窗口 ±70/±250px   = 1.0175 / 3.6339 x FS_px
+#     组件窗 宽 4-40 高 5-90 px    = 0.0581-0.5814 / 0.0727-1.3082 x FS_px; 面积 >=40px² = 0.00845 x FS_px²
+#     碎片判据 x 重叠容差 24px     = 0.3488 x FS_px
+#     note_rows 步进下限 15px      = 0.2180 x FS_px(挡 OCR 噪声页)
+#   round() 后 wz6 上与原整数门限逐项相同(比例 x FS_px ≈ 原值 ±1e-3, 取整回原值)。
+#   注意: FS_px 是**正文**步进中位; 边缘小字本身更小, 用正文步进当基准是有意为之(见 spec 09 §8.2)。
+_FS_WZ6 = 68.796      # wz6 正文字步进中位(2x px) = 换算基准(实测值, 见 docs/vert_paper_agnostic_report.md)
+def _fsf(v_wz6, env=None):
+    """wz6 绝对 px -> 按「正文字步进」比例换算到本书(px, 取整)。env 显式给比例时优先。"""
+    f = float(os.environ[env]) if (env and os.environ.get(env)) else v_wz6 / _FS_WZ6
+    return max(1, int(round(f * FS_px)))
+
+FRAG_OVL_PX = _fsf(24.0, 'VERT_FRAG_OVL_FRAC')         # 碎片判据 x 重叠容差(special_rows)
+NOTE_STEP_MIN = _fsf(15.0, 'VERT_NOTE_STEP_MIN_FRAC')  # 边注步进下限(note_rows; 挡 OCR 噪声页: p231 残片 1.1px)
+NOTE_LX_TOL_PX = _fsf(2.0, 'VERT_NOTE_LX_TOL_FRAC')    # 边注「在版心左缘外」的容差(note_rows: x1 <= 版心左缘+2)
+ZONE_PAD_MIN_PX = _fsf(8.0, 'VERT_ZONE_PAD_MIN_FRAC')  # 边注区带最小外扩(note_cols: max(8, 0.6x步进))
+INK_WIN_X = _fsf(70.0, 'VERT_INK_WIN_X_FRAC')          # 边缘小字窗口 x 半宽(ink_extent)
+INK_WIN_Y = _fsf(250.0, 'VERT_INK_WIN_Y_FRAC')         # 边缘小字窗口 y 半宽(ink_extent)
+INK_CW_LO = _fsf(4.0, 'VERT_INK_CW_LO_FRAC')           # 组件宽下限
+INK_CW_HI = _fsf(40.0, 'VERT_INK_CW_HI_FRAC')          # 组件宽上限
+INK_CH_LO = _fsf(5.0, 'VERT_INK_CH_LO_FRAC')           # 组件高下限
+INK_CH_HI = _fsf(90.0, 'VERT_INK_CH_HI_FRAC')          # 组件高上限
+INK_AREA = max(1, int(round(40.0 / _FS_WZ6 ** 2 * FS_px ** 2)))   # 组件面积下限(px²)
+print('[小字判据] 正文字步进 %.3f px; 小字窗口 ±%d x ±%d; 组件 宽%d-%d 高%d-%d 面积>=%d px²; '
+      '碎片容差 %d px; 边注步进下限 %d px (wz6 原值 70/250/4/40/5/90/40/24/15)' % (
+          FS_px, INK_WIN_X, INK_WIN_Y, INK_CW_LO, INK_CW_HI, INK_CH_LO, INK_CH_HI,
+          INK_AREA, FRAG_OVL_PX, NOTE_STEP_MIN))
 
 # ---------- 1.8) 书眉/页码(边缘小字) ----------
 # 要点(实测, 勿凭直觉):
@@ -496,16 +604,17 @@ Y_CAL = 0.0    # \put y 标定: 实测 put y = 字墨迹底(baseline); 渲染后
 
 def special_rows(k):
     """边缘小字行 -> [(kind, text, x0,x1,y0,y1)] px。kind: 'pn'=页码(纯数字/汉字数字) 'hd'=书眉。
-    过滤: 长行(h>=300)/超长文本(>10字)/不在左右边缘; 且剔除「被更长同行竖向包含」的碎片(边注列断行)"""
+    过滤: 长行(h>=页高比例)/超长文本(>10字)/不在左右页边带; 且剔除「被更长同行竖向包含」的碎片(边注列断行)。
+    门限相对量见 §0.5(BAND_R_PX/BAND_L_PX/LONG_H_PX; wz6 上 = 1100/100/300 px)。"""
     rows = all_rows[k]; out = []
     for r in rows:
         x0, x1, y0, y1, t = r
-        if y1 - y0 >= 300 or not (2 <= len(t) <= 10): continue
-        if not (x0 > 1100 or x1 < 100): continue
+        if y1 - y0 >= LONG_H_PX or not (2 <= len(t) <= 10): continue
+        if not (x0 > BAND_R_PX or x1 < BAND_L_PX): continue
         frag = False
         for o in rows:
             if o is r: continue
-            if o[2] <= y0 and y1 <= o[3] and (o[3] - o[2]) > (y1 - y0) and min(x1, o[1]) - max(x0, o[0]) > -24:
+            if o[2] <= y0 and y1 <= o[3] and (o[3] - o[2]) > (y1 - y0) and min(x1, o[1]) - max(x0, o[0]) > -FRAG_OVL_PX:
                 frag = True; break
         if frag: continue      # 边注/正文长列里的断行碎片, 非书眉页码
         kind = 'pn' if all(c in NUM_CHARS for c in t) else 'hd'
@@ -525,20 +634,21 @@ def src_gray(pi):
 
 def ink_extent(pi, x0, x1, y0, y1, others, floor=None):
     """源页墨迹实测: OCR 行邻域内小字组件的并集 bbox(px)。OCR bbox 对边缘小字不可靠(偏 18-180px)。
-    门限: 宽 4-40px(版框线/正文字更宽)、高 5-90px(版框线更高)、不贴窗口边缘(裁剪碎片丢弃)、
-          且 y 中心不落在同页其它特殊行的 OCR 区间内(p7 第二卷/抗日戰争時期 紧邻, 靠此分离)。"""
+    门限(相对量, §1.05): 宽 INK_CW_LO-HI(版框线/正文字更宽)、高 INK_CH_LO-HI(版框线更高)、
+          面积>=INK_AREA、不贴窗口边缘(裁剪碎片丢弃)、且 y 中心不落在同页其它特殊行的 OCR 区间内
+          (p7 第二卷/抗日戰争時期 紧邻, 靠此分离)。wz6 上 = 宽 4-40 / 高 5-90 / 面积 40px²。"""
     from scipy import ndimage
     a = src_gray(pi); H, W = a.shape
     cx = int((x0 + x1) // 2)
-    wx0, wx1 = int(max(0, cx - 70)), int(min(W, cx + 70))
-    wy0, wy1 = int(max(0, y0 - 250)), int(min(H, y1 + 250))
+    wx0, wx1 = int(max(0, cx - INK_WIN_X)), int(min(W, cx + INK_WIN_X))
+    wy0, wy1 = int(max(0, y0 - INK_WIN_Y)), int(min(H, y1 + INK_WIN_Y))
     if wx1 <= wx0 or wy1 <= wy0: return None    # OCR 行 bbox 越出页面时窗口为空(全书跑实测 p159 触发)
     lab, n = ndimage.label(a[wy0:wy1, wx0:wx1] < 185)
     cs = []
     for i, s in enumerate(ndimage.find_objects(lab), 1):
         h = s[0].stop - s[0].start; w = s[1].stop - s[1].start
-        if (lab[s] == i).sum() < 40: continue
-        if not (4 <= w <= 40 and 5 <= h <= 90): continue
+        if (lab[s] == i).sum() < INK_AREA: continue
+        if not (INK_CW_LO <= w <= INK_CW_HI and INK_CH_LO <= h <= INK_CH_HI): continue
         ya, yb, xa, xb = wy0 + s[0].start, wy0 + s[0].stop, wx0 + s[1].start, wx0 + s[1].stop
         if xa <= wx0 + 1 or xb >= wx1 - 1 or ya <= wy0 + 1 or yb >= wy1 - 1: continue   # 贴边=裁剪碎片
         cy = (ya + yb) / 2.0
@@ -592,10 +702,51 @@ def special_tex(k, pi):
 #   (如 p4: "*這是毛澤東同志一九三八年五月二十六日至六月三日在延安抗日戰爭研究會上" x54-104,
 #    续列 "的講演" x12-60 在左; 源图 x 12-104 为版框内的注栏, 正文列从 x119 起)。
 # v1 的 is_body_col 只把它"排除出正文"(不渲染); 本段按墨迹实测定坐落位与字号。
-# 判据(全书盘点见 tmp_vert/survey_note2.py): 未被书眉/页码认领 且 步进 ∈ [15, 0.85*正文字步进)
-#   且 (版心外: x0<100 且 x1 <= 最左正文列x0+2) 或 (* 开头的题注列)。
-NOTE_STEP_RATIO = float(os.environ.get('VERT_NOTE_STEP_RATIO') or 0.85)   # 边注/正文 步进比上限
-NOTE_STEP_MIN = 15.0        # 步进下限 px(挡 OCR 噪声页: p231 尾部 JSON 残片 步进 1.1px)
+# 判据(全书盘点见 tmp_vert/survey_note2.py): 未被书眉/页码认领 且 步进 ∈ [NOTE_STEP_MIN, NOTE_STEP_RATIO
+#   x 正文字步进) 且 (版心外: x0<左页边带终点 且 x1 <= 最左正文列x0+2) 或 (* 开头的题注列)。
+# 步进门限全部相对化(§0.5/§1.05): 下限 = 0.218 x FS_px; 上限比 self-calibrated(见 §1.85)。
+def _calib_note_ratio(ratios, fallback=0.85):
+    """边注/正文 步进比样本 -> (上限值 或 None, 依据)。样本不足返回 (None, 原因) -> 调用方留兜底。
+    口径(taskN, 与 §1.954 线宽同思路 —— **找实测分布里的空档**):
+      ① 取比值中位以上的样本, 找它们的**最大间隙**(注簇上缘 -> 正文簇下缘);
+      ② 上限 = 空档中点, 夹在 [0.5, 0.95](必须 < 1: 正文列的步进 ≈ FS_px; 下限挡噪声);
+      ③ 空档太窄(<0.08, 说明注/正文在比值上连续, 分割不可靠)或样本不足 -> 不标定;
+      ④ **兜底值若落在同一空档内(分类结果必然相同), 保留兜底值** —— 值面零漂移。
+    wz6 实测: 206 条比值 ∈ [0.004, 1.068], 中位 0.549, 注簇上缘 0.833, 正文簇 1.068,
+      空档 (0.833, 1.068) 含兜底 0.85 -> 保留 0.85(与原常数分类逐条相同)。"""
+    if len(ratios) < 8: return None, '样本 %d 条(需 >=8)' % len(ratios)
+    rs = sorted(ratios)
+    p50 = rs[len(rs) // 2]
+    gap, lo_, hi_ = 0.0, p50, rs[-1]
+    prev = p50
+    for v in rs:
+        if v <= p50: continue
+        if v - prev > gap: gap, lo_, hi_ = v - prev, prev, v
+        prev = v
+    if gap < 0.08:
+        return None, '最大空档仅 %.3f(注/正文在比值上连续)' % gap
+    if lo_ < fallback <= hi_:
+        return fallback, '兜底 %.2f 落在空档 (%.3f, %.3f) 内 -> 保留' % (fallback, lo_, hi_)
+    return round(min(0.95, max(0.5, (lo_ + hi_) / 2.0)), 3), '空档 (%.3f, %.3f) 中点' % (lo_, hi_)
+
+_nr_env = os.environ.get('VERT_NOTE_STEP_RATIO')
+if _nr_env:
+    NOTE_STEP_RATIO = float(_nr_env)
+else:
+    _nr_rs = []
+    for _k in keys:                                    # 左页边带内的短行(排除书眉/页码认领的)
+        _claim = set((c[2], c[3], c[4], c[5], c[1]) for c in special_rows(_k))
+        for _r in all_rows[_k]:
+            if len(_r[4]) < 2 or (_r[3] - _r[2]) >= LONG_H_PX or _r in _claim: continue
+            if _r[0] < BAND_L_PX or _r[4].startswith('*'):
+                _nr_rs.append(((_r[3] - _r[2]) / float(len(_r[4]))) / FS_px)
+    _nr_v, _nr_why = _calib_note_ratio(_nr_rs)
+    NOTE_STEP_RATIO = _nr_v if _nr_v else 0.85         # 兜底 0.85(= wz6 原常数)
+    _nrs = sorted(_nr_rs)
+    print('[标定·边注] 步进比上限: 样本 %d 条 中位 %.3f p95 %.3f max %.3f -> %.3f (%s, 兜底 0.85; env VERT_NOTE_STEP_RATIO)' % (
+        len(_nrs), _nrs[len(_nrs) // 2] if _nrs else 0,
+        _nrs[min(len(_nrs) - 1, int(0.95 * len(_nrs)))] if _nrs else 0,
+        _nrs[-1] if _nrs else 0, NOTE_STEP_RATIO, _nr_why))
 NOTE_INK_RATIO = float(os.environ.get('VERT_NOTE_INK_RATIO') or 0.88)   # 单字墨高/字号(中位口径; §1.956 按当前字体标定)
 # taskK-C 字号保护: 注释/页外小字按「中位墨高」定字号, 但满字(講/國/戰 这类占满字身的字)真实墨高
 #   可达 0.94 em —— 注释步进本来就紧(源书 墨高/步进 ≈ 0.95, 实测 p4 注 步进 20.5 而 字高 19.0),
@@ -615,7 +766,7 @@ def note_rows(k):
         if len(t) < 2 or (x0, x1, y0, y1, t) in claimed: continue
         step = (y1 - y0) / float(len(t))
         if not (NOTE_STEP_MIN <= step < NOTE_STEP_RATIO * FS_px): continue
-        if (x0 < 100 and x1 <= lx + 2) or t.startswith('*'):
+        if (x0 < BAND_L_PX and x1 <= lx + NOTE_LX_TOL_PX) or t.startswith('*'):
             out.append(r)
     return out
 
@@ -632,13 +783,13 @@ def note_cols(pi, k, rows=None, zone=None, zone_y=None):
     if not rows: return []
     steps = sorted((r[3] - r[2]) / float(len(r[4])) for r in rows)
     step = steps[len(steps) // 2]
-    m = int(max(8, step * 0.6))
+    m = int(max(ZONE_PAD_MIN_PX, step * 0.6))
     if zone is None:
         lx = min([r[0] for r in all_rows[k] if is_body_col(*r)], default=0)
         zx0 = 10 ** 9; zx1 = -1
         for x0, x1, y0, y1, t in rows:
-            if x0 < 100:                               # 左缘注列: 整条左白边(到版心左缘)
-                a_, b_ = 0, lx + 2
+            if x0 < BAND_L_PX:                         # 左缘注列: 整条左白边(到版心左缘)
+                a_, b_ = 0, lx + NOTE_LX_TOL_PX
             else:                                      # * 题注列(页中): 自身 x 带
                 a_, b_ = x0 - m, x1 + m
             zx0 = min(zx0, a_); zx1 = max(zx1, b_)
@@ -807,16 +958,38 @@ for p, t, v, nv in PN_LOG:
 #   外粗线 = 组厚 >= V_THICK_MIN 且落在内细线外侧 12pt 内(源书 2.5-4.0pt, 内框/界行线 0.5-1.5pt);
 #   渲染: eso-pic 带星版 + \put + \rule(探针 tmp_vert/probe_rule.py 实测: tate 下 \rule 尺寸不旋转,
 #   \put 参考点 = rule 左下角, 原点 = 页真左下角, 坐标 1:1 用源书 pt)。
+# 判据类常数(尺度无关, 本轮不改 —— 扫描淡墨质量/墨色阈值, 换书风险低): V_LINE_COV / V_LINE_COV_LO / V_H_COV
 V_FRAME = os.environ.get('VERT_FRAME', '1') not in ('0', 'false', 'False') and src_doc is not None
 V_LINE_COV = float(os.environ.get('VERT_LINE_COV', 0.55))
 V_LINE_COV_LO = float(os.environ.get('VERT_LINE_COV_LO', 0.30))   # 淡界行线兜底阈值(见 §1.95b)
 V_H_COV = float(os.environ.get('VERT_H_COV', 0.45))   # 横线判据: 实测源书横线 0.58-0.99, 正文行 <=0.30
-V_THICK_MIN = 2.4      # 粗线判据(pt)
+# 版框「几何合法性区间」(纸型无关化 taskN): 原为 wz6 绝对值 —— 内框高 700-900pt / 内框宽 400-640pt /
+#   列距枚举 40-48pt / 栅格跨度窗 400-640pt / 精修列距 35-52pt —— 全部改成**页幅比例**(§0.5 换算基准),
+#   wz6 上反算回原值(偏差 0)。env 可用 VERT_*_FRAC 给比例覆盖。
+V_INH_LO = _sc_pt(_envfrac('VERT_INH_LO_FRAC', _fp(700.0, 'h')), 'h')     # 内框高下限(原 700pt)
+V_INH_HI = _sc_pt(_envfrac('VERT_INH_HI_FRAC', _fp(900.0, 'h')), 'h')     # 内框高上限(原 900pt)
+V_INW_LO = _sc_pt(_envfrac('VERT_INW_LO_FRAC', _fp(400.0, 'w')), 'w')     # 内框宽下限(原 400pt)
+V_INW_HI = _sc_pt(_envfrac('VERT_INW_HI_FRAC', _fp(640.0, 'w')), 'w')     # 内框宽上限(原 640pt;
+#   注: 原值 640pt 比 wz6 页宽 595.3pt 还大 -> 该上界在 wz6 上**从未生效**, 相对化后同样不生效)
+V_GRID_P_LO = _sc_pt(_envfrac('VERT_GRID_P_LO_FRAC', _fp(40.0, 'w')), 'w')   # 栅格枚举列距下限(原 40pt)
+V_GRID_P_HI = _sc_pt(_envfrac('VERT_GRID_P_HI_FRAC', _fp(48.0, 'w')), 'w')   #   上限(原 48pt)
+V_GRID_SPAN_LO = _sc_pt(_envfrac('VERT_GRID_SPAN_LO_FRAC', _fp(400.0, 'w')), 'w')  # 13 线窗跨度下限(原 400pt)
+V_GRID_SPAN_HI = _sc_pt(_envfrac('VERT_GRID_SPAN_HI_FRAC', _fp(640.0, 'w')), 'w')  #   上限(原 640pt, 同 V_INW_HI 未生效)
+V_GRID_P_REF_LO = _sc_pt(_envfrac('VERT_GRID_P_REF_LO_FRAC', _fp(35.0, 'w')), 'w')  # 精修列距夹取(原 35pt)
+V_GRID_P_REF_HI = _sc_pt(_envfrac('VERT_GRID_P_REF_HI_FRAC', _fp(52.0, 'w')), 'w')  #   上限(原 52pt)
+V_PITCH_MIN = _sc_pt(_envfrac('VERT_PITCH_MIN_FRAC', _fp(8.0, 'w')), 'w')     # 「列距有效」下限(原 8pt)
+V_P_LO = _sc_pt(_envfrac('VERT_P_LO_FRAC', _fp(36.0, 'w')), 'w')     # _grid_from_bands 列距窗(原 36pt)
+V_P_HI = _sc_pt(_envfrac('VERT_P_HI_FRAC', _fp(50.0, 'w')), 'w')     #   上限(原 50pt)
+V_BAND_SP_LO = _sc_pt(_envfrac('VERT_BAND_SP_LO_FRAC', _fp(20.0, 'w')), 'w')   # 列带中心间距窗(原 20pt)
+V_BAND_SP_HI = _sc_pt(_envfrac('VERT_BAND_SP_HI_FRAC', _fp(100.0, 'w')), 'w')  #   上限(原 100pt)
+# 线宽判据(粗细分界 + 外粗线缺测兜底): 原为 wz6 实测常数(2.4/6.5pt, 兜底 3.2/3.4pt) ——
+#   本轮改由 §1.954 从**实测线宽分布**自定(见该节); 这里的值 = **兜底/对账基准**。
+V_THICK_MIN = 2.4      # 粗线判据(pt, 兜底; §1.954 标定覆盖)
 V_THICK_MAX = 6.5      # 粗线上限(pt): 源书外框线 2.5-4.5pt; 更厚的多是扫描黑边残条(8-17pt)
 V_FRAME_GAP = float(os.environ.get('VERT_FRAME_GAP') or 3.2)   # 兜底值(wz6 实测): 仅当该侧外粗线缺测时补位用
 V_FRAME_TH = float(os.environ.get('VERT_FRAME_TH') or 3.4)     # 兜底值(wz6 实测): 仅当外粗线缺测时补位用
 # 注: 这两项是「缺测补位」而非书常数 —— 有实测(外粗线/横线端头)时一律用实测值, 见 frame_geom ③。
-#   别的书若外框线更粗/更细且页页都缺测(如订口侧被裁切), 才需要 env 覆盖。
+#   别的书若外框线更粗/更细且页页都缺测(如订口侧被裁切), 才需要 env 覆盖(§1.954 兜底也会按实测线宽重定)。
 JIE_LOG = os.environ.get('VERT_JIE_LOG', '0') not in ('0', 'false', 'False')   # 界行线调试日志
 FDBG = os.environ.get('VERT_FRAME_DEBUG', '0') not in ('0', 'false', 'False')  # 版框检测诊断日志
 N_COL_FRAME = int(os.environ.get('VERT_NCOL_FRAME') or 12)   # 版框内框列数; 12 = 兜底值(wz6 实测), §1.955 标定覆盖
@@ -834,7 +1007,7 @@ def _grid_fit(ls):
     """淡界行线栅格拟合(§1.95b 兜底): 候选细线 -> 13 条等距线(= 12 格版框, 界行线即格线)。
     为什么不直接信候选: 低阈值扫描会把正文列竖笔画也算成细线(实测 p32 阈值 0.30 的 12 条候选里
     5 条是碎片), 碎片多到能把「相邻差中位」带偏 -> 单阈值 + 中位列距都不成立。做法:
-      ① 枚举 (列距 p ∈ 40-48pt, 某条候选所在栅格) 下所有跨 13 条线的窗口;
+      ① 枚举 (列距 p ∈ V_GRID_P_LO-HI, 某条候选所在栅格) 下所有跨 13 条线的窗口(相对量, §1.95);
       ② 打分 = (命中候选数, 窗口各线的墨覆盖率之和) —— 命中数优先, 覆盖率解平手: 实测 p22 最左
          一条线淡到漏检时, 栅格可整体右移一格而命中数不变, 但右移后最右那条落在版框外空白上
          (覆盖率 ~0), 靠覆盖率判回正确位置;
@@ -852,15 +1025,16 @@ def _grid_fit(ls):
             if g[0] - 1.0 <= x <= g[1] + 1.0 and g[3] > c: c = g[3]
         return c
     best = None
-    for p10 in range(400, 481, 4):                     # 列距 40.0-48.0pt 步进 0.4
-        p = p10 / 10.0
+    _n_p = 21                                          # 列距枚举: V_GRID_P_LO-HI 等分 21 档(原 40.0-48.0pt 步进 0.4)
+    for _i in range(_n_p):
+        p = V_GRID_P_LO + (V_GRID_P_HI - V_GRID_P_LO) * _i / (_n_p - 1.0)
         for a in cs:
             g0 = a - p * int(a / p)                    # 含 a 的栅格, 首线在 [0,p)
             n_w = int((cs[-1] + 1.5 * p - g0) / p) + 1
             pos = [g0 + m * p for m in range(n_w)]
             for s in range(0, len(pos) - 12):
                 win = pos[s:s + 13]
-                if not (400 <= win[-1] - win[0] <= 640): continue
+                if not (V_GRID_SPAN_LO <= win[-1] - win[0] <= V_GRID_SPAN_HI): continue
                 hits = 0; csum = 0.0
                 for x in win:
                     for c in cs:
@@ -881,10 +1055,10 @@ def _grid_fit(ls):
         var = sum((h[0] - mm) ** 2 for h in hits)
         if var > 1e-6:
             p2 = sum((h[0] - mm) * (h[1] - mx) for h in hits) / var
-            if 35.0 <= p2 <= 52.0:
+            if V_GRID_P_REF_LO <= p2 <= V_GRID_P_REF_HI:
                 p = p2; win[0] = mx - p * mm           # 精修: 以首线为基准
     pos = [win[0] + k * p for k in range(13)]
-    if not (400 <= pos[-1] - pos[0] <= 640): return [], None
+    if not (V_GRID_SPAN_LO <= pos[-1] - pos[0] <= V_GRID_SPAN_HI): return [], None
     covs = sorted(g[3] for g in ls); tops = sorted(g[4] for g in ls); bots = sorted(g[5] for g in ls)
     out = []
     for k, x in enumerate(pos):
@@ -906,10 +1080,11 @@ def _bar_px(ink):
         if cc[W - k:].mean() > 0.80: br = k
     return bl, br
 
-def frame_geom(pi):
+def frame_geom(pi, wstat=None):
     """单页版框实测(pt, 页顶向下) -> dict 或 None(封面/插页等无版框页返回 None)。
     key: in_l/in_r/in_t/in_b 内框(pt); out_l/out_r/out_t/out_b 外粗线(缺测为 None);
-         thin[] 内框内所有细竖线 x 中心(含内框左右线); hx_l/hx_r 横线 x 跨度。"""
+         thin[] 内框内所有细竖线 x 中心(含内框左右线); hx_l/hx_r 横线 x 跨度。
+    wstat: 给了则把本页实测的「竖线组厚度 / 横线组厚度」(pt)追加进去(§1.954 线宽分布标定用)。"""
     import numpy as np
     a = src_gray(pi); H, W = a.shape
     ink = a < 150
@@ -923,6 +1098,8 @@ def frame_geom(pi):
         xs = np.where(ink[y0:y1 + 1, xa:xb].any(axis=0))[0]
         if len(xs) == 0 or (xs[-1] - xs[0]) < 0.55 * (xb - xa): continue
         hg.append((y0, y1))
+    if wstat is not None:
+        wstat['h'].extend((g[1] - g[0] + 1) / 2.0 for g in hg)
     if len(hg) < 2:
         if FDBG: print('    [版框跳过] p%d 横线组不足 (%d 条, xa%d xb%d)' % (pi + 1, len(hg), xa, xb))
         return None
@@ -950,7 +1127,7 @@ def frame_geom(pi):
     if out_t is None: out_t = (in_t[0] - 9, in_t[0] - 6)
     if out_b is None: out_b = (in_b[1] + 6, in_b[1] + 9)
     it, ib = in_t[1] / 2.0, in_b[0] / 2.0                        # 内框上下缘(pt)
-    if not (700 <= ib - it <= 900):
+    if not (V_INH_LO <= ib - it <= V_INH_HI):
         if FDBG: print('    [版框跳过] p%d 内框高异常 %.1f' % (pi + 1, ib - it))
         return None
     # 3) 竖线(内框 y 区间内); 剔除贴纸边假线(扫描裁切边缘的暗边: 实测 p172/p210 在页缘 1-3pt 处
@@ -971,6 +1148,8 @@ def frame_geom(pi):
                         float(colc[x0:x1 + 1].mean()), (yb0 + ys[0]) / 2.0, (yb0 + ys[-1] + 1) / 2.0))
         return out
     vg = scan_v(V_LINE_COV)
+    if wstat is not None:
+        wstat['v'].extend(g[2] for g in vg)          # 竖线组厚度(pt) -> §1.954 线宽分布
     if FDBG: print('    [版框诊断] p%d 列覆盖>%.2f 命中 %d 组' % (
         pi + 1, V_LINE_COV, len(vg)))
     thin = [g for g in vg if g[2] <= V_THICK_MIN]
@@ -1021,7 +1200,7 @@ def frame_geom(pi):
     elif hx_r < pw_pt - 8: ir = round(max(ir, hx_r - V_FRAME_TH - V_FRAME_GAP), 1)
     # 5) 装订侧内框线太淡漏检(实测 p115/p191 等): 版框是印版常数, 用「列数 × 列距」从未漏检的一侧补;
     #    实测值与结构估值差 < 半列时优先用实测(每页扫描错位 ±5pt, 实测更贴源书)。
-    if pitch > 8:
+    if pitch > V_PITCH_MIN:
         if out_r is not None and abs((ir - N_COL_FRAME * pitch) - il) > 0.5 * pitch:
             il = round(ir - N_COL_FRAME * pitch, 1)
         if out_l is not None and abs((il + N_COL_FRAME * pitch) - ir) > 0.5 * pitch:
@@ -1029,10 +1208,10 @@ def frame_geom(pi):
     # 栅格兜底命中时: 链首末线就是内框左右线(12 格 = 13 条, 首末即框线), 比上面「横线端头」估值可靠
     #   —— 源书横线横跨整幅纸面(含订口页边), 端头不是框线位置(p36 实测会把右线高估 26pt)。
     if grid_ends is not None: il, ir = round(grid_ends[0], 1), round(grid_ends[1], 1)
-    if not (400 <= ir - il <= 640):
+    if not (V_INW_LO <= ir - il <= V_INW_HI):
         if FDBG: print('    [版框跳过] p%d 内框宽异常 %.1f (il%.1f ir%.1f)' % (pi + 1, ir - il, il, ir))
         return None
-    if pitch > 8 and abs((ir - il) / pitch - round((ir - il) / pitch)) > 0.22:
+    if pitch > V_PITCH_MIN and abs((ir - il) / pitch - round((ir - il) / pitch)) > 0.22:
         if FDBG: print('    [版框跳过] p%d 跨度非整数倍列距 %.2f (pitch %.1f)' % (pi + 1, (ir - il) / pitch, pitch))
         return None
     jie = [g[0] for g in thin if il - 2 <= g[0] <= ir + 2]      # 界行线(含内框左右线, 绘制时去首末)
@@ -1077,6 +1256,67 @@ def frame_tex(pi, gm=None):
         ('扫描黑边 L%.1f/R%.1f' % g['bar']) if (g['bar'][0] or g['bar'][1]) else ''))
     return ['\\AddToShipoutPictureFG*{%\n  ' + '%\n  '.join(puts) + '}']
 
+# ---------- 1.954) 版框线粗细判据自标定(taskN 纸型无关化) ----------
+# 原常数 V_THICK_MIN=2.4 / V_THICK_MAX=6.5pt 是 wz6 实测(界行线/内框线 0.5-1.5pt, 外粗线 3.5-4.5pt,
+#   更厚的多是扫描黑边残条 8-17pt)。别的书线更粗/更细 -> 细线被当粗线(内框缘错)或粗线被当细线(界行线错)。
+# 做法: 抽样页扫竖线组厚度 + 横线组厚度(同一套墨占比阈值), 从**实测分布**定分界:
+#   ① 在竖线组厚度(半整数 pt)里找「最大间隙」把样本分成细/粗两簇(两簇各 >= 3 条);
+#   ② V_THICK_MIN = 0.7 x 粗簇下缘 —— 落在「细簇上缘 .. 粗簇下缘」之间且偏粗侧(细线误判成粗线的
+#      代价更大: 粗线候选用来定内框缘); 实测 wz6: 细簇 0.5-1.5 / 粗簇 3.5-4.5 -> 0.7x3.5 = 2.45
+#      (原常数 2.4; 厚度只能是半整数, 故 2.45 与 2.4 分类**完全等价**, 见报告对账表);
+#   ③ V_THICK_MAX = 1.5 x 粗簇上缘(竖线组与横线组合并取 —— 同一条外框线两个方向同宽), 挡更厚的
+#      黑边残条; 实测 wz6: 粗簇上缘 4.5 -> 6.75(原 6.5, 半整数下同样等价);
+#   ④ 样本不足(无版框书, wz7 类)/无有效间隙 -> 保留兜底 (2.4, 6.5), 日志明示"未标定"。
+#   V_FRAME_GAP/TH(3.2/3.4pt) 是「外粗线缺测时的补位值」, 不是书常数 -> 保留兜底, 可用 env 覆盖。
+CALIB_N_PAGE = int(os.environ.get('VERT_CALIB_PAGES') or 16)   # 标定抽样页数(§1.954/§1.955/§1.956 共用)
+CALIB_T0 = __import__('time').time()                           # 标定趟计时(日志打印)
+THICK_SAMPLE = int(os.environ.get('VERT_THICK_SAMPLE') or 8)   # 线宽标定抽样页数
+CALIB_T954 = os.environ.get('VERT_THICK_CALIB', '1') not in ('0', 'false', 'False')
+
+def _calib_line_widths(vws, hws):
+    """实测线宽样本(竖线组厚度 / 横线组厚度, pt) -> (V_THICK_MIN, V_THICK_MAX, 依据)。
+    样本不足或无有效间隙 -> 返回 (None, None, 原因) 由调用方保留兜底值。"""
+    vs = sorted(vws)
+    if len(vs) < 6:
+        return None, None, '竖线组样本 %d 条(需 >=6)' % len(vs)
+    uniq = sorted(set(vs))
+    best = None
+    for a, b in zip(uniq, uniq[1:]):
+        lo = sum(1 for x in vs if x <= a); hi = sum(1 for x in vs if x >= b)
+        if lo < 3 or hi < 3: continue
+        if best is None or (b - a) > best[0]: best = (b - a, a, b)
+    if best is None:
+        return None, None, '厚度分布无有效两簇间隙'
+    _, thin_hi, thick_lo = best
+    thick_hi = max(max(vs), max(hws)) if hws else max(vs)
+    return (round(0.7 * thick_lo, 3), round(1.5 * thick_hi, 3),
+            '细簇上缘 %.2f / 粗簇 %.2f-%.2f (%d 条 vs %d 条)' % (
+                thin_hi, thick_lo, thick_hi,
+                sum(1 for x in vs if x <= thin_hi), sum(1 for x in vs if x >= thick_lo)))
+
+# 标定抽样页(1-based, 全书均布): §1.954 线宽 / §1.955 列数 / §1.956 源图侧统计共用同一批页
+CALIB_SAMP = sorted(set(list(range(1, len(keys) + 1, max(1, len(keys) // CALIB_N_PAGE)))[:CALIB_N_PAGE]))
+if SRC and CALIB_T954 and os.environ.get('VERT_THICK_MIN') is None:
+    _wst = {'v': [], 'h': []}
+    _nws = 0
+    for _pg in CALIB_SAMP[:max(1, THICK_SAMPLE)]:
+        if frame_geom(_pg - 1, wstat=_wst) is not None: _nws += 1
+    _tmin, _tmax, _why = _calib_line_widths(_wst['v'], _wst['h'])
+    if _tmin:
+        print('[标定·线宽] 抽 %d 页(有版框 %d): %s -> V_THICK_MIN %.2f V_THICK_MAX %.2f (兜底 %.1f/%.1f)' % (
+            min(THICK_SAMPLE, len(CALIB_SAMP)), _nws, _why, _tmin, _tmax, V_THICK_MIN, V_THICK_MAX))
+        V_THICK_MIN, V_THICK_MAX = _tmin, _tmax
+    else:
+        print('[标定·线宽] 未标定(%s) -> 用兜底 V_THICK_MIN %.2f V_THICK_MAX %.2f' % (
+            _why, V_THICK_MIN, V_THICK_MAX))
+elif os.environ.get('VERT_THICK_MIN') is not None:
+    V_THICK_MIN = float(os.environ['VERT_THICK_MIN'])
+    V_THICK_MAX = float(os.environ.get('VERT_THICK_MAX') or V_THICK_MAX)
+    print('[标定·线宽] 显式 VERT_THICK_MIN/MAX=%.2f/%.2f 优先(跳过标定)' % (V_THICK_MIN, V_THICK_MAX))
+else:
+    print('[标定·线宽] 无源 PDF -> 用兜底 V_THICK_MIN %.2f V_THICK_MAX %.2f(不标定)' % (
+        V_THICK_MIN, V_THICK_MAX))
+
 # ---------- 1.955) 标定趟 A: 版框列数 N_COL_FRAME(taskM) ----------
 # 背景(taskM 审计): N_COL_FRAME=12 原是 wz6 印刷版框的常数(12 列 x 43.4pt)。别的书列数不同 ->
 #   L1001-1004 用「内框宽 = 列数 x 列距」补漏检侧的框线, 列数错 -> 内框左右缘错 -> 列位整体错位;
@@ -1087,16 +1327,15 @@ def frame_tex(pi, gm=None):
 #   ③ 实测最外两条细线的跨距 ÷ 列距(只用实测线, 不受待标定值影响 —— 标定要独立于被标定量)
 #   取「①=③ 一致」的页的众数(两条独立口径互证); 无一致页则退 ② 众数; 都不可测 -> 兜底 12。
 #   显式 VERT_NCOL_FRAME 优先于标定值。
-CALIB_N_PAGE = int(os.environ.get('VERT_CALIB_PAGES') or 16)   # 标定抽样页数
-CALIB_T0 = __import__('time').time()                           # 标定趟计时(日志打印)
 
-def _calib_ncol_page(g):
-    """单页列数估计 -> (n①, n②, n③) 或 None(该页不可测: 无版框/列距异常/细线太少)。"""
+def _calib_ncol_page(g, pmin=8.0):
+    """单页列数估计 -> (n①, n②, n③) 或 None(该页不可测: 无版框/列距异常/细线太少)。
+    pmin: 「列距有效」下限(pt); 默认 8.0 = wz6 兜底, 调用处传相对量 V_PITCH_MIN(§1.95)。"""
     if not g:
         return None
     p = g.get('pitch') or 0.0
     thin = g.get('thin') or []
-    if p <= 8.0 or len(thin) < 6:
+    if p <= pmin or len(thin) < 6:
         return None
     n1 = int(round((g['in_r'] - g['in_l']) / p))
     n2 = len(thin) - 1
@@ -1122,25 +1361,56 @@ def _calib_ncol_pick(triples):
     n, cnt = mode([b for _a, b, _c in triples])
     return n, '①=③ 无一致页, 退 ②线条数-1 众数 %d(%d/%d 页)' % (n, cnt, len(triples))
 
-# 标定抽样页(1-based, 全书均布): 后续 §1.956 复用同一批页(源图侧统计)
-CALIB_SAMP = sorted(set(list(range(1, len(keys) + 1, max(1, len(keys) // CALIB_N_PAGE)))[:CALIB_N_PAGE]))
-if SRC and os.environ.get('VERT_NCOL_FRAME') is None:
+# 标定抽样页 CALIB_SAMP 见 §1.954(§1.954/§1.955/§1.956 共用同一批页)
+_fr_samp = []                                     # 抽样页的实测版框(§1.96a 内框缘基准 + 列数标定共用一个循环)
+if SRC:
     _nc_tri = []
     for _pg in CALIB_SAMP:
-        _t = _calib_ncol_page(frame_geom(_pg - 1))
+        _g = frame_geom(_pg - 1)
+        if _g: _fr_samp.append(_g)
+        _t = _calib_ncol_page(_g, V_PITCH_MIN)
         if _t:
             _nc_tri.append(_t)
-    _nc_new, _nc_why = _calib_ncol_pick(_nc_tri)
-    if _nc_new:
-        print('[标定A] 版框列数: 抽样 %d 页测到 %d 页 -> %d (兜底 12; %s)' % (
-            len(CALIB_SAMP), len(_nc_tri), _nc_new, _nc_why))
-        N_COL_FRAME = _nc_new
+    if os.environ.get('VERT_NCOL_FRAME') is None:
+        _nc_new, _nc_why = _calib_ncol_pick(_nc_tri)
+        if _nc_new:
+            print('[标定A] 版框列数: 抽样 %d 页测到 %d 页 -> %d (兜底 12; %s)' % (
+                len(CALIB_SAMP), len(_nc_tri), _nc_new, _nc_why))
+            N_COL_FRAME = _nc_new
+        else:
+            print('[标定A] 版框列数: 实测不可用(%s) -> 用兜底 %d' % (_nc_why, N_COL_FRAME))
     else:
-        print('[标定A] 版框列数: 实测不可用(%s) -> 用兜底 %d' % (_nc_why, N_COL_FRAME))
+        print('[标定A] 版框列数: 显式 VERT_NCOL_FRAME=%d 优先(跳过标定)' % N_COL_FRAME)
 elif os.environ.get('VERT_NCOL_FRAME') is not None:
     print('[标定A] 版框列数: 显式 VERT_NCOL_FRAME=%d 优先(跳过标定)' % N_COL_FRAME)
 else:
     print('[标定A] 版框列数: 无源 PDF -> 用兜底 %d(不标定)' % N_COL_FRAME)
+
+# ---------- 1.96a) 页边带并上「内框缘」(纸型无关化 taskN) ----------
+# 书眉/页码的语义是「在**版心右缘之外**(订口侧页边内)」, 左边注是「在版心左缘之外」。§0.5 的
+#   页宽比例带是**无内框书**的退化口径; 有实测内框时两者取并集 —— 判据是「框外 **或** 页边带内」,
+#   故门限取更靠内的那一侧:
+#     右: x0 > min(页宽比例带, 内框右缘)   左: x1 < max(页宽比例带, 内框左缘)
+#   内框基准 = §1.955 抽样页(16 页均布)实测内框缘的中位(pt -> px x2), 零额外开销。
+#   wz6 实测: 内框右缘中位 1116px > 页宽比例带 1100px、左缘中位 73px < 100px -> **两翼都不生效**
+#     (分类与产物 tex 逐字节不变); 别的书若版心更宽(右缘更靠右), 右带自动外扩到框缘, 避免框外
+#     的书眉/页码漏检; 无版框书(wz7 类) _fr_samp 为空 -> 纯页幅比例, 不误检。
+FRAME_REF = None
+if _fr_samp:
+    FRAME_REF = {'in_l': statistics.median(g['in_l'] for g in _fr_samp),
+                 'in_r': statistics.median(g['in_r'] for g in _fr_samp),
+                 'pitch': statistics.median(g['pitch'] for g in _fr_samp),
+                 'n_page': len(_fr_samp)}
+    _br0, _bl0 = BAND_R_PX, BAND_L_PX
+    BAND_R_PX, BAND_L_PX = _band_union(BAND_R_PX, BAND_L_PX, FRAME_REF['in_l'], FRAME_REF['in_r'])
+    print('[边带基准] 内框(抽 %d 页中位): 左缘 %.1fpt 右缘 %.1fpt 列距 %.2fpt -> 页边带 右%.1f 左%.1f px '
+          '(页幅比例带 %.1f/%.1f; %s)' % (
+              FRAME_REF['n_page'], FRAME_REF['in_l'], FRAME_REF['in_r'], FRAME_REF['pitch'],
+              BAND_R_PX, BAND_L_PX, _br0, _bl0,
+              '并用内框缘(框外口径)' if (BAND_R_PX != _br0 or BAND_L_PX != _bl0) else '与页幅比例带相同'))
+else:
+    print('[边带基准] 无实测版框(抽样 %d 页) -> 页边带只用页幅比例: 右%.1f 左%.1f px' % (
+        len(CALIB_SAMP), BAND_R_PX, BAND_L_PX))
 
 # ---------- 1.96) 版心右缘用源图墨迹复测(修 OCR 边缘列 bbox 右扩) ----------
 # 现象(实测 tmp_vert/right_fit.py): OCR 对「最右一列」的 bbox 系统性右扩 14-30pt(夹进版框右线/书眉
@@ -1333,10 +1603,11 @@ def _grid_from_bands(bands, il, ir, n=None):
         n = N_COL_FRAME
     cs = sorted((a + b) / 2.0 for a, b in bands)
     if len(cs) < 6: return None
-    ds = [b - a for a, b in zip(cs, cs[1:]) if 20 < b - a < 100]
+    ds = [b - a for a, b in zip(cs, cs[1:]) if V_BAND_SP_LO < b - a < V_BAND_SP_HI]
     if len(ds) < 4: return None
     p = statistics.median(ds)
-    if not (36.0 <= p <= 50.0) or len(cs) - 1 <= n - 3: return None
+    # 列距合法性窗(原 36-50pt)按页幅比例(§1.95); 书自身的「列距 = 内框宽÷列数」一致性由下一条保证
+    if not (V_P_LO <= p <= V_P_HI) or len(cs) - 1 <= n - 3: return None
     ks = [round((c - il) / p - 0.5) for c in cs]
     e = statistics.median([c - p * (k + 0.5) for c, k in zip(cs, ks)])
     if not (0.9 * (ir - il) <= n * p <= 1.1 * (ir - il)): return None

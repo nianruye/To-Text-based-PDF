@@ -11,17 +11,17 @@
 
 | 编号 | 文件 | 功能 | 实现锚点（build_vert.py） | 验收 |
 |---|---|---|---|---|
-| 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L1969-2022、编译 L2771-2794 | 编译零报错、字形与源书同款 |
-| 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | L399-486 参数拟合、L1908-1968 `page_tex`、L1145-1166 右缘复测、L1273-1906 框驱动 §1.98（槽格/列位/列顶数据驱动） | 列数/列位/断点与源书一致 |
-| 03 | [marginalia.md](03_marginalia.md) | 书眉/页码/边注（eso-pic 带星版 + 墨迹实测定位） | L487-589（书眉页码：`special_rows` L497/`ink_extent` L526/`special_tex` L554）、L590-711（边注：`note_rows` L607/`note_cols` L622/`note_tex` L681） | 位置 vs 源墨迹、无重叠发虚 |
-| 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底） | L800-1079（常量/`_grid_fit` L833/`frame_geom` L909/`frame_tex` L1050） | 内框/界行线 vs 源墨迹 |
-| 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L712-799（`pn_parse` L727/`pn_text` L746/`pn_sequence_fix` L750） | 纠正记录逐条复核 |
-| 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L1167-1272（`_ink_char_cols` L1186/`_lin_fit` L1216/`derot_rows` L1226） | 旋转页列位/字号 vs 源书 |
-| 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP） | §1.0a L87-118（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex` L137）、§1.0a2 L119-151（`BOLD_W`/`_vb`）、§1.0b L152-297（`char_cells` L75/`fit_gaps` L176）、`col_puts` L1604、落盘 L2752 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
-| 08 | [08_punct_vertical_forms.md](08_punct_vertical_forms.md) | 标点竖排形态（括号 → U+FE35…U+FE40 + 墨心回格心）+ OCR 列拆分归位（行首闭括号回上一列） | §1.0c L298-364（`VERT_FORMS`/`VERT_METRICS`/`BR_SIZE`/`_br_put` L349）、§1.0d L365-398（`BR_OPEN_OF` L377/`fix_split_brackets` L378 + 应用点 L405-415）、§1.9 `note_tex` 字号保护 L681 | p3 对照图 + 抽查 ≥5 页 + `verify_vert` PASS |
-| 09 | [09_calibration.md](09_calibration.md) | **参数自标定**（建排前从源图墨迹 + OCR + 字体文件测出本书参数：列数/字宽压缩/标点/括号/字体绑定组），显式 env 仍优先 | §1.955 L1080-1144（`N_COL_FRAME`）、§1.956 L2023-2696（`CALIB_*`/`_calib_*`：字体几何 L2171、源图样本 L2278、探针 L2385、合并与对账 L2600-2696）、测试 `src/test/unit/test_vert_calib.py` | wz6 对账表（`N_COL_FRAME` 精确 12、`XSCALE` 0.863）+ `verify_vert` PASS + 覆盖率不降 | 
+| 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L2240-2293、编译 L3042-3065 | 编译零报错、字形与源书同款 |
+| 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | L480-563 参数拟合、L2179-2239 `page_tex`、L1415-1436 右缘复测、L1543-2177 框驱动 §1.98（槽格/列位/列顶数据驱动） | 列数/列位/断点与源书一致 |
+| 03 | [marginalia.md](03_marginalia.md) | 书眉/页码/边注（eso-pic 带星版 + 墨迹实测定位；门限全部相对量 §0.5/§1.05） | L595-699（书眉页码：`special_rows` L605/`ink_extent` L635/`special_tex` L664）、L700-862（边注：`_calib_note_ratio` L708/`note_rows` L758/`note_cols` L773/`note_tex` L832） | 位置 vs 源墨迹、无重叠发虚 |
+| 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底；几何区间/线宽判据相对化） | L951-1258（常量/`_grid_fit` L1006/`frame_geom` L1083/`frame_tex` L1229）+ §1.954 L1259-1318（线宽自标定） | 内框/界行线 vs 源墨迹 |
+| 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L863-950（`pn_parse` L878/`pn_text` L897/`pn_sequence_fix` L901） | 纠正记录逐条复核 |
+| 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L1437-1542（`_ink_char_cols` L1456/`_lin_fit` L1486/`derot_rows` L1496） | 旋转页列位/字号 vs 源书 |
+| 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP） | §1.0a L168-199（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex` L218）、§1.0a2 L200-232（`BOLD_W`/`_vb`）、§1.0b L233-378（`char_cells` L156/`fit_gaps` L257）、`col_puts` L1875、落盘 L3023 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
+| 08 | [08_punct_vertical_forms.md](08_punct_vertical_forms.md) | 标点竖排形态（括号 → U+FE35…U+FE40 + 墨心回格心）+ OCR 列拆分归位（行首闭括号回上一列） | §1.0c L379-445（`VERT_FORMS`/`VERT_METRICS`/`BR_SIZE`/`_br_put` L430）、§1.0d L446-479（`BR_OPEN_OF`/`fix_split_brackets` L459 + 应用点 L490-501）、§1.9 `note_tex` 字号保护 L847 | p3 对照图 + 抽查 ≥5 页 + `verify_vert` PASS |
+| 09 | [09_calibration.md](09_calibration.md) | **参数自标定 + 纸型无关化**（建排前从源图墨迹 + OCR + 字体文件测出本书参数：列数/字宽压缩/标点/括号/字体绑定组；所有「绝对量」门限改相对页幅/字步进 §8） | §0.5 L41-120、§1.05 L564-593、§1.85 L708-756、§1.954 L1259-1318、§1.955 L1320-1387、§1.96a L1389-1413、§1.956 L2294-3022（字体几何 L2442、源图样本 L2549、探针 L2656、合并与对账 L2723-3022）；测试 `test_vert_calib.py` + `test_vert_paper_agnostic.py` | wz6 对账表（`N_COL_FRAME` 精确 12、`XSCALE` 0.863）+ 等价性 21 项 0.0000% + wz7 预检（列数 16/纸型/安全降级）+ `verify_vert` PASS | 
 
-> 锚点行号为 **2026-10-15（taskM 自标定改造后）当前文件**实测（`grep -n '^# ---------- '` / `grep -n '^def '`）；
+> 锚点行号为 **2026-10-15（taskN 纸型无关化后）当前文件**实测（`grep -n '^# ---------- '` / `grep -n '^def '`）；
 > 改 `build_vert.py` 后须同步本表。
 
 ## 架构
@@ -31,13 +31,16 @@ source_pdf/wz6.pdf --(OCR, 官方 API)--> data/wz6/wz6_spotting_{lines,coords}.j
                                           |
                                           v
                      src/pipelines/build_vert.py   (单脚本; 标定趟内联, 无外部驱动)
-                       0) 标定趟 A: 版框列数 N_COL_FRAME             §1.955 [09]
+                       -1) 纸型基准: 页幅 + 门限相对量(页边带/长行/小字) §0.5  [09 §8]
+                       0a) 线宽标定: 版框线粗细分界(抽样 8 页)          §1.954 [09 §8.4]
+                       0b) 标定趟 A: 版框列数 N_COL_FRAME             §1.955 [09]
                        1) 参数拟合(列高/字号/列距/天头/右缘)          §1
+                       1b) 小字判据相对量 + 边注步进比自标定           §1.05/§1.85 [09 §8]
                        2) 书眉/页码 墨迹实测 -> eso-pic \put           §1.8  [03]
                        3) 边注 墨迹实测字列 -> eso-pic \put            §1.9  [03]
                        4) 页码序列拟合纠正                            §1.87 [05]
                        5) 版框线检测 -> eso-pic \rule                 §1.95 [04]
-                       6) 版心右缘墨迹复测                            §1.96 [02]
+                       6) 页边带并内框缘 / 版心右缘墨迹复测            §1.96a/§1.96 [02][09 §8.3]
                        7) 旋转坐标系页还原(仅该页)                    §1.97 [06]
                        8) 标定趟 B: 源图样本 + 字体探针 -> 参数        §1.956 [09]
                                           |
@@ -75,7 +78,8 @@ source_pdf/wz6.pdf --(OCR, 官方 API)--> data/wz6/wz6_spotting_{lines,coords}.j
 | 版框 | 228/231 页（12 格 = 13 条线栅格） | build_vert 日志 |
 | 书眉 / 页码 / 边注 | 107 / 122 / 65 条 | build_vert 日志（#27 实测复核） |
 | 页码序列纠正 | 18 处（拟合 `value = 1.000*page + 176.0`） | build_vert 日志（#27 实测复核） |
-| 回归测试 | 209 全绿（unit 196 + invariants 13） | `src/test/` |
+| 回归测试 | **296 全绿**（unit 277 + invariants 13 + taskN 新增 19） | `src/test/` |
+| 纸型无关化（taskN） | 21 项门限 wz6 反算 **0.0000%**；产物 tex 逐字节不变；wz7 预检列数 16/纸型 921.8×1443pt/无版框安全降级 | [docs/vert_paper_agnostic_report.md](../../docs/vert_paper_agnostic_report.md) |
 
 > 条数为默认配置（`VERT_DEROT=1`）下的实测值。旧文档记的页码 121 / 边注 64 是**关掉旋转页还原**时的计数
 > （p159 旋转页少 1 条页码 + 1 条边注，实测对照见 [docs/vert_fix18_20_27_report.md](../../docs/vert_fix18_20_27_report.md)）；
@@ -111,6 +115,11 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 | `VERT_LINE_COV` / `VERT_LINE_COV_LO` | 0.55 / 0.30 | 界行线覆盖率主阈值 / 淡线兜底阈值 |
 | `VERT_TMP` | `/tmp/vert_<输出文件名 stem>_run` | tex/dvi/pdf 临时目录（按产物名分离，并发不共用；显式设置则用给的值） |
 | `VERT_FRAME_DEBUG` / `VERT_JIE_LOG` | 0 | 版框检测诊断 / 界行线日志 |
+| `VERT_BAND_R_FRAC` / `VERT_BAND_L_FRAC` / `VERT_LONG_H_FRAC` / `VERT_SMALL_FS_FRAC` | 0.923904 / 0.083991 / 0.120453 / 0.022083 | 页边带右/左、长行、左边注小字的**页幅比例**（换书微调用；默认 = wz6 换算值） |
+| `VERT_INK_*_FRAC` / `VERT_FRAG_OVL_FRAC` / `VERT_NOTE_STEP_MIN_FRAC` | wz6 换算 | 小字窗口/组件窗/碎片容差 ÷ 正文字步进 的比例（§1.05） |
+| `VERT_THICK_SAMPLE` / `VERT_THICK_MIN` / `VERT_THICK_MAX` | 8 / 2.4 / 6.5 | 线宽标定抽样页数；显式给线宽阈值则跳过标定 |
+| `VERT_NOTE_STEP_RATIO` | 自标定（wz6=0.85） | 边注/正文 步进比上限（显式给值则跳过自标定） |
+| `VERT_*_FRAC`（版框几何区间族） | wz6 换算 | 内框高/宽窗、栅格列距窗/跨度窗、列距有效下限等（spec 09 §8.5） |
 
 ## 测试点
 

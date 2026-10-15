@@ -26,7 +26,7 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
-| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定）；验证脚本 `src/test/verify_vert.py` |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化）；验证脚本 `src/test/verify_vert.py` |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
 | [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留 R1-R4） |
