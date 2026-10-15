@@ -592,6 +592,72 @@ print('[小字判据] 正文字步进 %.3f px; 小字窗口 ±%d x ±%d; 组件 
           FS_px, INK_WIN_X, INK_WIN_Y, INK_CW_LO, INK_CW_HI, INK_CH_LO, INK_CH_HI,
           INK_AREA, FRAG_OVL_PX, NOTE_STEP_MIN))
 
+# ---------- 1.06) 无版框书: 逐页门限(定义在 §1.975 之前 —— §1.8/§1.9 起判据就要用) ----------
+# NF_MODE 在 §1.975 判定(需要 §1.96a 的 FRAME_REF); 在那之前 _NF['on'] 为 False -> 这些函数原样
+# 返回上面的全局门限(有版框书与既有路径逐位不变)。
+_NF = {'on': False}             # 无版框路径开关(§1.975 置位)
+_nf_cache = {}                  # 逐页伪版心缓存(nf_frame, §1.975)
+
+def _nf_ink_gray(a):
+    """灰度页 -> 墨迹二值阈值(Otsu: 纸/墨两簇之间)。纯函数(入参任意灰度序列, 返回 int)。
+    为什么无版框书要逐页自适应: 固定阈值 150 是 wz6 的口径(纸 253 / 墨核心 ~50 -> 150 恰是两者中点,
+    等价「清晰墨边界」); 换到灰底扫描(实测 wz7 纸 185-199 / 墨核心 ~40 -> 中点 ~120)阈值 150
+    会把边缘灰晕算进墨迹 —— 面积口径随阈值变化在 wz6 只有 +36%(110->170), 在 wz7 是 +110%
+    (a/h² 0.23->0.47), 后果 XSCALE 1.85(应为 ~0.87)、标点墨高比 +30%。Otsu 与「清晰边界」同口径。"""
+    import numpy as np
+    h = np.bincount(np.asarray(a).ravel(), minlength=256).astype(float)
+    tot = h.sum(); sm = float((np.arange(256) * h).sum())
+    best, bk, w0, s0 = -1.0, 128, 0.0, 0.0
+    for t in range(256):
+        w0 += h[t]; s0 += t * h[t]
+        w1 = tot - w0
+        if w0 <= 0 or w1 <= 0: continue
+        v = w0 * w1 * (s0 / w0 - (sm - s0) / w1) ** 2
+        if v > best: best, bk = v, t
+    return bk
+
+_nf_ink_cache = {}
+def _nf_ink(pi):
+    """无版框页的源图墨迹布尔图(逐页 Otsu 阈值; 与标定样本/渲染同一口径)。"""
+    if pi not in _nf_ink_cache:
+        a = src_gray(pi)
+        _nf_ink_cache[pi] = a < _nf_ink_gray(a)
+        if len(_nf_ink_cache) > 8:
+            _nf_ink_cache.pop(next(iter(_nf_ink_cache)))
+    return _nf_ink_cache[pi]
+
+def _src_ink(pi):
+    """标定/无框路径的源图墨迹: NF 页用逐页自适应阈值, 其余(有版框书如 wz6)**固定 150 不变**。"""
+    return _nf_ink(pi) if (_NF['on'] and src_doc is not None) else src_gray(pi) < 150
+
+def _frame_ink(pi, g):
+    """§1.98/§1.99 路径的源图墨迹: 伪版心(virtual)页用自适应阈值, 有版框页固定 150 不变。"""
+    return _nf_ink(pi) if (g and g.get('virtual')) else src_gray(pi) < 150
+
+def _nf_page_px(pi):
+    """本页纸型(2x px)。**逐页**取源 PDF 的真实页幅 —— 混纸型书(同一册里有多种开本, 实测 wz7 有
+    922x1437 / 892x1323 / 705x1084 三种)用全局基准会把小开本页的门限算错。无源 PDF -> 全局基准。"""
+    if src_doc is not None and 0 <= pi < src_doc.page_count:
+        r = src_doc[pi].rect
+        return round(r.width * PT_PER_PX, 1), round(r.height * PT_PER_PX, 1)
+    return PW_PX, PH_PX
+
+def _nf_thr(k):
+    """无版框书: 本页门限 (长行下限, 右页边带, 左页边带, 碎片容差)。
+    ① 按本页纸型比例缩放(混开本: 全局门限对 705pt 小开本页会差 ~30%);
+    ② 页边带再并上**本页伪版心缘**(§1.96a 同口径 —— 实测该书页码在版心右缘之外、但只到 87% 页宽,
+       用 wz6 的 92.4% 页宽比例带会漏检; 并上伪版心缘即认到)。
+    非 NF(含所有有实测版框的书) -> 返回原全局门限(逐位不变)。"""
+    if not _NF['on'] or src_doc is None:
+        return LONG_H_PX, BAND_R_PX, BAND_L_PX, FRAG_OVL_PX
+    pw, ph = _nf_page_px(keys.index(k))
+    sx, sy = pw / PW_PX, ph / PH_PX
+    br, bl = BAND_R_PX * sx, BAND_L_PX * sx
+    gv = _nf_cache.get(keys.index(k))
+    if gv:
+        br, bl = _band_union(br, bl, gv['in_l'], gv['in_r'])
+    return LONG_H_PX * sy, br, bl, FRAG_OVL_PX * sx
+
 # ---------- 1.8) 书眉/页码(边缘小字) ----------
 # 要点(实测, 勿凭直觉):
 # 1) OCR bbox 对边缘小字系统性偏移(右页偏右 18pt / 页码偏低 45pt), 渲染坐标必须用源图墨迹实测定;
@@ -607,14 +673,15 @@ def special_rows(k):
     过滤: 长行(h>=页高比例)/超长文本(>10字)/不在左右页边带; 且剔除「被更长同行竖向包含」的碎片(边注列断行)。
     门限相对量见 §0.5(BAND_R_PX/BAND_L_PX/LONG_H_PX; wz6 上 = 1100/100/300 px)。"""
     rows = all_rows[k]; out = []
+    _lh, _br, _bl, _fo = _nf_thr(k)      # 无版框书: 本页纸型/伪版心缘的口径(有版框书 = 原全局门限)
     for r in rows:
         x0, x1, y0, y1, t = r
-        if y1 - y0 >= LONG_H_PX or not (2 <= len(t) <= 10): continue
-        if not (x0 > BAND_R_PX or x1 < BAND_L_PX): continue
+        if y1 - y0 >= _lh or not (2 <= len(t) <= 10): continue
+        if not (x0 > _br or x1 < _bl): continue
         frag = False
         for o in rows:
             if o is r: continue
-            if o[2] <= y0 and y1 <= o[3] and (o[3] - o[2]) > (y1 - y0) and min(x1, o[1]) - max(x0, o[0]) > -FRAG_OVL_PX:
+            if o[2] <= y0 and y1 <= o[3] and (o[3] - o[2]) > (y1 - y0) and min(x1, o[1]) - max(x0, o[0]) > -_fo:
                 frag = True; break
         if frag: continue      # 边注/正文长列里的断行碎片, 非书眉页码
         kind = 'pn' if all(c in NUM_CHARS for c in t) else 'hd'
@@ -643,7 +710,10 @@ def ink_extent(pi, x0, x1, y0, y1, others, floor=None):
     wx0, wx1 = int(max(0, cx - INK_WIN_X)), int(min(W, cx + INK_WIN_X))
     wy0, wy1 = int(max(0, y0 - INK_WIN_Y)), int(min(H, y1 + INK_WIN_Y))
     if wx1 <= wx0 or wy1 <= wy0: return None    # OCR 行 bbox 越出页面时窗口为空(全书跑实测 p159 触发)
-    lab, n = ndimage.label(a[wy0:wy1, wx0:wx1] < 185)
+    # 阈值: wz6 口径固定 185(略宽于正文阈值 150, 边缘小字墨淡); 无版框书(NF)按本页对比度取阈
+    #   —— 灰底扫描(wz7 纸 185-199)用 185 会把整片纸纹当墨迹, 组件窗再滤也挡不住。
+    _t = min(185, _nf_ink_gray(a)) if (_NF['on'] and src_doc is not None) else 185
+    lab, n = ndimage.label(a[wy0:wy1, wx0:wx1] < _t)
     cs = []
     for i, s in enumerate(ndimage.find_objects(lab), 1):
         h = s[0].stop - s[0].start; w = s[1].stop - s[1].start
@@ -760,13 +830,14 @@ def note_rows(k):
     rows = all_rows[k]
     claimed = set((c[2], c[3], c[4], c[5], c[1]) for c in special_rows(k))
     lx = min([r[0] for r in rows if is_body_col(*r)], default=0)   # 版心左缘 = 最左正文列 x0
+    _lh, _br, _bl, _fo = _nf_thr(k)      # 无版框书: 本页口径(有版框书 = 原全局门限)
     out = []
     for r in rows:
         x0, x1, y0, y1, t = r
         if len(t) < 2 or (x0, x1, y0, y1, t) in claimed: continue
         step = (y1 - y0) / float(len(t))
         if not (NOTE_STEP_MIN <= step < NOTE_STEP_RATIO * FS_px): continue
-        if (x0 < BAND_L_PX and x1 <= lx + NOTE_LX_TOL_PX) or t.startswith('*'):
+        if (x0 < _bl and x1 <= lx + NOTE_LX_TOL_PX) or t.startswith('*'):
             out.append(r)
     return out
 
@@ -786,9 +857,10 @@ def note_cols(pi, k, rows=None, zone=None, zone_y=None):
     m = int(max(ZONE_PAD_MIN_PX, step * 0.6))
     if zone is None:
         lx = min([r[0] for r in all_rows[k] if is_body_col(*r)], default=0)
+        _bl2 = _nf_thr(k)[2]                           # 无版框书: 本页左页边带
         zx0 = 10 ** 9; zx1 = -1
         for x0, x1, y0, y1, t in rows:
-            if x0 < BAND_L_PX:                         # 左缘注列: 整条左白边(到版心左缘)
+            if x0 < _bl2:                              # 左缘注列: 整条左白边(到版心左缘)
                 a_, b_ = 0, lx + NOTE_LX_TOL_PX
             else:                                      # * 题注列(页中): 自身 x 带
                 a_, b_ = x0 - m, x1 + m
@@ -1231,6 +1303,8 @@ def frame_tex(pi, gm=None):
     gm: §1.98 框驱动路径给的已校正版框(in_l/in_r 用墨迹列带栅格校正过), 缺省现算。"""
     g = frame_geom(pi) if gm is None else gm
     if not g: return []
+    if g.get('virtual'):
+        return []          # §1.975 无版框书: 伪版心不是印出来的 -> **不凭空画**外框/内框/界行线
     puts = []
     def hl(x0, x1, ytop, th):
         puts.append(r'\put(%.1f,%.1f){\rule{%.2fpt}{%.2fpt}}' % (x0, page_h - ytop - th, x1 - x0, th))
@@ -1540,6 +1614,206 @@ def derot_rows(k, pi, rows):
         pi + 1, tag, len(rows), len(cols), kx, bx, rms, ky, by))
     return out
 
+# ---------- 1.975) 无版框书: 伪版心 + 伪槽格(taskO / #29) ----------
+# 背景(#29): §1.98/§1.99 的几何全部锚在**版框**上(frame_geom) —— 无版框的书(本册的排印本正文页)
+#   取不到版框 -> page_metrics 全 None -> 整页走 v2 流式排版(列位/字号取 OCR 盒的全局拟合),
+#   且 §1.956 的源图侧标定样本(XSCALE / PUNCT_* / BR_SIZE* / INK_*)一个也取不到 -> 8 项回落兜底。
+# 做法(与 §1.99 同源, 只把「版心」换成**伪版心**):
+#   伪版心 = 本页正文 OCR 行并集的墨迹包围盒(正文行 = 本页页高比例的「长行」+ 单行文本);
+#   伪槽格 = 伪版心内 _ink_bands(cov=0.12) 的墨迹列带 —— 每带 = 一列; 格边界 = 相邻带心连线的中点
+#     (列间空隙中点), 首末格外扩半个列距 -> 格宽 = 列距, 与框驱动槽格同语义(标点摆位 PUNCT_DX 的
+#     分母 = 格距; 槽内 run/顶/底/步进/字号全部走 §1.98 同一套统计)。
+#   无版框 -> **不画**版框线/界行线(frame_tex 见 'virtual' 直接返回空): 不凭空画框。
+# 开关: NF_MODE = 抽样页一个版框都没测到(FRAME_REF is None) 且 VERT_NOFRAME != 0 ——
+#   有实测版框的书(wz6) 与「有版框但无槽可配」的页(§1.99)路径**一字不改**。
+# OCR 坐标回源图坐标系(taskO 实测, 见 docs/vert_noframe_report.md §3): 该书 OCR 帧相对源页有
+#   **系统性各向异性缩放**(p406 拟合 kx 1.20 / ky 1.12, 逐页略异; p407 整页还在 90° 旋转坐标系里,
+#   页码 x 因此合法地越出页幅) —— OCR 绝对坐标不能直接与源图门限比较(实测 p406 最左列 OCR x0=76px
+#   落进全局「左页边带」被当边注丢弃; 页码行 OCR x 落进版心带 -> 不认作特殊行)。故本路径先做
+#   **逐页仿射标定**(OCR 行心 ↔ 墨迹列心; 尺度 = 相邻间距比的中位, 截距 = 中位差; y 尺度 = 字步进比
+#   中位), 把本页 OCR 行映射回源图坐标系(只改几何, 文本不动), 再交既有判据(is_body_col/
+#   special_rows/page_rows 本就是「源图坐标系」口径) —— 这是「坐标系问题」的处置。
+NF_MODE = (FRAME_REF is None) and os.environ.get('VERT_NOFRAME', '1') not in ('0', 'false', 'False')
+_NF['on'] = NF_MODE             # 置位 §1.06 的逐页门限(在此之前一律用全局门限)
+NF_MIN_COL = 3                  # 伪槽格最少列数(更少 -> 该页交回 v2 流式)
+NF_COV = 0.12                   # 墨迹列带覆盖阈值(与 §1.99 同: 带出段尾短列)
+NF_FIT_K = (0.7, 1.6)           # OCR/源图 尺度合理区间(实测 1.07-1.20; 超出判标定失败, 保持原坐标)
+NF_FIT_RES = 0.5                # 标定残差上限(列距倍数): 超限说明配对错位 -> 不采纳
+
+def nf_body_rows(rows, ph):
+    """本页正文 OCR 行: 长行(本页页高 x LONG_H_FRAC) + 单行文本。
+    比 is_body_col 多两点(都是无版框书必需): ① 页幅用**本页**(混纸型); ② **不**按「左带小字」丢行
+    —— 无版框书的左侧就是正文列(实测 p406 最左列 OCR x0=76px < 全局左带 155px 会被误丢)。"""
+    return [r for r in rows
+            if (r[3] - r[2]) >= LONG_H_FRAC * ph and len(r[4]) >= 2 and '\n' not in r[4]]
+
+def nf_join_rows(rows):
+    """无版框书: 把 OCR 在「小字標題/曲牌 + 正文」相接处插进去的换行拼回一行(实测 wz7 多页:
+    「甜水令\\n「瓊樹生花，玉龍晚凍…」行盒仍是**一整列** —— y 跨度/字数 = 常列步进)。
+    wz6 的换行行是「多块合并的残片」(图例 194 字), 故该规则**只在 NF 路径用**。
+    判据: 该行步进 ∈ [0.7, 1.4] × 本页常列步进中位 -> 拼回; 否则保持原样(下游按残片丢弃)。"""
+    st = sorted((r[3] - r[2]) / max(1, len(r[4])) for r in rows if len(r[4]) >= 2 and '\n' not in r[4])
+    if not st: return rows
+    med = st[len(st) // 2]
+    out = []
+    for x0, x1, y0, y1, t in rows:
+        if '\n' not in t:
+            out.append((x0, x1, y0, y1, t)); continue
+        t2 = t.replace('\n', '')
+        s2 = (y1 - y0) / max(1, len(t2))
+        out.append((x0, x1, y0, y1, t2) if 0.7 * med <= s2 <= 1.4 * med else (x0, x1, y0, y1, t))
+    return out
+
+def nf_fill_bands(ink, bands, il, ir, it, ib, need, cov_lo=0.04):
+    """墨迹列带**补齐**(与 §1.99「残余墨迹列」同法): 把已检列带涂掉后, 在残余墨迹的 x 投影上按
+    低阈值 cov_lo 补带, 直到条数不少于 need。
+    为什么必须补: 段尾/詩行短列的墨迹覆盖度低于 cov=0.12 会漏检(实测 wz7 源页 1205: 真列 18 条
+    只检到 15 条), 而列带数 < 正文行数时 page_puts 把配不上的行**整列丢掉**(实测该页丢 78 字:
+    「遞畢酒…」44 字 + 「小優彈唱起來…」34 字)。"""
+    if len(bands) >= need: return bands
+    import numpy as np
+    il2, ir2 = int(il * 2), int(ir * 2)
+    ya, yb = int((it + 2) * 2), int((ib - 2) * 2)
+    if ir2 <= il2 or yb <= ya: return bands
+    left = ink[ya:yb, il2:ir2].copy()
+    for a, b in bands:
+        xa = max(0, int(a * 2) - il2 - 2); xb = min(left.shape[1], int(b * 2) - il2 + 2)
+        if xb > xa: left[:, xa:xb] = False
+    extra = [((il2 + a) / 2.0, (il2 + b + 1) / 2.0)
+             for a, b in _runs(left.mean(axis=0) > cov_lo, 4) if b - a >= 16]
+    extra.sort(key=lambda t: -(t[1] - t[0]))                  # 取墨迹最多的补足
+    return sorted(bands + extra[:max(0, need - len(bands))])
+
+def nf_edges(bands):
+    """墨迹列带 -> (伪槽格边界 edges, 列距中位 pitch)。边界 = 相邻带心中点, 首末外扩 pitch/2;
+    格宽因此 = 该处列距(与 §1.98「槽 = 内框等分」同语义: 标点摆位的分母是格距)。"""
+    cs = sorted((a + b) / 2.0 for a, b in bands)
+    if len(cs) < NF_MIN_COL: return None, 0.0
+    ds = [y - x for x, y in zip(cs, cs[1:]) if y - x > 4.0]
+    if len(ds) < 2: return None, 0.0
+    p = statistics.median(ds)
+    if p <= 0: return None, 0.0
+    return [cs[0] - p / 2.0] + [(a + b) / 2.0 for a, b in zip(cs, cs[1:])] + [cs[-1] + p / 2.0], p
+
+def nf_fit(pairs):
+    """(OCR, 源图) 成对坐标(同序) -> (k, b, rms): x_ocr = k*x_src + b; 样本/间距不足 -> None。
+    尺度用**相邻间距比的中位**(个别配对错位只是离群值, 不影响中位), 截距用中位差。"""
+    if len(pairs) < 4: return None
+    rs = [(o2 - o1) / (s2 - s1) for (o1, s1), (o2, s2) in zip(pairs, pairs[1:]) if (s2 - s1) > 8.0]
+    if len(rs) < 3: return None
+    k = statistics.median(rs)
+    b = statistics.median([o - k * s for o, s in pairs])
+    res = sorted(abs(o - (k * s + b)) for o, s in pairs)
+    return k, b, res[len(res) // 2]
+
+def nf_fit_align(cs, ro, slack=3):
+    """源图列心 cs / OCR 行心 ro(各自按 x 升序; 条数可不等 —— 端部多一条残片/漏检) -> (k,b,rms,pairs)。
+    做法: 枚举「相对错位 d」把两个序列错开对齐, 取残差中位最小者 —— 直接按下标配对在条数不等时
+    会整段错位(实测 p1207: 17 带 vs 16 行, 按标配对累计漂移 3 列 -> 拟合出尺度 2.4 的假值)。
+    尺度/残差合理性由调用方按 NF_FIT_K / NF_FIT_RES 判(这里只给候选)。配对序 = 由右向左? 不: 升序。"""
+    best = None
+    for d in range(-slack, slack + 1):
+        pr = [(ro[i + d], cs[i]) for i in range(len(cs)) if 0 <= i + d < len(ro)]
+        if len(pr) < 4: continue
+        f = nf_fit(pr)
+        if not f: continue
+        k, b, rms = f
+        if not (NF_FIT_K[0] <= k <= NF_FIT_K[1]): continue
+        if best is None or rms < best[2] - 1e-9 or (rms < best[2] + 1e-9 and len(pr) > len(best[3])):
+            best = (k, b, rms, pr)
+    return best
+
+_nf_done = set()                # 已标定回源图坐标系的页(避免重复标定)
+def _nf_fix_page(pi, k, body, bands, ink, it, ib):
+    """逐页 OCR 帧 -> 源图坐标系(仿射)。返回 (新 rows, 说明) 或 (None, 原因)。
+    尺度/残差不过关 -> 不采纳(宁可留原坐标: 错标定会把整页列搬出页外)。"""
+    st = [_band_stats(ink, a, b, it, ib) for a, b in bands]
+    ok = sorted([(a + b) / 2.0, s] for (a, b), s in zip(bands, st)
+                if s['top'] is not None and s['step'] > 0)            # 源图: 墨迹列(左->右)
+    if len(ok) < 4: return None, '列带统计不足 %d' % len(ok)
+    cs = [c for c, _s in ok]
+    ro = sorted(body, key=lambda r: (r[0] + r[1]) / 2.0)              # OCR: 行心 左->右
+    if abs(len(cs) - len(ro)) > max(1, 0.35 * max(len(cs), len(ro))):
+        return None, '列带/行 条数差太大 %d vs %d' % (len(cs), len(ro))
+    # 单位: 墨迹侧是 pt, OCR 侧是 2x px -> 统一到 px(与行坐标同单位, 反解后仍回到 px 口径)
+    cs2 = [c * 2.0 for c in cs]
+    pitch = statistics.median([y - x for x, y in zip(cs2, cs2[1:])]) if len(cs2) > 1 else 0.0
+    fx = nf_fit_align(cs2, [(r[0] + r[1]) / 2.0 for r in ro])
+    if not fx: return None, 'x 样本不足/尺度不合理'
+    kx, bx, rx, pr = fx
+    if pitch <= 0 or rx > NF_FIT_RES * pitch:
+        return None, 'x 尺度%.3f 残差%.1fpx(>%.1f) 不可信' % (kx, rx, NF_FIT_RES * pitch)
+    # y: 尺度 = 字步进比的中位(行高/字数 ÷ 墨迹字步进); 截距 = 行心/列心差的中位
+    smap = dict((round(c, 3), s) for c, s in ok)
+    rmap = dict((round((r[0] + r[1]) / 2.0, 3), r) for r in ro)
+    bys, yy = [], []
+    for o, c in pr:
+        r = rmap[round(o, 3)]; s = smap[round(c / 2.0, 3)]
+        stp = (r[3] - r[2]) / max(1, len(r[4]))
+        if s['step'] > 0 and stp > 0: bys.append(stp / (s['step'] * 2.0))
+        yy.append(((r[2] + r[3]) / 2.0, (s['top'] + s['bot'])))
+    if len(bys) < 4: return None, 'y 样本不足'
+    ky = statistics.median(bys)
+    if not (NF_FIT_K[0] <= ky <= NF_FIT_K[1]): return None, 'y 尺度%.3f 不可信' % ky
+    by = statistics.median([o - ky * s for o, s in yy])
+    n = len(pr)
+    # 采纳前再验一次「映射后正文落点」: 正文 x 带必须落在墨迹列带附近且在页幅内 ——
+    #   残差小但整体错位的拟合(配对漂移 1-2 列)会把整页列搬到页外(实测 p1709 映射后 x -516px)。
+    pw, ph = _nf_page_px(pi)
+    c0 = min(kx * r[0] + bx for r in body); c1 = max(kx * r[1] + bx for r in body)
+    b0, b1 = bands[0][0] * 2.0, bands[-1][1] * 2.0
+    if not (-0.02 * pw <= c0 and c1 <= 1.02 * pw
+            and abs(c0 - b0) <= 0.25 * pw and abs(c1 - b1) <= 0.25 * pw):
+        return None, '映射后正文 x %.0f-%.0f 与墨迹列带 %.0f-%.0f 不符' % (c0, c1, b0, b1)
+    out = []
+    for x0, x1, y0, y1, t in all_rows[k]:
+        out.append((kx * x0 + bx, kx * x1 + bx, ky * y0 + by, ky * y1 + by, t))
+    return out, 'kx%.3f bx%+.1f 残差%.1fpx ky%.3f by%+.1f (配 %d 列)' % (kx, bx, rx, ky, by, n)
+
+def nf_frame(pi, k):
+    """无版框页 -> 伪版心 dict(键同 frame_geom, 另加 virtual/cells/page/pitch) 或 None。
+    顺带把本页 OCR 坐标标定回源图坐标系(每页一次, 原地改 all_rows[k])。结果按页缓存。"""
+    if pi in _nf_cache: return _nf_cache[pi]
+    _nf_cache[pi] = _nf_frame(pi, k)
+    return _nf_cache[pi]
+
+def _nf_frame(pi, k):
+    pw, ph = _nf_page_px(pi)
+    ink = _nf_ink(pi)                       # 自适应阈值(与标定/渲染同口径)
+    rows = all_rows.get(k)
+    if not rows: return None
+    rows = nf_join_rows(rows)               # OCR 插的换行拼回(只 NF: 见 nf_join_rows)
+    all_rows[k] = rows
+    body = nf_body_rows(rows, ph)
+    if len(body) < NF_MIN_COL: return None
+    il = min(r[0] for r in body) / 2.0; ir = max(r[1] for r in body) / 2.0
+    it = min(r[2] for r in body) / 2.0; ib = max(r[3] for r in body) / 2.0
+    bands = _ink_bands(ink, il, ir, it, ib, cov=NF_COV)
+    bands = nf_fill_bands(ink, bands, il, ir, it, ib, len(body))   # 短列补齐(否则整列被丢)
+    if len(bands) < NF_MIN_COL: return None
+    fixed = None
+    if pi not in _nf_done:                       # ① OCR 坐标 -> 源图坐标系(只做一次)
+        _nf_done.add(pi)
+        fixed, why = _nf_fix_page(pi, k, body, bands, ink, it, ib)
+        if fixed:
+            all_rows[k] = fixed
+            rows = fixed
+            body = nf_body_rows(rows, ph)
+            if len(body) < NF_MIN_COL: return None
+            il = min(r[0] for r in body) / 2.0; ir = max(r[1] for r in body) / 2.0
+            it = min(r[2] for r in body) / 2.0; ib = max(r[3] for r in body) / 2.0
+            bands = _ink_bands(ink, il, ir, it, ib, cov=NF_COV)
+            if len(bands) < NF_MIN_COL: return None
+        elif why:
+            print('    [无框-坐标] p%d OCR 帧未标定(%s) -> 用原坐标' % (pi + 1, why))
+    edges, pitch = nf_edges(bands)
+    if not edges: return None
+    return {'in_l': il, 'in_r': ir, 'in_t': it, 'in_b': ib, 'in_th': 0.0, 'ib_th': 0.0,
+            'out_t': None, 'out_t_th': V_FRAME_TH, 'out_b': None, 'out_b_th': V_FRAME_TH,
+            'out_l': None, 'out_l_th': V_FRAME_TH, 'out_r': None, 'out_r_th': V_FRAME_TH,
+            'thin': [], 'pitch': pitch, 'hx_l': il, 'hx_r': ir, 'bar': (0.0, 0.0),
+            'virtual': True, 'cells': edges, 'page_px': (pw, ph), 'fixed': bool(fixed), 'rows': body}
+
 # ---------- 1.98) 框驱动排版基准(逐页版框/槽格/墨带/字号) ----------
 # 背景(实测): v2 的排版基准取自 OCR 盒的全局中位(字号 34.4/列距 47.6/列高 863.7), 但 OCR 坐标
 #   逐页有 ~10% 量级的伸缩 + 相位漂移(实测 p100: OCR 相邻列 x0 差 48.0pt vs 源书版框实测 43.5pt;
@@ -1613,11 +1887,97 @@ def _grid_from_bands(bands, il, ir, n=None):
     if not (0.9 * (ir - il) <= n * p <= 1.1 * (ir - il)): return None
     return e, p
 
+def _slots_of_edges(ink, dink, edges, it, ib):
+    """槽格边界 edges(pt) -> 逐槽统计 [{x0,x1,nr,hm,step,runs,top,bot}] 或 None。
+    框驱动槽格(§1.98: 内框等分/墨迹列带栅格)与无框伪槽格(§1.975: 墨迹列带)共用同一套口径,
+    保证两种来源的槽统计可比(XSCALE/PUNCT_* 的源侧样本即取自这里)。"""
+    n = len(edges) - 1
+    raw = [_slot_runs(ink, edges[i], edges[i + 1], it, ib, min_h=0.0) for i in range(n)]
+    # 异常长 run 剔掉(> 3x 全页 run 高中位): 淡界行线/扫描黑边被并进槽内时会连成一条竖贯 run
+    #   (实测 p32: 两槽的 run 高 768pt -> 字号被算成 873pt, 该页判不适配)
+    _al = sorted(b - a for rs in raw for a, b in rs if b - a >= 4.0)
+    _cap = max(40.0, 3.0 * _al[len(_al) // 2]) if _al else 40.0
+    # 槽顶/槽底另走「全墨迹」口径(实测, 全书 2640 槽里 8 槽的底、4 槽的顶被上面的长 run 剔除
+    #   截断, 最大 471pt —— 实测 p149 c1 底 611 vs 真值 1082.5、p223 c1 顶 1049.5 vs 真值 305):
+    #   ① 只剔「贴扫描窗口边」的 run(版框横线/装订黑边一定贴窗边; 正文字墨离墨带顶 ~12pt);
+    #   ② 合并成长 run 的连续字(相邻字墨相碰)不剔 —— 取首 run 顶/末 run 底即为该列墨迹上下缘。
+    _ea, _eb = (it + 2.0), (ib - 2.0)
+    draw = [_slot_runs(dink, edges[i], edges[i + 1], it, ib, min_h=0.0) for i in range(n)]
+    slots = []
+    for i in range(n):
+        rs = [r for r in raw[i] if 4.0 <= r[1] - r[0] <= _cap]
+        hs = sorted(b - a for a, b in rs)
+        cs = sorted((a + b) / 2.0 for a, b in rs)
+        ds = sorted(d for d in (cs[j + 1] - cs[j] for j in range(len(cs) - 1)) if d < 80)
+        step0 = ds[len(ds) // 2] if ds else 0.0
+        # ③ 细碎 run(高 <4pt: 「三」「一」「二」的分离点画、标点)贴到最近的字 run 上, 再取首/末。
+        #    否则列首/列尾是这类字时槽顶/底少算一个字(实测 p50 c12 源列首「三」331.0 被算成 360.0,
+        #    列顶偏 29pt; 同类字: 一二三川州)。离最近字 run 超过 0.4 步进(>12pt)的当噪点丢掉。
+        ext = [r for r in draw[i] if (r[0] - _ea) > 1.5 and (_eb - r[1]) > 1.5]
+        keep = [list(r) for r in ext if r[1] - r[0] >= 4.0]
+        _dd = 0.7 * (step0 or 12.0)   # 0.7 格: 省略号点画间距实测 ~16pt(0.4 格会漏, 见 p153 c9)
+        for t in [r for r in ext if r[1] - r[0] < 4.0]:
+            if not keep: keep.append(list(t)); continue
+            j, gap = None, 1e9
+            for k, r in enumerate(keep):
+                gp = min(abs(r[0] - t[1]), abs(t[0] - r[1]))
+                if gp < gap: j, gap = k, gp
+            if gap <= _dd:
+                keep[j][0] = min(keep[j][0], t[0]); keep[j][1] = max(keep[j][1], t[1])
+        slots.append({'x0': edges[i], 'x1': edges[i + 1], 'nr': len(rs),
+                      'hm': (hs[len(hs) // 2] if hs else 0.0), 'step': step0,
+                      'runs': rs,                        # taskJ-B: 空格检测用(逐字墨迹 run)
+                      'top': (keep[0][0] if keep else (rs[0][0] if rs else None)),
+                      'bot': (keep[-1][1] if keep else (rs[-1][1] if rs else None))})
+    return slots
+
+def _metrics_finish(pi, g, slots, it, ib, w):
+    """槽统计 -> page_metrics 结果(正文/注槽分类 + 墨带 + 字号 + 步进上限 + 合理性校验)。"""
+    hmax = max(s['hm'] for s in slots)
+    body = [s for s in slots if s['nr'] >= 2 and s['hm'] >= 0.75 * hmax]
+    note = [s for s in slots if s['nr'] >= 3 and s['hm'] < 0.75 * hmax]
+    m = None
+    if body:
+        # 墨带顶/底 = 正文块上/下缘: 全槽中位会被「段首缩进列」(顶) / 「段尾短列」(底) 带偏
+        #   (实测 p18: 12 槽里 6 个短列 -> 中位底 1068, 而满列底 1099.5, 差 31pt = 1 格)。
+        #   取「偏满列的一半」的中位: 顶取上半(小的那一半)中位, 底取下半(大的那一半)中位。
+        tots = sorted(s['top'] for s in body if s['top'])
+        bots = sorted(s['bot'] for s in body if s['bot'])
+        band_t = (statistics.median([t for t in tots if t <= tots[len(tots) // 2]])
+                  if tots else it)
+        band_b = (statistics.median([b for b in bots if b >= bots[len(bots) // 2]])
+                  if bots else ib)
+        font = round(statistics.median(s['hm'] for s in body) / INK_RATIO, 1)
+        caps = [s['step'] for s in body if s['step'] > 0]
+        m = {'pi': pi, 'slots': slots, 'body': body, 'note': note, 'g': g,
+             'band_t': band_t, 'band_b': band_b, 'block_b': (max(bots) if bots else ib),
+             'font': font,
+             'step_cap': round(statistics.median(caps), 2) if caps else font * 0.9,
+             'w': w}
+    elif note:
+        # 整页小字(如 p230 尾注页): 全部当正文槽, 字号按实测小字
+        nb = [s['bot'] for s in note if s['bot']]
+        band_t = statistics.median(s['top'] for s in note)
+        band_b = statistics.median(nb)
+        font = round(statistics.median(s['hm'] for s in note) / INK_RATIO, 1)
+        m = {'pi': pi, 'slots': slots, 'body': slots, 'note': [], 'g': g,
+             'band_t': band_t, 'band_b': band_b, 'block_b': max(nb), 'font': font,
+             'step_cap': font * 0.95, 'w': w}
+    # 合理性校验: 字号 10-60pt(源书正文 34/双行小字 22; 超出即非文字页) 且 墨带高 >= 0.4 版心高
+    #   (实测 p229 插图页 12 槽各一条 795pt 竖贯 run -> 字号 896pt; p156 註釋页墨带仅 78pt)
+    if m and not (10.0 <= m['font'] <= 60.0 and (m['band_b'] - m['band_t']) >= 0.4 * (ib - it)):
+        print('    [基准否决] p%d 字号 %.1f 墨带 %.1f-%.1f (版心高 %.1f) -> 回退流式' % (
+            pi + 1, m['font'], m['band_t'], m['band_b'], ib - it))
+        m = None
+    return m
+
 _metrics_cache = {}
 def page_metrics(pi):
     """逐页框驱动基准 -> dict 或 None(无版框页: 封面/p1-p2/末页)。
     key: slots[](12 槽: x0/x1/nr/hm/step/top/bot), body[](正文槽), note[](小字注槽),
-         band_t/band_b 正文墨带(pt), font 字号, step_cap 步进上限, w 内框宽。"""
+         band_t/band_b 正文墨带(pt), font 字号, step_cap 步进上限, w 内框宽。
+    无版框书(§1.975 NF_MODE): frame_geom 测不到版框时走**伪版心/伪槽格**(墨迹列带), 其余口径相同
+      —— 该分支只在本册「一个版框都没测到」时启用, 有版框书走上面的原路径一字不改。"""
     if pi in _metrics_cache: return _metrics_cache[pi]
     m = None
     g = frame_geom(pi)
@@ -1629,6 +1989,7 @@ def page_metrics(pi):
         #   差异的 7 槽(0.8%)深墨阈值均给出更完整的列范围。
         dink = src_gray(pi) < 110
         il, ir, it, ib = g['in_l'], g['in_r'], g['in_t'], g['in_b']
+        il0, ir0 = il, ir                     # m['w'] 用**原始**内框宽(栅格校正只改槽格, 不改这条)
         n = N_COL_FRAME
         edges = [il + (ir - il) * i / n for i in range(n + 1)]
         bands = _ink_bands(ink, il, ir, it, ib)
@@ -1640,78 +2001,21 @@ def page_metrics(pi):
                     pi + 1, il, ir, e, e + n * p, p))
             edges = [e + p * i for i in range(n + 1)]
             g = dict(g); g['in_l'], g['in_r'] = round(e, 1), round(e + n * p, 1)
-        raw = [_slot_runs(ink, edges[i], edges[i + 1], it, ib, min_h=0.0) for i in range(n)]
-        # 异常长 run 剔掉(> 3x 全页 run 高中位): 淡界行线/扫描黑边被并进槽内时会连成一条竖贯 run
-        #   (实测 p32: 两槽的 run 高 768pt -> 字号被算成 873pt, 该页判不适配)
-        _al = sorted(b - a for rs in raw for a, b in rs if b - a >= 4.0)
-        _cap = max(40.0, 3.0 * _al[len(_al) // 2]) if _al else 40.0
-        # 槽顶/槽底另走「全墨迹」口径(实测, 全书 2640 槽里 8 槽的底、4 槽的顶被上面的长 run 剔除
-        #   截断, 最大 471pt —— 实测 p149 c1 底 611 vs 真值 1082.5、p223 c1 顶 1049.5 vs 真值 305):
-        #   ① 只剔「贴扫描窗口边」的 run(版框横线/装订黑边一定贴窗边; 正文字墨离墨带顶 ~12pt);
-        #   ② 合并成长 run 的连续字(相邻字墨相碰)不剔 —— 取首 run 顶/末 run 底即为该列墨迹上下缘。
-        _ea, _eb = (it + 2.0), (ib - 2.0)
-        draw = [_slot_runs(dink, edges[i], edges[i + 1], it, ib, min_h=0.0) for i in range(n)]
-        slots = []
-        for i in range(n):
-            rs = [r for r in raw[i] if 4.0 <= r[1] - r[0] <= _cap]
-            hs = sorted(b - a for a, b in rs)
-            cs = sorted((a + b) / 2.0 for a, b in rs)
-            ds = sorted(d for d in (cs[j + 1] - cs[j] for j in range(len(cs) - 1)) if d < 80)
-            step0 = ds[len(ds) // 2] if ds else 0.0
-            # ③ 细碎 run(高 <4pt: 「三」「一」「二」的分离点画、标点)贴到最近的字 run 上, 再取首/末。
-            #    否则列首/列尾是这类字时槽顶/底少算一个字(实测 p50 c12 源列首「三」331.0 被算成 360.0,
-            #    列顶偏 29pt; 同类字: 一二三川州)。离最近字 run 超过 0.4 步进(>12pt)的当噪点丢掉。
-            ext = [r for r in draw[i] if (r[0] - _ea) > 1.5 and (_eb - r[1]) > 1.5]
-            keep = [list(r) for r in ext if r[1] - r[0] >= 4.0]
-            _dd = 0.7 * (step0 or 12.0)   # 0.7 格: 省略号点画间距实测 ~16pt(0.4 格会漏, 见 p153 c9)
-            for t in [r for r in ext if r[1] - r[0] < 4.0]:
-                if not keep: keep.append(list(t)); continue
-                j, gap = None, 1e9
-                for k, r in enumerate(keep):
-                    gp = min(abs(r[0] - t[1]), abs(t[0] - r[1]))
-                    if gp < gap: j, gap = k, gp
-                if gap <= _dd:
-                    keep[j][0] = min(keep[j][0], t[0]); keep[j][1] = max(keep[j][1], t[1])
-            slots.append({'x0': edges[i], 'x1': edges[i + 1], 'nr': len(rs),
-                          'hm': (hs[len(hs) // 2] if hs else 0.0), 'step': step0,
-                          'runs': rs,                        # taskJ-B: 空格检测用(逐字墨迹 run)
-                          'top': (keep[0][0] if keep else (rs[0][0] if rs else None)),
-                          'bot': (keep[-1][1] if keep else (rs[-1][1] if rs else None))})
-        hmax = max(s['hm'] for s in slots)
-        body = [s for s in slots if s['nr'] >= 2 and s['hm'] >= 0.75 * hmax]
-        note = [s for s in slots if s['nr'] >= 3 and s['hm'] < 0.75 * hmax]
-        if body:
-            # 墨带顶/底 = 正文块上/下缘: 全槽中位会被「段首缩进列」(顶) / 「段尾短列」(底) 带偏
-            #   (实测 p18: 12 槽里 6 个短列 -> 中位底 1068, 而满列底 1099.5, 差 31pt = 1 格)。
-            #   取「偏满列的一半」的中位: 顶取上半(小的那一半)中位, 底取下半(大的那一半)中位。
-            tots = sorted(s['top'] for s in body if s['top'])
-            bots = sorted(s['bot'] for s in body if s['bot'])
-            band_t = (statistics.median([t for t in tots if t <= tots[len(tots) // 2]])
-                      if tots else it)
-            band_b = (statistics.median([b for b in bots if b >= bots[len(bots) // 2]])
-                      if bots else ib)
-            font = round(statistics.median(s['hm'] for s in body) / INK_RATIO, 1)
-            caps = [s['step'] for s in body if s['step'] > 0]
-            m = {'pi': pi, 'slots': slots, 'body': body, 'note': note, 'g': g,
-                 'band_t': band_t, 'band_b': band_b, 'block_b': (max(bots) if bots else ib),
-                 'font': font,
-                 'step_cap': round(statistics.median(caps), 2) if caps else font * 0.9,
-                 'w': ir - il}
-        elif note:
-            # 整页小字(如 p230 尾注页): 全部当正文槽, 字号按实测小字
-            nb = [s['bot'] for s in note if s['bot']]
-            band_t = statistics.median(s['top'] for s in note)
-            band_b = statistics.median(nb)
-            font = round(statistics.median(s['hm'] for s in note) / INK_RATIO, 1)
-            m = {'pi': pi, 'slots': slots, 'body': slots, 'note': [], 'g': g,
-                 'band_t': band_t, 'band_b': band_b, 'block_b': max(nb), 'font': font,
-                 'step_cap': font * 0.95, 'w': ir - il}
-        # 合理性校验: 字号 10-60pt(源书正文 34/双行小字 22; 超出即非文字页) 且 墨带高 >= 0.4 内框高
-        #   (实测 p229 插图页 12 槽各一条 795pt 竖贯 run -> 字号 896pt; p156 註釋页墨带仅 78pt)
-        if m and not (10.0 <= m['font'] <= 60.0 and (m['band_b'] - m['band_t']) >= 0.4 * (ib - it)):
-            print('    [基准否决] p%d 字号 %.1f 墨带 %.1f-%.1f (内框高 %.1f) -> 回退流式' % (
-                pi + 1, m['font'], m['band_t'], m['band_b'], ib - it))
-            m = None
+        slots = _slots_of_edges(ink, dink, edges, it, ib)
+        m = _metrics_finish(pi, g, slots, it, ib, ir0 - il0)
+    elif NF_MODE and src_doc is not None:
+        # ---- §1.975 无版框伪槽格: 版心 = 正文行墨迹包围盒, 槽 = 墨迹列带(格边界 = 相邻带心中点) ----
+        gv = nf_frame(pi, keys[pi])
+        if gv:
+            ink = _nf_ink(pi)
+            dink = src_gray(pi) < 0.75 * _nf_ink_gray(src_gray(pi))   # 深墨掩膜(同比例)
+            slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'])
+            m = _metrics_finish(pi, gv, slots, gv['in_t'], gv['in_b'], gv['in_r'] - gv['in_l'])
+            if m:
+                print('    [无框伪槽格] p%d %d 列(列距%.2f) 字号%.1f 墨带 %.1f-%.1f 版心 x%.1f-%.1f y%.1f-%.1f%s' % (
+                    pi + 1, len(gv['cells']) - 1, gv['pitch'], m['font'], m['band_t'], m['band_b'],
+                    gv['in_l'], gv['in_r'], gv['in_t'], gv['in_b'],
+                    '' if gv['fixed'] else ' (OCR 坐标未标定)'))
     _metrics_cache[pi] = m
     return m
 
@@ -1831,9 +2135,15 @@ def page_rows(k, m, pi):
             else:
                 keep.append(r)
         out_rows = keep
+    if os.environ.get('VERT_NF_DBG'):
+        print('    [行分组] p%d 原始 %d -> 认领后 %d; 版心内 %d 页外 %d' % (
+            pi + 1, len(all_rows[k]), len(inb), len(ins), len(out_rows)))
     step_px = statistics.median([(r[3] - r[2]) / float(len(r[4])) for r in inb]) if inb else 60.0
     ins = _merge_col_rows(ins, step_px)
     out_rows = _merge_col_rows(out_rows, step_px)
+    if os.environ.get('VERT_NF_DBG'):
+        print('    [行分组] p%d 合并后 版心内 %d 页外 %d (步进中位 %.1f)' % (
+            pi + 1, len(ins), len(out_rows), step_px))
     if len(ins) < 2:
         return ins, [], out_rows
     # 短行(n<8)另判: OCR 的 y 跨度对短列松紧不一(实测 p162「問題。」3 字列 span/n 只有 33pt 而
@@ -1866,6 +2176,13 @@ def page_rows(k, m, pi):
             body += lng
     else:
         body += lng
+    if os.environ.get('VERT_NF_DBG'):
+        print('    [行归属] p%d 正文 %d / 注 %d / 页外 %d; 丢弃行:' % (
+            pi + 1, len(body), len(note), len(out_rows)))
+        _kept = set(id(r) for r in body + note + out_rows)
+        for r in all_rows[k]:
+            if id(r) not in _kept:
+                print('        x%7.1f-%7.1f y%7.1f n%3d %s' % (r[0] / 2, r[1] / 2, r[2] / 2, len(r[4]), r[4][:28]))
     return body, note, out_rows
 
 def _esc_ch(t):
@@ -1965,7 +2282,7 @@ def page_puts(k, pi, m):
     slots = sorted(m['body'], key=lambda s: -s['x1'])
     R, C = len(rows), len(slots)
     if C and 1.7 * C <= R <= 2.3 * C:                    # 双行小字页: 槽内再分左右子列
-        ink = src_gray(pi) < 150
+        ink = _frame_ink(pi, m['g'])
         it, ib = m['g']['in_t'], m['g']['in_b']
         sub = []
         for s in slots:
@@ -2031,7 +2348,7 @@ def page_puts_loose(k, pi, g):
          的步进取小; 字号 = min(源测字号, 由装得下内框反解的上限), 再交 col_puts 渲染
          (标点挤格 §1.0 / 字号保护 一并生效)。
     返回 (tex 列表, 配对数)。"""
-    ink = src_gray(pi) < 150
+    ink = _frame_ink(pi, g)
     il, ir, it, ib = g['in_l'], g['in_r'], g['in_t'], g['in_b']
     T, B = it + 2.0, ib - 2.0
     avail = B - T
@@ -2368,10 +2685,24 @@ def _calib_xscale(src_body, probe, corpus):
     为什么用面积/高²而不是墨宽/墨高: x 向压缩 K 不改墨高、把墨面积乘 K, 故该比值就是 K;
     而墨宽/墨高比只反映字形宽窄(源书铅字比 Noto 窄 1.48 倍), 直接当 K 会把字压到 0.67
     -> 墨量比源书少 23%(用户抱怨的正是「密密麻麻」= 墨量偏多), 见报告 §3.1。
+    **注意口径适用边界(taskO)**: a/h² 与二值化阈值强相关 —— 墨迹边缘的灰晕对面积的贡献远大于对
+    高度的贡献(实测 wz6 110->170 阈值 a/h² +38%, 灰底扫描 wz7 +110%), 故换到软调/灰底扫描的书上
+    该口径会系统性偏大(wz7 算出 1.85 = 把字拉宽到列距的 1.8 倍, 直接崩版)。这类书(NF)改用
+    `_calib_xscale_w` 的「墨宽/墨高比」口径(同扫描 110->170 只变 ±5%)。样本不足 -> None。
     样本不足 -> None(调用方回落兜底值)。"""
     sa = _calib_med([a / h ** 2 for h, _w, a in src_body])
     ba = _calib_med([probe[c][4] / probe[c][1] ** 2 for c in corpus if c in probe])
     return round(sa / ba, 3) if (sa and ba) else None
+
+def _calib_xscale_w(src_body, probe, corpus):
+    """XSCALE(宽高比口径) = 源书正文单字「墨宽/墨高」中位 ÷ 渲染同字「墨宽/墨高」中位。
+    只对**宽**、不对墨量: 源书铅字比 Noto 瘦(实测 wz6 0.65 / wz7 0.88 对 Noto ~1.0),
+    故该口径把字压得更窄、墨量略少于源书(这是它已知的代价, 见 taskM 报告 §3.1);
+    但它对二值化口径稳定(边缘灰晕同比放大墨宽与墨高 -> 比值不变), 换书/换扫描时不会翻车。
+    无版框书(NF)用这条。"""
+    sr = _calib_med([w / h for h, w, _a in src_body])
+    br = _calib_med([probe[c][0] / probe[c][1] for c in corpus if c in probe])
+    return round(sr / br, 3) if (sr and br) else None
 
 def _calib_punct_size(src_small, probe, body_h_em):
     """PUNCT_SIZE = 源书「挤格标点墨高 ÷ 正文字高」中位 × (渲染正文墨高em ÷ 渲染标点墨高em)。
@@ -2406,7 +2737,7 @@ def _calib_br_forms(forms, src_small, probe, body_h_em, body_w_em, xscale, dbg=F
     if dbg:
         _fams = sorted(set(FAM_OF_FORM.get(VERT_FORMS.get(f)) for f in forms))
         print('        [括号族 %-8s 样本明细] 质检前 %s | 质检后 %s' % (
-            '/'.join(_fams),
+            '/'.join(f for f in _fams if f),
             ['%s h%.3f w%.3f d_cy%.2f' % (s[0], s[2], s[3], s[5]) for s in Sall],
             ['%s h%.3f w%.3f d_cy%.2f' % (s[0], s[2], s[3], s[5]) for s in S]))
     R = {'n': len(Sall), 's_h': None, 's_w': None, 's': None, 'src_hh': None, 'src_ww': None,
@@ -2564,7 +2895,7 @@ def _calib_src_page(pi, k):
     pairs = _align_rows_slots(rows, slots)
     if not pairs:
         return None
-    ink = src_gray(pi) < 150
+    ink = _src_ink(pi)
     body, small = [], []
     for ri, si in pairs:
         t = rows[ri][4]
@@ -2852,8 +3183,13 @@ if _src_body and _probe:
     _nh = _calib_med([_probe[c][1] for c in _note_c if c in _probe]) or _bh
     _nmax = max([_probe[c][1] for c in (_body_c + _note_c) if c in _probe] or [0]) or None
     _asc = _calib_med([_probe[c][5] for c in _body_c if c in _probe])
-    # XSCALE
-    _calib_vals['XSCALE'] = _calib_xscale(_src_body, _probe, _body_c) or None
+    # XSCALE: 有版框书(wz6 口径, 已验收)用面积口径; 无版框书(NF)改用宽高比口径(见 _calib_xscale_w)
+    _xs_a = _calib_xscale(_src_body, _probe, _body_c)
+    _xs_w = _calib_xscale_w(_src_body, _probe, _body_c)
+    _calib_vals['XSCALE'] = (_xs_w if _NF['on'] else _xs_a) or None
+    if _xs_a and _xs_w:
+        print('[标定B] XSCALE 口径: 面积/高² %.3f | 宽/高比 %.3f -> 采用%s' % (
+            _xs_a, _xs_w, '宽高比(NF: 无版框书, 面积口径随二值化阈值漂移大)' if _NF['on'] else '面积/高²'))
     # 标点(字号 + 摆位三项同源)
     _ps = _calib_punct_size(_src_small, _probe, _bh)
     _py, _px, _pg = _calib_punct_pos(_src_small)
@@ -2969,6 +3305,18 @@ parts = [preamble]
 n_frame_pg = 0
 for i, pg in enumerate(sel):
     k = keys[pg-1]
+    # §1.975 无版框书: **逐页纸型** —— 同一册里可夹多种开本(实测 wz7 有 922x1437 / 892x1323 /
+    #   705x1084 三种)。\put 坐标以「页真左下角」为原点, 故页幅一改, 本页所有绝对定位随之对齐;
+    #   \special{papersize} 逐页改媒体框(dvipdfmx 支持文档中途改, 实测 2 页不同纸型输出正确)。
+    if NF_MODE and src_doc is not None:
+        _pw, _ph = _nf_page_px(pg - 1)
+        if (_pw, _ph) != (PW_PX, PH_PX):
+            page_w, page_h = _pw / PT_PER_PX, _ph / PT_PER_PX
+            parts.append('\\setlength{\\paperheight}{%.1fpt}\\setlength{\\paperwidth}{%.1fpt}\n'
+                         '\\special{papersize=%.1fpt,%.1fpt}' % (
+                             page_h, page_w, round(page_w * 1.00375, 1), round(page_h * 1.00375, 1)))
+            print('  [逐页纸型] p%d %.1f x %.1f pt (基准 %.1f x %.1f pt)' % (
+                pg, page_w, page_h, PW_PX / 2.0, PH_PX / 2.0))
     dr = derot_rows(k, pg - 1, all_rows[k])      # §1.97: OCR 旋转坐标系页还原(只影响本页)
     if dr is not None: all_rows[k] = dr
     parts.append('%% ===== 源第 %d 页 (key %s) =====' % (pg, k))
@@ -2997,6 +3345,8 @@ for i, pg in enumerate(sel):
     #   改用「内框内墨迹列带」绝对定位(与 §1.98 同源: 几何全部取源图墨迹实测)。
     if V_FRAME and V_FRAME_LAYOUT and src_doc is not None:
         gl = frame_geom(pg - 1)
+        if gl is None and NF_MODE:               # §1.975 无版框书: 兜底路径也锚在伪版心上
+            gl = nf_frame(pg - 1, k)
         if gl:
             puts2, _np2 = page_puts_loose(k, pg - 1, gl)
             if puts2:

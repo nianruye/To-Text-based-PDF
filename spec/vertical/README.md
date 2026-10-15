@@ -127,3 +127,9 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 2. **逐页字符量**：非预期差异页 0（wz6 p74/p231 为预期，见 `verify_vert.py` 的「预期差异页」自动识别机制）
 3. **越界**：全书 span/矢量 0 个超出页 rect
 4. **免回归**：改动后重跑 `verify_vert.py` + `pytest src/test/unit src/test/invariants`（横排 201 项不受影响）
+
+<!-- taskO(#29) 补充: 无版框书路径锚点(2026-10-15) -->
+| 分部 | 内容 | 锚点 |
+|---|---|---|
+| 09_calibration §9 | 无版框书: 伪版心/伪槽格 + 逐页门限/纸型 + OCR 帧标定 + NF 源侧口径 | §1.06 `L596-640`、§1.975 `L1600-1745`、§1.98 NF 分支 `L1940-1960` |
+| 07/08(标定侧) | 无框路径的 `XSCALE` 宽高比口径 `_calib_xscale_w` | §1.956 `L2985-2998` |

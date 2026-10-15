@@ -115,7 +115,7 @@ def out_pages(pdf_path, bbox_tol):
 
 
 def src_paper(pdf_path):
-    """源 PDF 纸型：众数页幅(竖排依赖精确页高: 右缘 = 70 + om + textheight) + 非众数页清单"""
+    """源 PDF 纸型：众数页幅(竖排依赖精确页高: 右缘 = 70 + om + textheight) + 非众数页清单 + 逐页页幅"""
     doc = fitz.open(pdf_path)
     per = [(round(p.rect.width, 2), round(p.rect.height, 2)) for p in doc]
     n = doc.page_count
@@ -124,7 +124,7 @@ def src_paper(pdf_path):
         return None, [], n
     modal, cnt = collections.Counter(per).most_common(1)[0]
     odd = [{"page": i + 1, "size": s} for i, s in enumerate(per) if s != modal]
-    return {"size": modal, "count": cnt}, odd, n
+    return {"size": modal, "count": cnt, "per_page": per}, odd, n
 
 
 def expected_reason(o, a):
@@ -215,10 +215,28 @@ def main():
             oh = out[0]["h"] if out else 0.0
             dw = abs(ow - pw) / pw if pw else 0.0
             dh = abs(oh - ph) / ph if ph else 0.0
-            print(f"页幅: 源书众数 {pw}x{ph}pt（{paper['count']}/{n_sp} 页）  |  输出 {ow}x{oh}pt  "
+            print(f"页幅: 源书众数 {pw}x{ph}pt（{paper['count']}/{n_sp} 页）  |  输出首页 {ow}x{oh}pt  "
                   f"|  相对差 {dw:.2%}/{dh:.2%}")
+            # 逐页页幅比对(taskO): 混纸型书(同一册里多种开本)输出本就该逐页不同 —— 只比众数会把
+            #   正确的逐页纸型判成失败(实测 wz7: 24 页里 8 页 922x1437 + 16 页 705x1084)。
+            #   门限仍是 0.5%(与原有判据一致); 逐页最大相对差成为 FAIL 判据。
+            per = paper.get("per_page") or []
+            dw = dh = 0.0
+            bad_pg = []
+            for i, o in enumerate(out):
+                if i >= len(per): break
+                sw, sh = per[i]
+                if not sw or not sh: continue
+                if (sw, sh) != (pw, ph): continue      # 源书非众数页: 按既有契约(输出单纸型)不判
+                _dw = abs(o["w"] - sw) / sw; _dh = abs(o["h"] - sh) / sh
+                if max(_dw, _dh) > 0.005:
+                    bad_pg.append((i + 1, sw, sh, o["w"], o["h"]))
+                dw = max(dw, _dw); dh = max(dh, _dh)
+            print(f"  逐页页幅(众数纸型页, 输出页 i vs 源页 i) 最大相对差 {dw:.2%}/{dh:.2%}"
+                  + (f"; 不符 {len(bad_pg)} 页: "
+                     + ", ".join("p%d 源%gx%g 输出%gx%g" % b for b in bad_pg[:6]) if bad_pg else "  ✓ 相符"))
             if odd:
-                print(f"  源书非众数页幅 {len(odd)} 页（输出统一用众数纸型，竖排按单一纸型渲染）: "
+                print(f"  源书非众数页幅 {len(odd)} 页（输出按源书逐页页幅渲染, 见上行逐页对账）: "
                       + ", ".join("p%d %sx%s" % (o["page"], o["size"][0], o["size"][1]) for o in odd[:6]))
     else:
         dw = dh = 0.0
@@ -254,7 +272,7 @@ def main():
     if lost:
         fails.append("整页丢失(0 字) %d 页: %s" % (len(lost), ",".join("p%d" % r["page"] for r in lost[:8])))
     if a.src_pdf and paper and max(dw, dh) > 0.005:
-        fails.append(f"页幅与源书众数纸型不符: 相对差 {dw:.2%}/{dh:.2%}")
+        fails.append(f"页幅(逐页 vs 源书)相对差超阈: 最大 {dw:.2%}/{dh:.2%}")
     if fails:
         print("\n== 退出码 FAIL ==")
         for f in fails:
