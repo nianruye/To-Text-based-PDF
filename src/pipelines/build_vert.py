@@ -70,6 +70,204 @@ def n_cells(t):
     """排版格数 = 字数 - 挤格标点数(标点挤在前字格内, 不占格)"""
     return max(1, sum(1 for c in t if c not in PUNCT_HANG))
 
+def char_cells(t):
+    """逐字格号 [(cell, hanging)] —— 挤格标点与前一字同格(hanging=True); 其余各占一格。"""
+    out = []
+    k = 0
+    for i, c in enumerate(t):
+        if c in PUNCT_HANG and i > 0:
+            out.append((max(0, k - 1), True))
+        else:
+            out.append((k, False))
+            k += 1
+    return out
+
+# ---------- 1.0a) 字模横向压缩(taskJ-A) ----------
+# 背景(用户实测反馈①「看着密密麻麻」): 重建页的墨迹覆盖率比源书高 17-25%。
+# 实测(探针 tmp_vert/taskJ/measure_char2.py, wz6 p10/p14/p100, 4x 灰度同阈值 150, 逐字墨迹):
+#   源书   墨高 29.75pt / 墨宽 20.0pt (宽高比 0.67 —— 长体/窄体宋, 竖排老铅字常态)
+#   本项目 Noto Serif CJK TC 墨高 29.25pt / 墨宽 29.25pt (宽高比 1.0, 全角方体)
+#   -> 单字墨迹面积 我/源 = 1.13-1.19(页级), 其中 字宽因子 x1.48 / 墨高因子 x0.98 / 填充率 x0.79。
+# 修法: 横向压缩字形(保字高) —— 实测墨迹面积随 K 等比缩放(墨宽 = 27.5xK 精确)。
+#   K 由三页实测标定: K=0.87 时修后单字墨迹面积与源书差 -4.1%..+0.9%(两种阈值口径都在 ±5% 内)。
+#   墨高不变(源书 29.75 vs 我 29.25, 已是 -1.7%), 步进/列距/列位全不动(框驱动基准不受影响)。
+#
+# ⚠ 实现方式(taskJ2 修泄漏): **不用 \\scalebox**(graphicx), 改用手写 PDF 算子 q/<K> 0 0 1 0 0 cm ... Q。
+#   根因(探针 tmp_vert/taskJ2/probe_stream.py / probe_big.py, 实数复现):
+#     graphicx(dvipdfmx.def) 把 \\scalebox 编译成 \\special{pdf:btrans}+\\special{x:scale K 1}+\\special{pdf:etrans},
+#     dvipdfmx 把它展开为「平移到锚点 · 缩放 · 平移回」并在 etrans 时用**数值逆矩阵**还原 ——
+#     逆矩阵只印到 6 位有效数字: 1/0.87 = 1.149425... 印成 1.14943, 于是每字残留
+#       0.87 x 1.14943 = 1.0000041 (x 方向, 绕该字锚点)
+#     留在 CTM 里。全书累积: N 字后后续内容被 x1.0000041^N 缩放。实测 N=2000 字时页尾规则线
+#     从 put 0..574pt(= 页 0..571.86bp)漂到 -2.34..574.29bp —— 左端越出页缘, 正是 p157
+#     verify_vert「矢量图形越界 4 个 draw bbox=[-0.8,284.7,572.6,284.7]」的来源(该书 231 页仅 p157
+#     越界, 因为它的界行线实测左端 = 0.0pt 且字数最多, 别的页 hx_l 有余量)。
+#   为什么 q...Q 不泄漏: PDF 图形状态栈的 Q 是**精确还原**(非数值逆), 累积残差为 0 ——
+#     同探针 N=2000: 规则线恒为 0.00..571.86bp, 与不压缩(plain)逐字节相同。
+#     用 \\special{pdf:literal direct ...}(dvipdfmx 原样插入算子, 不附加 q/cm/Q, 见 dvipdfmx-special.pdf),
+#     它与 xfakebold 的用法同源。
+#   锚点语义: dvipdfmx 的 DVI 原点(1in = 72bp)在页面坐标的 x=72 —— q/K 0 0 1 0 0 cm 是相对**该点**缩放,
+#     故写入坐标须反解: 目标页坐标 X -> put 值 = (X - 72)/K + 72(探针 probe_literal.py 实测:
+#     X=52.697 应写 49.813, 与 span 左缘实测 52.69 一致; K=1 时该式退化为 X)。
+#   调用方语义不变(与 \\scalebox 等价): 传进来的 x_pt = 缩放后字盒**左缘**的目标页坐标,
+#     墨心 = put + K x (未压缩时的墨心偏移) -> 字心目标 xc 用 x_pt = xc - K x F/2(否则整列左移 (1-K)xF/2)。
+PAGE_ORIGIN_BP = 72.0    # dvipdfmx DVI 原点(1in)在页面坐标的 x(bp); 横向缩放绕此点
+XSCALE = float(os.environ.get('VERT_XSCALE') or 0.87)   # 字模横向压缩系数(1.0 = 不压缩)
+
+def _put_tex(ch, x_pt, y_pt, F, xs=None):
+    """单字 \\put 片段(pt, 页左上原点 y 向下)。xs = 横向压缩(默认 XSCALE)。
+    xs<1 时用自带 q/<K> 0 0 1 0 0 cm ... Q 包住该字(只缩 x 保字高, 状态精确还原不污染后续内容,
+    见上方 §1.0a 根因说明); 传入的 x_pt 是缩放后字盒左缘的目标页坐标, 内部按 PAGE_ORIGIN_BP 反解。"""
+    xs = XSCALE if xs is None else xs
+    body = r'\fontsize{%spt}{%spt}\selectfont %s' % (round(F, 1), round(F, 1), _esc_ch(ch))
+    if abs(xs - 1.0) > 1e-6:
+        ks = ('%.4f' % xs).rstrip('0').rstrip('.')
+        x_pt = (x_pt - PAGE_ORIGIN_BP) / float(ks) + PAGE_ORIGIN_BP   # 反解: 变换绕页 x=72bp
+        body = (r'\special{pdf:literal direct q %s 0 0 1 0 0 cm}%s'
+                r'\special{pdf:literal direct Q}') % (ks, body)
+    return r'\put(%.1f,%.1f){%s}' % (x_pt * PT2BP, y_pt * PT2BP, body)
+
+# ---------- 1.0b) 列内空隙(源书空一格)对齐(taskJ-B) ----------
+# 背景(用户实测反馈②): 源书问答体「問：」「答：」后空一格, OCR 不保留 -> 我们的列里没有这一格,
+#   整列后续字被摊开(步进按格子数均分, 少算一格 -> 步进偏大)。空隙只能从**源图墨迹**反推。
+# 判据(任务书): 列内相邻字墨迹间距 > 1.3x 中位步进 (单格空隙 = 2x 中位步进)。
+# 难点: 相邻字相碰会并成一个 run(顶差也 = 2m), 挤格标点的墨又落在「下一格」的位置(顶差被拆成
+#   1.15m + 0.68m) —— 单看顶差两者都会骗过判据。故用**结构对齐**(DP)而不是单点阈值:
+#   把 OCR 字符(带「格号 + 是否挤格」)单调对齐到槽内 run 序列, 字符的**预测墨顶** =
+#   T0 + (格号 + 累计空格 + 0.85×挤格?) x 步进; 允许「跳过字符」(粘连)/「跳过 run」(标点碎点)/
+#   「插一格」(代价 p_gap), 末尾再用「总格数 vs 槽实测墨迹跨度」收口 —— 插格只有在确实解释了
+#   墨迹位置偏差时才划算。实测(p14 問：行/答：行, wz6): 插格位置 = 問：之后 1 格, 与源图一致。
+GAP_ON = os.environ.get('VERT_GAP', '1') not in ('0', 'false', 'False')
+GAP_HANG = 0.85      # 挤格标点墨顶 = 本字格顶 + GAP_HANG x 步进(与 PUNCT_DY 同源, 源书实测)
+P_MERGE = 0.15       # DP 代价: 字符并进上一个 run(相邻字相碰粘连, 预测墨顶落在该 run 内)
+P_PUNCT = 0.30       # DP 代价: 挤格标点不匹配 run(墨小且挤在格缝上)
+P_SKIPN = 1.20       # DP 代价: 普通字无墨(OCR 多字) —— 必须比「1 格错配」(≈1.0) 贵,
+                     #   否则 DP 会用「跳一个字 + 中间插一格」凑出一致的墨迹(实测 p15 問：列:
+                     #   空隙被错插到第 11 字处), 那种解与源书排版不符。
+P_SKIPR = 0.40       # DP 代价: run 无字符(标点碎点/粘连长 run 的尾部)
+P_GAP = 0.55         # DP 代价: 插一格空隙
+P_TOT = 1.00         # DP 代价: 末字格号与槽实测墨迹跨度的差(每格)
+GAP_MAX = 4          # 单列最多插几格(防异常放大)
+_gap_log = []        # 空隙检出记录(全书跑完落盘, VERT_GAP_REPORT)
+
+def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=GAP_HANG, p_merge=P_MERGE, p_punct=P_PUNCT,
+             p_skipn=P_SKIPN, p_r=P_SKIPR, p_g=P_GAP, p_t=P_TOT):
+    """槽内墨迹 run + 文本 -> [(字符下标, 插入格数)]（taskJ-B 纯函数, DP）。
+    runs: [(墨顶, 墨底)] pt(页顶向下); m: 步进 pt; T0/B: 槽实测墨迹顶/底 pt(用于预测与收口)。
+    DP 状态 (字符下标 i, run 下标 j, 已插格数 g); 转移:
+      m  字符 <- run 匹配    代价 = (|预测墨顶 - 实测墨顶| / m)^2
+      e  字符并进上一 run    预测墨顶落在上一 run 的 [顶, 底] 内(相邻字相碰) —— 便宜
+      n  普通字无墨         贵(见 P_SKIPN 注释)
+      p  挤格标点           便宜(墨小/挤格缝, 且不参与匹配)
+      r  跳过 run / g 插一格
+    收口: (i=len(t), j=len(runs), g) 最优 + |槽跨度格数 - (文本格数+g)| x p_t。"""
+    L = len(t); n = len(runs)
+    if not GAP_ON or L < 2 or n < 3 or m <= 1.0:
+        return []
+    tops = [r[0] for r in runs]
+    bots = [r[1] for r in runs]
+    cell = char_cells(t)
+    ncell = max(c for c, _h in cell) + 1 if cell else 1
+
+    def pred(i, g):
+        c, hang = cell[i]
+        return T0 + (c + g + (hratio if hang else 0.0)) * m
+
+    INF = float('inf')
+    dp = [[[INF] * (GAP_MAX + 1) for _ in range(n + 1)] for _ in range(L + 1)]
+    bt = [[[None] * (GAP_MAX + 1) for _ in range(n + 1)] for _ in range(L + 1)]
+    dp[0][0][0] = 0.0
+    for i in range(L + 1):
+        for j in range(n + 1):
+            for g in range(GAP_MAX + 1):
+                cur = dp[i][j][g]
+                if cur == INF:
+                    continue
+                if i < L and j < n and not cell[i][1]:
+                    # 挤格标点不参与「匹配 run」: 它的墨又小又挤在格缝上(源书实测冒号墨心在
+                    #   本字格顶 + 1.2-1.4 步进, 与 PUNCT_DY=0.85 的渲染位置并不一致), 拿它做
+                    #   匹配依据会把整列对齐带偏(实测 p14 答：列: 空隙被错插到第 17 字处)。
+                    c = cur + (abs(pred(i, g) - tops[j]) / m) ** 2
+                    if c < dp[i + 1][j + 1][g]:
+                        dp[i + 1][j + 1][g] = c; bt[i + 1][j + 1][g] = (i, j, g, 'm')
+                if i < L and j >= 1 and cell[i][1]:
+                    c = cur + p_punct
+                    if c < dp[i + 1][j][g]:
+                        dp[i + 1][j][g] = c; bt[i + 1][j][g] = (i, j, g, 'p')
+                if i < L and j >= 1 and not cell[i][1] and bots[j - 1] >= pred(i, g):
+                    c = cur + p_merge                      # 预测墨顶落在上一 run 内 = 与它粘连
+                    if c < dp[i + 1][j][g]:
+                        dp[i + 1][j][g] = c; bt[i + 1][j][g] = (i, j, g, 'e')
+                if i < L and not cell[i][1] and cur + p_skipn < dp[i + 1][j][g]:
+                    dp[i + 1][j][g] = cur + p_skipn; bt[i + 1][j][g] = (i, j, g, 'n')
+                if j < n and cur + p_r < dp[i][j + 1][g]:
+                    dp[i][j + 1][g] = cur + p_r; bt[i][j + 1][g] = (i, j, g, 'r')
+                if i < L and g < GAP_MAX and cur + p_g < dp[i][j][g + 1]:
+                    dp[i][j][g + 1] = cur + p_g; bt[i][j][g + 1] = (i, j, g, 'g')
+    # 槽实测墨迹跨度对应的**格数**: 末字墨底 = 首字墨顶 + (N-1) x m + 墨高 -> N = (B-T0-墨高)/m + 1
+    #   (漏减墨高会系统性多算 ~0.95 格 -> 每列都误判有一处空隙; 实测 p14: exp 22.89 vs 真值 22)
+    if h_ink is None:
+        h_ink = statistics.median([b - a for a, b in runs]) if runs else 0.95 * m
+    exp = (B - T0 - h_ink) / m + 1.0
+    best, bg = INF, 0
+    for g in range(GAP_MAX + 1):
+        c = dp[L][n][g]
+        if c == INF:
+            continue
+        c += p_t * abs(exp - (ncell + g))
+        if c < best:
+            best, bg = c, g
+    if best == INF or bg == 0:
+        return []
+    # 回溯: 'g' 转移 = 在该字符之前插一格
+    out = {}
+    i, j, g = L, n, bg
+    while (i or j or g):
+        p = bt[i][j][g]
+        if p is None:
+            break
+        pi_, pj_, pg_, act = p
+        if act == 'g':
+            out[pi_] = out.get(pi_, 0) + 1
+        i, j, g = pi_, pj_, pg_
+    # 空隙位置修正: 插入点若落在挤格标点之前, 后移到该标点之后 —— 源书标点紧跟上字(墨在上格右下角),
+    #   空隙在标点之后(实测 p14 問: 源书冒号墨迹 y380-387 贴着問的字脚, 空格在其后)。
+    #   DP 对「标点前/标点后」两种插法代价完全相同(挤格标点不参与匹配), 不修正会随机落成前者。
+    fix = {}
+    for ci, e in out.items():
+        jj = ci
+        while jj < L and t[jj] in PUNCT_HANG:
+            jj += 1
+        if jj >= L:
+            continue        # 落点越到列尾(末字全是挤格标点) = 末尾空格, 无视觉含义 -> 丢弃
+        fix[jj] = fix.get(jj, 0) + e
+    # 逐格校验(任务书判据的等价形式): 该空格格内不得有墨 —— 源书那格确实空着才算空隙。
+    #   两类「多出一格」要分开: ①排版空格(格内无墨, 该补); ②OCR 漏字(格内有墨, 补空格只是掩盖
+    #   丢字, 且会把后续字挤下) -> 只保留 ①。校验格号 = 字符名义格号 + 之前已插格数。
+    out = {}
+    cum = 0
+    for ci in sorted(fix):
+        e_ok = 0
+        for k in range(fix[ci]):
+            y0 = T0 + (cell[min(ci, L - 1)][0] + cum + k) * m
+            if any(y0 + 0.2 * m < tp < y0 + 0.8 * m for tp in tops):
+                break
+            e_ok += 1
+        if e_ok:
+            out[ci] = e_ok
+        cum += fix[ci]
+    if os.environ.get('VERT_GAP_DEBUG') and len(out) != len(fix):
+        print('    [DP] 校验剔除 %d 处(格内有墨)' % (len(fix) - len(out)))
+    if os.environ.get('VERT_GAP_DEBUG'):
+        print('    [DP] T0=%.1f B=%.1f m=%.2f n=%d L=%d ncell=%d exp=%.2f g=%d cost=%.2f' % (
+            T0, B, m, n, L, ncell, exp, bg, best))
+        for i2, (c2, h2) in enumerate(cell):
+            tg = tops[i2] if i2 < n else None
+            print('        %2d %s cell%-2d hang%d  pred(0)=%.1f pred(g)=%.1f  run=%.1f  gaps=%s' % (
+                i2, t[i2], c2, h2, T0 + (c2 + (hratio if h2 else 0)) * m,
+                T0 + (c2 + bg + (hratio if h2 else 0)) * m, tg if tg is not None else -1, out))
+    return sorted(out.items())
+
 # ---------- 1) 参数拟合 ----------
 def col_stats(k):
     """每列: (x0,x1,y0,y1,t)"""
@@ -978,6 +1176,7 @@ def page_metrics(pi):
                     keep[j][0] = min(keep[j][0], t[0]); keep[j][1] = max(keep[j][1], t[1])
             slots.append({'x0': edges[i], 'x1': edges[i + 1], 'nr': len(rs),
                           'hm': (hs[len(hs) // 2] if hs else 0.0), 'step': step0,
+                          'runs': rs,                        # taskJ-B: 空格检测用(逐字墨迹 run)
                           'top': (keep[0][0] if keep else (rs[0][0] if rs else None)),
                           'bot': (keep[-1][1] if keep else (rs[-1][1] if rs else None))})
         hmax = max(s['hm'] for s in slots)
@@ -1175,7 +1374,7 @@ def _esc_ch(t):
     """单字 LaTeX 转义(与旧正文流同一组: % # & _)。"""
     return t.replace('%', r'\%').replace('#', r'\#').replace('&', r'\&').replace('_', r'\_')
 
-def col_puts(t, xc, m, sl=None, prev_bot=None):
+def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     """一列正文 -> (逐字 \\put 列表, 本列墨迹底 pt)。列位 = 槽中心(字盒居中于界行线栅格格内)。
     列顶/列底改用**本槽实测**(§1.98 槽实测; 全 222 页 2601 个正文槽统计), 三类:
       ① 列顶 = 本槽实测墨迹顶 —— 源书 87.5% 槽顶 = 墨带顶(0.0 格), 9.9% 是段首缩进列(「空二字」,
@@ -1192,6 +1391,8 @@ def col_puts(t, xc, m, sl=None, prev_bot=None):
       标点用 PUNCT_SIZE×字号 单独绝对定位到「前一字格右下区」(墨心 = 前格顶 + PUNCT_DY×步进,
       x = 格左缘 + PUNCT_DX×格距; 源书实测见 §1.0)。
     字号保护(任务B): 任何列的墨高 <= 0.95×步进, 越则本列缩字号(防字粘连)。
+    列内空隙(任务J-B): 源书「問：/答：」后空一格 —— OCR 不保留。用本槽 run 序列 + DP 反推
+      (fit_gaps, §1.0b), 该格只推进不落墨(渲染 = 留白一格)。计入排版格数 nc。
     空子列(双行小字页配对到无墨子列)无实测时用页墨带顶/底。"""
     n = len(t)
     if n == 0: return [], None
@@ -1203,6 +1404,17 @@ def col_puts(t, xc, m, sl=None, prev_bot=None):
     band_b = m['band_b']
     full = (band_b - B) <= 3.0 * cap                         # 满列判据: 源槽墨底贴墨带底
     nc = n_cells(t)                                          # 排版格数(标点不占格)
+    # 列内空隙(taskJ-B): 本槽 run 序列 + 文本 -> 额外空格格数(该格不落墨, 只推进)
+    gaps = (fit_gaps(sl['runs'], t, (sl.get('step') or cap), T, B, h_ink=ink_h)
+            if (sl and sl.get('runs')) else [])
+    gap_at, extra = {}, 0
+    for ci, e in gaps:
+        gap_at[ci] = gap_at.get(ci, 0) + e; extra += e
+    nc += extra
+    if extra and pi is not None:
+        _gap_log.append({'page': pi + 1, 'x0': round(xc, 1), 'ncell': n_cells(t), 'extra': extra,
+                         'step': round(sl.get('step') or 0.0, 2), 'text': t[:24],
+                         'at': [[ci, e] for ci, e in gaps]})
     if nc == 1:
         step, top = 0.0, (B - ink_h if full else T)
     elif full:                                               # ① 满列: 顶贴槽实测顶, 底拉齐槽实测底
@@ -1227,23 +1439,21 @@ def col_puts(t, xc, m, sl=None, prev_bot=None):
         if top + ink_h + (nc - 1) * step > guard_b:
             step = (guard_b - top - ink_h) / (nc - 1)
     y0 = top + INK_ASC * F                                   # 首字基线(页顶向下, 墨顶在基线上方 0.94F)
-    x_put = (xc - F / 2.0) * PT2BP
+    x_put = xc - XSCALE * F / 2.0                            # taskJ-A: 横向压缩后字心仍居中于槽中心
     pitch = (sl['x1'] - sl['x0']) if sl else m['w'] / N_COL_FRAME    # 本格格距(pt)
     Fp = PUNCT_SIZE * F                                      # 标点字号(源书标点墨迹明显小于正文)
     out = []
     k = 0                                                    # 当前格号(挤格标点不推进)
-    for ch in t:
+    for ci, ch in enumerate(t):
+        k += gap_at.get(ci, 0)                               # 该字符前的空格格(taskJ-B): 只推进不落墨
         if ch in PUNCT_HANG and k > 0:                       # 挤格标点: 贴前一格右下区(单独字号)
             tx = sl['x0'] + PUNCT_DX * pitch if sl else xc - pitch / 2.0 + PUNCT_DX * pitch
             ty = top + (k - 1) * step + PUNCT_DY * step
             dx, dy = PUNCT_INK.get(ch, (0.47, -0.36))        # 字形墨心相对锚点(em)
-            out.append(r'\put(%.1f,%.1f){\fontsize{%spt}{%spt}\selectfont %s}' % (
-                (tx - dx * Fp) * PT2BP, (page_h - (ty - dy * Fp)) * PT2BP,
-                round(Fp, 1), round(Fp, 1), _esc_ch(ch)))
+            out.append(_put_tex(ch, tx - XSCALE * dx * Fp, page_h - (ty - dy * Fp), Fp))
             continue
-        y_put = (page_h - (y0 + k * step)) * PT2BP
-        out.append(r'\put(%.1f,%.1f){\fontsize{%spt}{%spt}\selectfont %s}' % (
-            x_put, y_put, F, F, _esc_ch(ch)))
+        y_put = page_h - (y0 + k * step)
+        out.append(_put_tex(ch, x_put, y_put, F))
         k += 1
     return out, top + ink_h + (max(k, 1) - 1) * step
 
@@ -1265,6 +1475,8 @@ def page_puts(k, pi, m):
             for x0, x1 in ((c, s['x1']), (s['x0'], c)):  # 竖排: 先右子列
                 rs = _slot_runs(ink, x0, x1, it, ib)
                 hs = sorted(b - a for a, b in rs)
+                # 不带 'runs': 双行小字子列的列几何本身不可靠(同槽双列、step 无实测), taskJ-B
+                #   的空隙检测不适用该形态(该形态渲染另有已知遗留, 见 spec/vertical/07 §6)
                 sub.append({'x0': x0, 'x1': x1, 'nr': len(rs),
                             'hm': (hs[len(hs) // 2] if hs else 0.0),
                             'step': 0.0,
@@ -1277,7 +1489,7 @@ def page_puts(k, pi, m):
     for ri, si in pairs:
         sl = slots[si]
         xc = (sl['x0'] + sl['x1']) / 2.0
-        p, prev_bot = col_puts(rows[ri][4], xc, m, sl, prev_bot)
+        p, prev_bot = col_puts(rows[ri][4], xc, m, sl, prev_bot, pi)
         puts += p
     ok = (not R) or (len(pairs) >= 0.8 * R)
     print('  [正文列] p%d %d 行 -> %d 槽 (槽 run %s) 字号 %.1f 墨带 %.1f-%.1f 上限 %.2f %s' % (
@@ -1416,7 +1628,7 @@ def page_puts_loose(k, pi, g):
         m2 = {'font': F, 'step_cap': max(step, 0.1), 'band_t': Bb, 'band_b': Bb, 'block_b': B,
               'w': ir - il, 'note': [], 'body': [], 'g': g, 'slots': []}
         sl = {'x0': bx0, 'x1': max(bx1, bx0 + 1.0), 'nr': 0, 'hm': 0.0, 'step': 0.0, 'top': Tb, 'bot': Bb}
-        p, _ = col_puts(t, xc, m2, sl)
+        p, _ = col_puts(t, xc, m2, sl, pi=pi)
         puts += p
         if os.environ.get('VERT_LOOSE_DEBUG'):
             print('    [兜底行] %-14s nc=%2d 带x%.1f-%.1f hm%.1f -> F%.1f xc%.1f 列y%.1f-%.1f 步进%.2f %s' % (
@@ -1552,6 +1764,8 @@ preamble = r'''\documentclass[10pt,disablejfam]{tarticle}
 \fi
 \makeatother
 \usepackage{eso-pic}                 %% 书眉/页码绝对定位(逐字 \put 手工断列)
+%% 字模横向压缩(taskJ-A)不用 graphicx 的 \\scalebox: 它的 btrans/etrans 逆矩阵舍入会残留 x1.0000041/字
+%%   污染 CTM(见 §1.0a), 改用 \\special{pdf:literal direct q K 0 0 1 0 0 cm ... Q} 故无需 graphicx。
 \setlength{\unitlength}{1pt}
 \setlength{\parindent}{0pt}
 \setlength{\textwidth}{%(TW)spt}
@@ -1623,6 +1837,21 @@ for i, pg in enumerate(sel):
     if pg != sel[-1]:
         parts.append('\\newpage')           # 末页不加 \newpage: 否则多出一张空白页(231 页跑成 232 页)
 parts.append('\\end{document}\n')
+
+# ---------- 2.5) 列内空隙检出清单落盘(taskJ-B) ----------
+# 全书跑 231 页的统计 + 逐条记录(page/x0/文本头/插入位置/格数/步进) -> JSON。
+#   默认落 TMP; VERT_GAP_REPORT=<path> 可指定(验收要求落 data/wz6/wz6_gaps_detected.json)。
+if _gap_log:
+    _rep = os.environ.get('VERT_GAP_REPORT') or os.path.join(TMP, 'gaps_detected.json')
+    _pg = sorted(set(g['page'] for g in _gap_log))
+    json.dump({'n_gap': len(_gap_log), 'n_cell': sum(g['extra'] for g in _gap_log),
+               'npage': len(_pg), 'vscale': XSCALE,
+               'items': sorted(_gap_log, key=lambda g: g['page'])},
+              open(_rep, 'w', encoding='utf8'), ensure_ascii=False, indent=1)
+    print('[空隙] 检出 %d 处 / %d 格, 落在 %d 页 -> %s' % (
+        len(_gap_log), sum(g['extra'] for g in _gap_log), len(_pg), _rep))
+else:
+    print('[空隙] 未检出(或 VERT_GAP=0)')
 
 tex_path = os.path.join(TMP, 'vert.tex')
 open(tex_path, 'w', encoding='utf8').write('\n'.join(parts))

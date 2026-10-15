@@ -11,12 +11,15 @@
 
 | 编号 | 文件 | 功能 | 实现锚点（build_vert.py） | 验收 |
 |---|---|---|---|---|
-| 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L1323-1363、编译 L1407-1409 | 编译零报错、字形与源书同款 |
-| 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | L41-113 参数拟合、L1261-1366 `page_tex`、L691-711 右缘复测、L819-1260 框驱动 §1.98（槽格/列位/列顶数据驱动） | 列数/列位/断点与源书一致 |
-| 03 | [marginalia.md](03_marginalia.md) | 书眉/页码/边注（eso-pic 带星版 + 墨迹实测定位） | L115-213（书眉页码）、L215-323（边注） | 位置 vs 源墨迹、无重叠发虚 |
-| 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底） | L413-689（常量/`_grid_fit`/`frame_geom`/`frame_tex`） | 内框/界行线 vs 源墨迹 |
-| 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L325-411（`pn_parse`/`pn_text`/`pn_sequence_fix`） | 纠正记录逐条复核 |
-| 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L713-817（`_ink_char_cols`/`_lin_fit`/`derot_rows`） | 旋转页列位/字号 vs 源书 |
+| 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L1742-1783、编译 L1860-1882 | 编译零报错、字形与源书同款 |
+| 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | L271-344 参数拟合、L1681-1719 `page_tex`、L921-942 右缘复测、L1049-1679 框驱动 §1.98（槽格/列位/列顶数据驱动） | 列数/列位/断点与源书一致 |
+| 03 | [marginalia.md](03_marginalia.md) | 书眉/页码/边注（eso-pic 带星版 + 墨迹实测定位） | L345-444（书眉页码）、L445-554（边注） | 位置 vs 源墨迹、无重叠发虚 |
+| 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底） | L643-920（常量/`_grid_fit`/`frame_geom`/`frame_tex`） | 内框/界行线 vs 源墨迹 |
+| 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L555-642（`pn_parse`/`pn_text`/`pn_sequence_fix`） | 纠正记录逐条复核 |
+| 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L943-1048（`_ink_char_cols`/`_lin_fit`/`derot_rows`） | 旋转页列位/字号 vs 源书 |
+| 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP） | §1.0a L85-129（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex`）、§1.0b L130-270（`char_cells`/`fit_gaps`）、`col_puts` 调点 L1400-1455、落盘 L1841-1855 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
+
+> 锚点行号为 **2026-10-15 当前文件**实测（`grep -n '^# ---------- '`）；改 `build_vert.py` 后须同步本表。
 
 ## 架构
 
