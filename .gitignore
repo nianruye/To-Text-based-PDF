@@ -19,3 +19,4 @@ spotting_*.json
 uploads/
 font_classifier/
 page_numbers*.json
+tmp_vert/
