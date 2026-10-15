@@ -176,37 +176,65 @@
 3. **SRC 缺省 = 降级 + 显式警告**：`src_doc is None` 会关掉 **4 项**墨迹特性 —— 书眉/页码/边注（L121）、版框线（L415）、版心右缘墨迹复测（L689，回退 OCR 拟合值 594.9pt）、旋转坐标系页还原（L719 + L766 提前返回）。
    **不报错、退出码仍 0**；但启动时向 **stderr** 逐条打印这 4 项警告（#18：3 参数调试调用不再静默降级，见 V6）。
 
-### V2 环境变量（env）：19 个，全 `VERT_` 前缀
+### V2 环境变量（env）：42 个，全 `VERT_` 前缀
 
 | env | 默认值 | 读取位置 | 缺失/缺省后果 |
 |---|---|---|---|
-| VERT_PAGES | `''` = 全书 | L17（解析 L1707-1716） | 输出全部页；**范围外页号被静默丢弃**；非法格式（非数字/区间反了）→ `ValueError` |
+| VERT_PAGES | `''` = 全书 | L17（解析 L1873-1882） | 输出全部页；**范围外页号被静默丢弃**；非法格式（非数字/区间反了）→ `ValueError` |
 | VERT_TMP | **`/tmp/vert_<OUT 文件名 stem>_run`**（#20 已修，原 `/opt/test/tmp_vert/run`） | L23（默认值）/ L36（`makedirs`） | 按**产物名 stem** 分离 -> 并发跑不同产物不共用目录；显式设置则用给的值（**空串等同未设**）；不存在则创建 |
-| VERT_PUNCT_SIZE | `0.62` | L55 | 标点字号 / 正文字号（挤格标点单独字号；float()，非数字 → `ValueError`） |
-| VERT_NCOL | 未设 → 每页正文列数的 **90 分位**；无样本回退 11 | L322 | 自动列容量；设为空串等同未设（falsy）；非整数 → `ValueError` |
-| VERT_SPECIAL | `'1'`（开） | L351 | 书眉/页码/边注渲染（**需 SRC**，否则强制关） |
-| VERT_FRAME | `'1'`（开） | L653 | 版框线渲染（需 SRC） |
-| VERT_LINE_COV | `0.55` | L654 | 界行线覆盖率主阈值（float()，非数字 → `ValueError`） |
-| VERT_LINE_COV_LO | `0.30` | L655 | 淡界行线栅格兜底阈值（须 < 主阈值才生效） |
-| VERT_H_COV | `0.45` | L656 | 横线判据阈值 |
-| VERT_JIE_LOG | `'0'`（关） | L661 | 界行线逐页日志 |
-| VERT_FRAME_DEBUG | `'0'`（关） | L662 | 版框检测诊断日志 |
-| VERT_RIGHT_INK | `'1'`（开） | L928 | 版心右缘墨迹复测；`0` = 回退 OCR 拟合值 594.9pt（需 SRC） |
-| VERT_DEROT | `'1'`（开） | L958 | 旋转坐标系页还原（另需 SRC） |
-| VERT_FRAME_LAYOUT | `'1'`（开） | L1069 | 框驱动排版（逐页版框/槽格/列位；需 SRC，`0` = 回退流式排版） |
-| VERT_XSCALE | `0.87` | L115 | 字模横向压缩系数（`1.0` = 不压缩；**`or` 取值，空串等同未设**；float() 非数字 → `ValueError`） |
-| VERT_GAP | `'1'`（开） | L140 | 列内空隙（源书空一格）DP 检测；`0` = 关闭该步（回退到「不补格」渲染） |
-| VERT_GAP_REPORT | 未设 → `$VERT_TMP/gaps_detected.json` | L1845 | 空隙检出清单落盘路径（`or` 取值，空串等同未设；验收实例：`data/wz6/wz6_gaps_detected.json`） |
-| VERT_GAP_DEBUG | `'0'`（关） | L259 / L261 | 空隙 DP 逐列诊断日志（打印 T0/B/步进/预测/实测/代价） |
-| VERT_LOOSE_DEBUG | `'0'`（关） | L1633 | 无版框页兜底行（`page_puts_loose`）诊断日志 |
+| VERT_SPECIAL | `'1'`（开） | L493 | 书眉/页码/边注渲染（**需 SRC**，否则强制关） |
+| VERT_FRAME | `'1'`（开） | L810 | 版框线渲染（需 SRC） |
+| VERT_LINE_COV | `0.55` | L811 | 界行线覆盖率主阈值（float()，非数字 → `ValueError`） |
+| VERT_LINE_COV_LO | `0.30` | L812 | 淡界行线栅格兜底阈值（须 < 主阈值才生效） |
+| VERT_H_COV | `0.45` | L813 | 横线判据阈值 |
+| VERT_JIE_LOG | `'0'`（关） | L818 | 界行线逐页日志 |
+| VERT_FRAME_DEBUG | `'0'`（关） | L819 | 版框检测诊断日志 |
+| VERT_FRAME_GAP | `3.2` | L816 | **兜底值**：外粗线缺测时的「外粗线—内细线」空隙量（pt）；有实测一律用实测 |
+| VERT_FRAME_TH | `3.4` | L817 | **兜底值**：外粗线厚度（pt，缺测时用） |
+| VERT_NCOL_FRAME | 未设 → **标定趟 A 实测**（内框宽÷列距 + 界行线条数互证）；不可测 → 12 | L1081（`N_COL_FRAME`） | 版框内框列数；**别的书不是 12 列**，故默认走标定 |
+| VERT_NCOL | 未设 → 每页正文列数的 **90 分位**；无样本回退 11 | L464 | 自动列容量；设为空串等同未设（falsy）；非整数 → `ValueError` |
+| VERT_RIGHT_INK | `'1'`（开） | L1152 | 版心右缘墨迹复测；`0` = 回退 OCR 拟合值 594.9pt（需 SRC） |
+| VERT_DEROT | `'1'`（开） | L1182 | 旋转坐标系页还原（另需 SRC） |
+| VERT_FRAME_LAYOUT | `'1'`（开） | L1293 | 框驱动排版（逐页版框/槽格/列位；需 SRC，`0` = 回退流式排版） |
+| VERT_XSCALE | 未设 → **标定值**（源书单字「墨面积/墨高²」比）；不可测 → 0.87 | L117 | 字模横向压缩系数（`1.0` = 不压缩；**`or` 取值，空串等同未设**；float() 非数字 → `ValueError`） |
+| VERT_PUNCT_SIZE | 未设 → **标定值**；不可测 → 0.62 | L57 | 标点字号 / 正文字号（挤格标点单独字号） |
+| VERT_PUNCT_DX | 未设 → **标定值**；不可测 → 0.81 | L58 | 标点墨心 x = 槽左缘 + DX × 格距 |
+| VERT_PUNCT_DY | 未设 → **标定值**；不可测 → 0.85 | L59 | 标点墨心 y = 前字格顶 + DY × 步进 |
+| VERT_GAP_HANG | 未设 → **标定值**（墨顶口径）；不可测 → 0.85 | L163 | 挤格标点墨顶相对本字格顶的偏移（× 步进）；DP 预测项 |
+| VERT_BR_SIZE | 未设 → **标定值**（各括号族折中尺寸的中位）；不可测 → 0.66 | L345 | 竖排括号字号 / 正文字号（无分档时的默认） |
+| VERT_BR_SIZE_MAP | 未设 → 标定值（有则用之，无样本的族回落 VERT_BR_SIZE） | L347 | 按字形覆盖：`︗:0.55,︹:0.49`（逗号分隔，非法项跳过） |
+| VERT_BR | `'1'`（开） | L344 | 括号竖排形态替换总开关 |
+| VERT_INK_RATIO | 未设 → **探针标定值**（像素口径）；不可测 → 0.88 | L1290 | 单字墨高 / 字号（中位口径，字号←墨高换算用） |
+| VERT_INK_ASC | 未设 → **探针标定值**；不可测 → 0.94 | L1291 | 墨顶距基线 = ASC × 字号 |
+| VERT_NOTE_INK_RATIO | 未设 → **探针标定值**（注文语料）；不可测 → 0.88 | L599 | 注文字号反推用的墨高比 |
+| VERT_NOTE_INK_MAX | 未设 → **fontTools 轮廓口径**的本书用字墨高上界；不可测 → 0.94 | L605 | 满字墨高上限（字号保护用） |
+| VERT_NOTE_STEP_RATIO | `0.85` | L597 | 边注/正文 步进比**上限判据**（非书常数：wz6 实测比 0.69，余量 18%；别的书偏紧时用本 env 放宽） |
+| VERT_FONT | `NotoSerifCJK-Regular.ttc` | L1977 | 正文字体文件（pxchfon/DVIPDFMX 经 kpathsea 查找；标定趟用同名字体做探针与 fontTools 几何） |
+| VERT_GFONT | `NotoSansCJK-Regular.ttc` | L1978 | gothic 字体（数学模式 `\mathgt` 用） |
+| VERT_BOLD | `0`（关） | L128 | 墨迹加粗描边线宽（pt，taskL-e；`0` = 输出与不设时逐字节相同） |
+| VERT_GAP | `'1'`（开） | L162 | 列内空隙（源书空一格）DP 检测；`0` = 关闭该步（回退到「不补格」渲染） |
+| VERT_GAP_REPORT | 未设 → `$VERT_TMP/gaps_detected.json` | L2756 | 空隙检出清单落盘路径（`or` 取值，空串等同未设；验收实例：`data/wz6/wz6_gaps_detected.json`） |
+| VERT_GAP_DEBUG | `'0'`（关） | L286 / L288 | 空隙 DP 逐列诊断日志（打印 T0/B/步进/预测/实测/代价） |
+| VERT_LOOSE_DEBUG | `'0'`（关） | L1860 | 无版框页兜底行（`page_puts_loose`）诊断日志 |
+| VERT_CALIB_PAGES | `16` | L1090 | 标定趟源图侧均布抽样页数（`VERT_CALIB_PAGES=4` 可快速预检） |
+| VERT_CALIB_RARE_PAGES | `8` | L2070 | 稀有括号定向补抽页数上限（按缺样本的族分配） |
+| VERT_CALIB_REPORT | 未设 → `$VERT_TMP/vert_calib.json` | L2682 | 标定结果落盘路径（含标定值/兜底值/生效值/原始统计） |
+| VERT_CALIB_CACHE | 未设（= 每次都重标） | L2511 | 指定 json 则**跳过源图侧与探针**直接用其中的 `values`（同书反复调试用；跨书复用不在契约内） |
+| VERT_CALIB_ONLY | `0`（关） | L2693 | `1` = 只跑标定并打印对账表后 `exit 0`（不建排），供新书预检/排障 |
+| VERT_CALIB_DEBUG | `0`（关） | L2051 | `1` = 打印探针逐字与源图小字样本明细；`2` = 另打印逐槽 run/文本（最多 8 条） |
 
-> 行号为 **2026-10-15 快照**（`grep -n "environ.get('VERT_"`）；`build_vert.py` 新增段落后会整体偏移，**以符号名 grep 为准**。
+> 行号为 **2026-10-15（taskM 自标定改造后）快照**（`grep -n "environ.get('VERT_"`）；`build_vert.py` 新增段落后会整体偏移，**以符号名 grep 为准**。
 
 **布尔类取值的语义**（同一写法 `os.environ.get(k, 默认) not in ('0','false','False')`）：
 只有字符串 `0` / `false` / `False` 判**关**，**其它任何值（含空串 `VERT_FRAME=`）都判开**
-（例外：`VERT_XSCALE` / `VERT_GAP_REPORT` 用 `or` 取值 —— 空串等同未设）。
+（例外：`VERT_XSCALE` / `VERT_GAP_REPORT` / `VERT_TMP` / `VERT_CALIB_REPORT` 等用 `or` 取值 —— 空串等同未设）。
 
-**与横排 env 的关系**：横排 16 个共享 env + v13 独立 5 个**均无 `VERT_` 前缀**，竖排 19 个**全 `VERT_` 前缀** → 命名空间零交集，
+**标定类 env 的优先级（taskM 契约）**：**显式 env > 标定值 > 兜底值**。
+设了对应的 `VERT_*` 就完全不采纳标定结果（对账表「来源」列标 `env`），未设则用标定值（标 `标定`），
+标定不可用时用代码兜底值（标 `兜底`）。据此，**同一份源书 + 同一字体 + 不设任何标定 env 时, 产物可复现**
+（实测两次构建（不同 `PYTHONHASHSEED`）`vert.tex` 逐字节相同、逐页 4x 灰度像素全等）。
+
+**与横排 env 的关系**：横排 16 个共享 env + v13 独立 5 个**均无 `VERT_` 前缀**，竖排 42 个**全 `VERT_` 前缀** → 命名空间零交集，
 不存在 [coupling_analysis.md](../../docs/coupling_analysis.md) 里「16 env 透传」那类隐式耦合（root-cause #15 不覆盖竖排）。
 
 ### V3 输入 JSON：与横排同一格式（唯一共享契约）
@@ -239,12 +267,14 @@
 
 | 路径 | 写入者 | 说明 |
 |---|---|---|
-| argv[3] `OUT` | L949 `os.replace(TMP/vert.pdf, OUT)` | **脚本不派生产物名**；`output/<book>/<book>_vert_*.pdf` 是**调用方约定**（实例：`_full.pdf` 全书 / `_preview.pdf` 预览 / `_notes_check.pdf` 边注核对） |
-| `$VERT_TMP`（默认 `/tmp/vert_<OUT stem>_run`） | L24（默认值）/ L37（`makedirs`） | **按输出文件名 stem 分离**（#20 已修）；显式 `VERT_TMP` 覆盖之（空串等同未设） |
-| `$VERT_TMP/vert.tex` | L931-932 | 中间产物（tex 全文落盘，可复查） |
-| `$VERT_TMP/vert.dvi` -> `vert.pdf` | L936 uplatex / L937 dvipdfmx | `vert.pdf` 成功后 `os.replace` 到 OUT，不留副本 |
+| argv[3] `OUT` | L2785 `os.replace(TMP/vert.pdf, OUT)` | **脚本不派生产物名**；`output/<book>/<book>_vert_*.pdf` 是**调用方约定**（实例：`_full.pdf` 全书 / `_preview.pdf` 预览 / `_notes_check.pdf` 边注核对） |
+| `$VERT_TMP`（默认 `/tmp/vert_<OUT stem>_run`） | L23（默认值）/ L36（`makedirs`） | **按输出文件名 stem 分离**（#20 已修）；显式 `VERT_TMP` 覆盖之（空串等同未设） |
+| `$VERT_TMP/vert.tex` | L2768-2769 | 中间产物（tex 全文落盘，可复查） |
+| `$VERT_TMP/vert.dvi` -> `vert.pdf` | L2772 uplatex / L2773 dvipdfmx | `vert.pdf` 成功后 `os.replace` 到 OUT，不留副本 |
 | `$VERT_TMP/vert.aux` / `vert.log` | uplatex | 不清理 |
-| `$VERT_GAP_REPORT`（默认 `$VERT_TMP/gaps_detected.json`） | L1841-1855 | **空隙检出清单**（JSON：`n_gap`/`n_cell`/`npage`/`vscale` + 逐条 `page`/`x0`/`ncell`/`extra`/`step`/`text`/`at`）；验收实例 `data/wz6/wz6_gaps_detected.json` |
+| `$VERT_GAP_REPORT`（默认 `$VERT_TMP/gaps_detected.json`） | L2752-2766 | **空隙检出清单**（JSON：`n_gap`/`n_cell`/`npage`/`vscale` + 逐条 `page`/`x0`/`ncell`/`extra`/`step`/`text`/`at`）；验收实例 `data/wz6/wz6_gaps_detected.json` |
+| `$VERT_CALIB_REPORT`（默认 `$VERT_TMP/vert_calib.json`） | L2680-2691 | **标定结果**（JSON：`pages_sampled`/`pages_used`/`font`/`font_resolved`/`probe`/`n_col_frame`/`br_size`/`values`（标定值）/`fallback`/`effective`）；taskM 新增 |
+| `$VERT_TMP/calib_probe/probe.{tex,dvi,pdf,log}` | L2385-2449 `_calib_probe` | **标定探针**（用主 preamble + 逐字 `\put` 渲染 2 页参考字形，供像素口径测墨高/墨心）；taskM 新增，每次构建覆盖写 |
 
 **不冲突性（grep 核对）**：竖排不写 `/tmp/seg2_line.*`、`/tmp/srcpage_*.png`、`/tmp/fig_*.png`、`/tmp/toc_map.json`
 -> 与 issue #10（geom/classic 临时文件同名并发冲突）**无关**。
@@ -253,8 +283,8 @@
 **同名产物**并发仍会共用 `vert.*` -> 需显式 `VERT_TMP` 分开（属预期，与横排 #10 的「路径分 build_name」同方案）。
 
 **退出码（#18 已修，判据实测标定）**：输入文件缺失（lines/coords/src）-> stderr 显式报错 + `sys.exit(1)`；
-编译失败 -> `sys.exit(1)`（L951-958）；正常路径 `sys.exit(0)`（L951）。**失败判据不能只看 rc**：实测正常成功编译的
-uplatex **rc 也是 1** —— 唯一报错是类加载期「KANJI Encoding scheme `JT1' unknown.」（preamble L884 已注明无法在文档内拦截，
+编译失败 -> `sys.exit(1)`（L2784-2794）；正常路径 `sys.exit(0)`（L2787）。**失败判据不能只看 rc**：实测正常成功编译的
+uplatex **rc 也是 1** —— 唯一报错是类加载期「KANJI Encoding scheme `JT1' unknown.」（preamble L1986 已注明无法在文档内拦截，
 upLaTeX 下该命令本就被忽略）。故判据 = `dvipdfmx` rc≠0 **或** `vert.pdf` 未生成 **或** uplatex 输出里有**该容忍项之外**的 `!` 报错行
 （nonstopmode 下真出错照样出 PDF，只查产物存在会漏判）。SRC 缺省（3 参数调试调用）-> 只警告、退出码仍 0。
 **门禁规定不变：竖排 PASS/FAIL 只看 `verify_vert.py` 的退出码** —— 构建成功不等于产物合格（页数/字符量/越界只能由 verify_vert 判）。
@@ -297,24 +327,35 @@ upLaTeX 下该命令本就被忽略）。故判据 = `dvipdfmx` rc≠0 **或** `
 **verify_vert 无 env 依赖**（不 import os），全部参数走 argparse；位置参数顺序与 verify_geom 一致，
 另有 `--src-pdf --char-tol --bbox-tol --cjk-min --noise-min-char --long-row --expect-low --top --json`。
 
-### V9 实现锚点（build_vert.py @ 竖排收尾修复，958 行）
+### V9 实现锚点（build_vert.py @ taskM 自标定改造，2794 行）
 
 | 模块 | 行号 | 说明 |
 |---|---|---|
 | argv/env 入口 | L15-40 | 4 个 argv + 输入校验（#18）+ TMP 目录创建（#20 默认按 OUT stem） |
-| 列统计 / 列分类 | L42-62 | `col_stats` L42 / `is_body_col` L53（换行框排除 L56、书眉页码排除 L60、左缘小字排除 L61） |
-| 参数拟合 | L64-113 | 字号/列距/列高/天头/右缘/列容量 -> FS PITCH HCOL TTOP RIGHT_p NCOL；textwidth/textheight/topmargin/oddsidemargin L99-102 |
-| 页幅 | L103-110 | 默认常量 / SRC PDF 实测 |
-| 书眉 + 页码 | L115-213 | `special_rows` L125 / `src_gray` L144 / `ink_extent` L154 / `special_tex` L182 |
-| 边注 | L215-315 | `note_rows` L226 / `note_cols` L241 / `note_tex` L293 |
-| 页码序列纠正 | L317-403 | `pn_parse` L332 / `pn_text` L351 / `pn_sequence_fix` L355；全局 `PN_FIX` L399 |
-| 版框线 | L405-680 | `_runs` L427 / `_grid_fit` L436 / `_bar_px` L502 / `frame_geom` L512 / `frame_tex` L653 |
-| 版心右缘墨迹复测 | L682-702 | 抽样约 12 页版框内右线中位 = 563.1pt（`VERT_RIGHT_INK`） |
-| 旋转页还原 | L704-808 | `_ink_char_cols` L723 / `_lin_fit` L753 / `derot_rows` L763（只替换本页 `all_rows`，L917-918） |
-| 每页正文列 | L810-858 | `page_tex`（列块总宽受内框约束 L846-853） |
-| 页选择 | L860-869 | `VERT_PAGES` 解析（范围外静默丢弃 L867） |
-| preamble | L872-912 | tarticle + pxchfon + JY1/JT1 补丁 + eso-pic |
-| 装配 + 编译 | L914-958 | `\newpage` 分隔（末页不加，L927-928）/ uplatex L936 / dvipdfmx L937 / 产物搬移 + `exit(0)` L949-951 / 失败判据与 `exit(1)` L939-958 |
+| §1.0 挤格标点 | L41-86 | `PUNCT_HANG` L48 / `PUNCT_ASCII` L51 / `PUNCT_INK` L53 / `PUNCT_SIZE·DX·DY` L57-59 / `_norm_punct` L61 / `n_cells` L71 / `char_cells` L75 |
+| §1.0a 字模横向压缩 | L87-118 | `PAGE_ORIGIN_BP` L116 / `XSCALE` L117 / `_put_tex` L137 |
+| §1.0a2 墨迹加粗 | L119-151 | `BOLD_W` L128 / `_vb` L130 |
+| §1.0b 列内空隙 | L152-297 | `GAP_ON` L162 / `GAP_HANG` L163 / DP 代价 L164-172 / `_gap_log` L174 / `fit_gaps` L176 |
+| §1.0c 标点竖排形态 | L298-364 | `VERT_FORMS` L314 / `VERT_METRICS` L322 / `_parse_br_map` L331 / `BR_ON·BR_SIZE_DEF·BR_SIZE` L344-347 / `_br_put` L349 |
+| §1.0d 列拆分归位 | L365-398 | `BR_OPEN_OF` L376 / `fix_split_brackets` L378 / 应用点 L405-415 |
+| §1 参数拟合 | L399-486 | `col_stats` L400 / `is_body_col` L425 / FS·PITCH·HCOL·TTOP·RIGHT_p L466-470 / `NCOL` L464 / textwidth·textheight·topmargin·oddsidemargin L470-474 |
+| §1.8 书眉 + 页码 | L487-589 | `special_rows` L497 / `src_gray` L516 / `ink_extent` L526 / `special_tex` L554 / `X_CAL`·`Y_CAL` L494-495 |
+| §1.9 边注 | L590-711 | `NOTE_STEP_RATIO` L597 / `NOTE_INK_RATIO` L599 / `NOTE_INK_MAX` L605 / `note_rows` L607 / `note_cols` L622 / `note_tex` L681 |
+| §1.87 页码序列纠正 | L712-799 | `pn_parse` L727 / `pn_text` L746 / `pn_sequence_fix` L750；全局 `PN_FIX` L794 |
+| §1.95 版框线 | L800-1079 | `V_FRAME_GAP`·`V_FRAME_TH` L816-817 / `N_COL_FRAME` L822 / `_runs` L824 / `_grid_fit` L833 / `_bar_px` L899 / `frame_geom` L909 / `frame_tex` L1050 |
+| §1.955 标定趟 A（列数） | L1080-1144 | `CALIB_N_PAGE` L1090 / `_calib_ncol_page` L1093 / `_calib_ncol_pick` L1108 / `CALIB_SAMP` L1126 / 驱动 L1127-1143 |
+| §1.96 版心右缘墨迹复测 | L1145-1166 | 抽样约 12 页版框内右线中位 = 563.1pt（`VERT_RIGHT_INK`） |
+| §1.97 旋转页还原 | L1167-1272 | `_ink_char_cols` L1186 / `_lin_fit` L1216 / `derot_rows` L1226（只替换本页 `all_rows`） |
+| §1.98 框驱动排版 | L1273-1906 | `INK_RATIO`·`INK_ASC` L1290-1291 / `_slot_runs` L1295 / `_ink_bands` L1313 / `_grid_from_bands` L1326 / `page_metrics` L1346 / `_align_rows_slots` L1447 / `page_rows` L1521 / `col_puts` L1604 / `page_puts` L1687 / `page_puts_loose` L1751 / `note_puts_frame` L1866 |
+| §2 每页正文列（流式回退） | L1907-1968 | `page_tex` L1908（列块总宽受内框约束） |
+| 页选择 | L1957-1967 | `VERT_PAGES` 解析（范围外静默丢弃） |
+| 字体选择 + preamble | L1969-2022 | `VERT_FONT`·`VERT_GFONT` L1977-1978 / tarticle + pxchfon + JY1/JT1 补丁 + eso-pic |
+| §1.956 标定趟 B（参数） | L2023-2696 | `CALIB_DEF` L2054 / `_calib_xscale` L2095 / `_calib_punct_size` L2105 / `_calib_punct_pos` L2115 / `_calib_br_forms` L2124 / `_calib_font_geom` L2171 / `_calib_match_small` L2219 / `_calib_src_page` L2278 / `_calib_probe` L2385 / 应用·对账·落盘 L2452-2696 |
+| §2.5 空隙清单落盘 | L2752-2766 | `_gap_log` JSON（`VERT_GAP_REPORT`） |
+| 装配 + 编译 | L2697-2794 | `\newpage` 分隔（末页不加）/ uplatex L2773 / dvipdfmx L2774 / 产物搬移 + `exit(0)` / 失败判据与 `exit(1)` |
+
+> 行号为 **2026-10-15（taskM 改造后）** 实测；`build_vert.py` 新增段落后会整体偏移，**以符号名 grep 为准**
+> （`grep -n '^# ---------- '` / `grep -n '^def '`）。竖排 spec 分部锚点见 [spec/vertical/README.md](../../spec/vertical/README.md)。
 
 ### 实测基线（2026-10-15 重跑核对）
 
@@ -388,7 +429,7 @@ upLaTeX 下该命令本就被忽略）。故判据 = `dvipdfmx` rc≠0 **或** `
 | GMPG 格式 | 渲染端 <-> verify + fit_common 三方 | verify_geom split > 0 = FAIL |
 | **竖排行** `pipelines/build_vert.py` | **仅竖排管线** -> verify_vert(wz6)；**不波及横排任何环节**（无 unit/invariants 覆盖） | verify_vert 退出码 + 逐页字符量/越界（本地跑，不进 CI） |
 | **竖排行** `test/verify_vert.py` | 竖排验证 harness -> 所有竖排验证调用 | 退出码行为 + wz6 基线（231 页 / 97.2% / 越界 0+0） |
-| **竖排行** `VERT_*`（19 个 env） | 仅竖排；与横排 env 命名空间**零交集**（无透传、无隐式共享） | 无 unit 覆盖 -> 改动后重跑 verify_vert + 抽样对照源墨迹 |
+| **竖排行** `VERT_*`（42 个 env） | 仅竖排；与横排 env 命名空间**零交集**（无透传、无隐式共享） | 无 unit 覆盖 -> 改动后重跑 verify_vert + 抽样对照源墨迹 |
 | **竖排行** upLaTeX + tarticle + pxchfon + Noto CJK 栈 | 仅竖排（横排走 xelatex + xeCJK） | build_vert 编译日志零错 + 页幅/字形抽查 |
 | **竖排行** OCR spotting JSON（`data/<book>/*_spotting_{lines,coords}.json`） | **三管线共读同一格式 = 横竖唯一共享契约** | 横排：verify_geom（GMPG/pitch）；竖排：verify_vert（页数/字符量） |
 | **竖排行** `utils/tex_escape.py` 等 4 个共享模块 | geom + classic（**竖排不 import**） | unit + invariants + verify_geom；**对竖排零影响** |

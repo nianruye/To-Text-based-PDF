@@ -19,6 +19,7 @@ from _loader import load            # noqa: E402
 
 _CONSTS = ['PUNCT_HANG', 'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP', 'INK_RATIO', 'GAP_ON', 'GAP_HANG',
            'P_MERGE', 'P_PUNCT', 'P_SKIPN', 'P_SKIPR', 'P_GAP', 'P_TOT', 'GAP_MAX',
+           'BOLD_W',
            # taskK: _put_tex 现在会调 _br_put(括号竖排形态) —— 提取它及其常量(本文件断言不受影响)
            'VERT_FORMS', 'VERT_METRICS', 'BR_ON', 'BR_SIZE_DEF', 'BR_SIZE']
 
@@ -26,7 +27,7 @@ _CONSTS = ['PUNCT_HANG', 'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP', 'INK_RATIO', 'GAP_
 @pytest.fixture(scope='module')
 def ns():
     return load('build_vert.py', ['char_cells', 'n_cells', 'fit_gaps', '_put_tex', '_esc_ch',
-                                  '_br_put'],
+                                  '_br_put', '_vb'],
                 _CONSTS)
 
 
@@ -138,3 +139,54 @@ class TestFitGaps:
         ns2 = load('build_vert.py', ['fit_gaps', 'char_cells', 'n_cells'],
                    [c for c in _CONSTS if c != 'GAP_ON'], mocks={'GAP_ON': False})
         assert ns2['fit_gaps'](self.RUNS, self.T, 31.0, 335.8, 1043.8, h_ink=29.5) == []
+
+
+# ---------- E. 墨迹加粗(taskL-e: 换楷体后的墨量补偿) ----------
+class TestVBold:
+    """taskL-e: 换楷体后墨量补偿 —— PDF 文本渲染模式「填充+描边」(2 Tr + w) 加粗, 不做任何缩放。
+
+    锁三条契约:
+      ① 默认关闭(VERT_BOLD 未设) -> _vb 原样返回, 既有输出逐字节不变(回归保护);
+      ② 开启时包装只有一种形式: q <w> w 2 Tr ... Q
+         (与 §1.0a 的 q/<K> 0 0 1 0 0 cm 同走图形状态栈, 精确还原);
+      ③ 绝不出现任何缩放算子(scalebox/btrans/etrans/x:scale/cm) —— taskJ2 泄漏回归锁。
+    实测(探针 tmp_vert/taskL/probe/probe_bold2.py): 加粗段之后的段落与基线**逐像素相同**。
+    """
+
+    GLYPH = r'\fontsize{34.4pt}{34.4pt}\selectfont 國'
+
+    def test_default_off_is_identity(self, ns):
+        """① 默认 BOLD_W=0 -> 原样返回, 不改变既有行为。"""
+        assert ns['BOLD_W'] == 0
+        assert ns['_vb'](self.GLYPH) == self.GLYPH
+
+    def test_put_tex_has_no_bold_operator_by_default(self, ns):
+        """① 默认下 _put_tex 输出仍只有「\\put + 可选 q/K 压缩」, 无加粗算子。"""
+        s = ns['_put_tex']('國', 100.0, 200.0, 34.4, xs=0.87)
+        assert '2 Tr' not in s
+        assert ' w ' not in s
+
+    def test_wraps_with_render_mode_fill_stroke(self, ns, monkeypatch):
+        """② 开启后的包装形式(u 与 Q 配对, 中间只放字形)。"""
+        monkeypatch.setitem(ns, 'BOLD_W', 0.6)
+        s = ns['_vb']('X')
+        assert s == (r'\special{pdf:literal direct q 0.6 w 2 Tr}'
+                     r'X\special{pdf:literal direct Q}')
+
+    def test_no_scaling_operator_ever(self, ns, monkeypatch):
+        """③ 加粗绝不引入缩放/逆矩阵(taskJ2 根因) —— 只允许 q ... Q 精确还原。"""
+        for w in (0.2, 0.6, 0.9):
+            monkeypatch.setitem(ns, 'BOLD_W', w)
+            s = ns['_vb']('X')
+            for bad in ('scalebox', 'btrans', 'etrans', 'x:scale', ' cm'):
+                assert bad not in s, '加粗包装里出现了缩放算子: %s' % bad
+
+    def test_bold_applies_inside_put_tex(self, ns, monkeypatch):
+        """开启后 _put_tex 把字形包住, \\put 结构与字号声明不变(位置/字号语义不受影响)。"""
+        monkeypatch.setitem(ns, 'BOLD_W', 0.35)
+        s = ns['_put_tex']('國', 100.0, 200.0, 34.4, xs=0.87)
+        assert s.startswith(r'\put(')
+        assert '0.35 w 2 Tr' in s
+        assert self.GLYPH in s, '字形本身(含字号声明)必须原样保留在包装内'
+        # 横向压缩与加粗可共存: 压缩的 q/K 仍在外层
+        assert '0.87 0 0 1 0 0 cm' in s

@@ -26,12 +26,13 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
-| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙）；验证脚本 `src/test/verify_vert.py` |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定）；验证脚本 `src/test/verify_vert.py` |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
 | [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留 R1-R4） |
 | [docs/vert_fix18_20_27_report.md](../docs/vert_fix18_20_27_report.md) | 竖排收尾修复报告（#18 退出码分级 + #20 临时目录按产物名分离 + #27 数字实测核对；含验收实测与渲染零变化对照） |
 | [docs/vert_width_gap_report.md](../docs/vert_width_gap_report.md) | 竖排字宽压缩收尾报告（taskJ2：`\scalebox` btrans/etrans 数值逆矩阵泄漏根因与 q/cm/Q 精确还原修法 + 列内空隙 DP 检出全书落地 + 独立复核口径失效分析） |
+| [docs/vert_calib_report.md](../docs/vert_calib_report.md) | 竖排参数自标定报告（taskM：wz6 硬编码常数 -> 建排前自动标定 + 对账表 + 产物不回退证据 + **换书剩余人工依赖清单**） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
 | [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
 | [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（12 函数契约） |

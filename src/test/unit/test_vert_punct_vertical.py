@@ -19,8 +19,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _loader import load            # noqa: E402
 
 _CONSTS = ['VERT_FORMS', 'VERT_METRICS', 'BR_ON', 'BR_SIZE_DEF', 'BR_SIZE', 'BR_OPEN_OF',
-           'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP', 'INK_RATIO']
-_FUNCS = ['_br_put', 'fix_split_brackets', '_put_tex', '_esc_ch']
+           'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP', 'INK_RATIO',
+           # taskL: _put_tex 现在会调 _vb(墨迹加粗包装) —— 提取它及其常量(默认关闭, 本文件断言不受影响)
+           'BOLD_W']
+_FUNCS = ['_br_put', 'fix_split_brackets', '_put_tex', '_esc_ch', '_vb']
 
 
 @pytest.fixture(scope='module')

@@ -141,6 +141,7 @@
 | 18 | 竖排 `build_vert.py` 无 PASS/FAIL 退出码（编译失败退出码仍 0） | 已修（退出码分级：输入缺失/编译失败 -> `sys.exit(1)`；SRC 缺省的 3 参数调试调用只警告、仍 0。**判据实测标定：只有已知类加载期 JT1 报错不判失败 —— 正常全书编译 uplatex rc=1**。unit 8 项锁定；见 docs/vert_fix18_20_27_report.md） |
 | 20 | 竖排 `VERT_TMP` 同名并发冲突（并行两次构建共用 `vert.tex/dvi/pdf`） | 已修（默认改为 `/tmp/vert_<输出文件名 stem>_run` 按产物名分离；显式 `VERT_TMP` 仍可覆盖。契约 V2/V6 已同步；并发两实例实测路径不同） |
 | 27 | 竖排文档数字与实测漂移（页码/边注/纠正处数/L666 注释右缘） | 已修（独立实测重核：书眉 107 / 页码 122 / 边注 65 / 纠正 18 处 / 右缘 563.1pt；`build_vert.py` 注释 + spec/vertical + docs/vert_v2_report.md 已按真值同步） |
+| 28 | 竖排参数是 wz6 实测后硬编码（列数 12/字宽压缩 0.87/标点 0.62+0.81+0.85/括号 0.66/字体墨迹比 0.88-0.94）→ 换书/换字体必然失准 | 已修（**建排前自动标定趟**：§1.955 列数（内框宽÷列距 + 界行线条数互证）+ §1.956 源图墨迹 + 字体探针 → 各参数；显式 env 优先、兜底表保留；wz6 对账表 `N_COL_FRAME` 精确 12 / `XSCALE` -0.8%，`verify_vert` PASS + 覆盖率 ×1.009；见 [spec/vertical/09_calibration.md](spec/vertical/09_calibration.md) + [docs/vert_calib_report.md](docs/vert_calib_report.md)） |
 
 **竖排 issue 来源对照**（#18-#27）：
 
