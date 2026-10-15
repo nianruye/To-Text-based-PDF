@@ -1,7 +1,7 @@
 # 01 引擎链（竖排渲染）
 
 **状态**：implemented（wz6 全书 231 页跑通）
-**实现锚点**：`src/pipelines/build_vert.py` L872-912（preamble）、L936-937（编译命令）
+**实现锚点**：`src/pipelines/build_vert.py` L1323-1363（preamble）、L1407-1409（编译命令）
 **关联**：GitHub commit `ddc8761`（v1.4 引擎链定案）
 
 ## 目标
@@ -39,7 +39,7 @@ upLaTeX 下这些编码未定义。依据：jsclasses 自己的写法是
 `\def\jsc@JYn{\if@jsc@uplatex JY2\else JY1\fi}`（pxchfon L91 同规则）——
 upLaTeX 的正确编码是 JY2/JT2。
 
-**修法**（preamble L885-895）：
+**修法**（preamble L1336-1346）：
 1. `\documentclass[10pt,disablejfam]{tarticle}` —— 跳过类里坏掉的 mincho 数学字体声明；
 2. 按 jsclasses 的 upLaTeX 分支用 **JY2 重建**：`\DeclareSymbolFont{mincho}{JY2}{mc}{m}{n}` +
    `\DeclareSymbolFontAlphabet{\mathmc}{mincho}` + bold 变体（等价还原数学模式汉字 `\mathmc/\mathgt`）；
@@ -59,7 +59,7 @@ upLaTeX 的正确编码是 JY2/JT2。
 
 ## 约束
 
-1. 编译必须在 `VERT_TMP` 目录内执行（`uplatex vert.tex` + `dvipdfmx vert.dvi`，L936-937）；
+1. 编译必须在 `VERT_TMP` 目录内执行（`uplatex vert.tex` + `dvipdfmx vert.dvi`，L1407-1409）；
    临时目录默认按输出文件名 stem 分离（`/tmp/vert_<stem>_run`，#20 已修）-> **不同产物名的实例可并行**；
    **同名产物**仍不能并行（共用 `vert.tex/dvi/pdf`），需显式用不同 `VERT_TMP` 分开。
 2. `\pagestyle{empty}`：页码不用 LaTeX 页脚机制，全部由 eso-pic 绝对定位画（见 [03_marginalia.md](03_marginalia.md)）。

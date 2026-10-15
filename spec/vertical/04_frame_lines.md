@@ -1,8 +1,8 @@
 # 04 版框线（双边外框 + 界行线）
 
 **状态**：implemented（wz6：228/231 页画出；3 页无框 = 封面/前附/水印页，源书本就无框）
-**实现锚点**：`src/pipelines/build_vert.py` L405-425（常量）、L427-434（`_runs`）、L436-500（`_grid_fit`）、
-L502-510（`_bar_px`）、L512-651（`frame_geom`）、L653-680（`frame_tex`）
+**实现锚点**：`src/pipelines/build_vert.py` L413-433（常量）、L435-443（`_runs`）、L444-508（`_grid_fit`）、
+L510-518（`_bar_px`）、L520-659（`frame_geom`）、L661-689（`frame_tex`）
 **关联**：commit `ff4b5b7`（版框线 + 淡线栅格兜底）；检测实验脚本 `tmp_vert/frame_detect2.py` / `line_scan.py`
 
 ## 目标
@@ -65,7 +65,7 @@ L502-510（`_bar_px`）、L512-651（`frame_geom`）、L653-680（`frame_tex`）
 ## 约束
 
 1. **不硬编码页号**：全部判据为覆盖率/厚度/结构闭合 + 印版常数（12 列、799pt 内框高）；
-2. 只画测到的：外粗线缺测（订口侧被吞）时不画，不用模板补（`frame_tex` L668-669）；
+2. 只画测到的：外粗线缺测（订口侧被吞）时不画，不用模板补（`frame_tex` L676-677）；
 3. 版框检测结果同时被 [02_tate_layout.md](02_tate_layout.md) 的「列块总宽上限」复用（同一页只算一次）；
 4. 开关 `VERT_FRAME=0` 关闭；`VERT_FRAME_DEBUG=1` / `VERT_JIE_LOG=1` 打诊断。
 

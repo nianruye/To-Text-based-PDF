@@ -1,8 +1,8 @@
 # 06 旋转坐标系页还原（`derot_rows`）
 
 **状态**：implemented（wz6 实测命中 1 页；数据驱动，不硬编码页号）
-**实现锚点**：`src/pipelines/build_vert.py` L704-721（常量/判据）、L723-751（`_ink_char_cols`）、
-L753-761（`_lin_fit`）、L763-808（`derot_rows`）、L917-918（渲染时按页套用）
+**实现锚点**：`src/pipelines/build_vert.py` L713-730（常量/判据）、L732-760（`_ink_char_cols`）、
+L762-770（`_lin_fit`）、L772-817（`derot_rows`）、L1368（渲染时按页套用）
 **关联**：commit `ff4b5b7`（p159 整页丢失修复）
 **相关工具**：`src/tools/test_ocr_orientation.py`（OCR 侧参数对比试验，见本文末）
 
