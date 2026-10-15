@@ -1,7 +1,7 @@
 # 01 引擎链（竖排渲染）
 
 **状态**：implemented（wz6 全书 231 页跑通）
-**实现锚点**：`src/pipelines/build_vert.py` L852-892（preamble）、L916-917（编译命令）
+**实现锚点**：`src/pipelines/build_vert.py` L872-912（preamble）、L936-937（编译命令）
 **关联**：GitHub commit `ddc8761`（v1.4 引擎链定案）
 
 ## 目标
@@ -39,7 +39,7 @@ upLaTeX 下这些编码未定义。依据：jsclasses 自己的写法是
 `\def\jsc@JYn{\if@jsc@uplatex JY2\else JY1\fi}`（pxchfon L91 同规则）——
 upLaTeX 的正确编码是 JY2/JT2。
 
-**修法**（preamble L865-875）：
+**修法**（preamble L885-895）：
 1. `\documentclass[10pt,disablejfam]{tarticle}` —— 跳过类里坏掉的 mincho 数学字体声明；
 2. 按 jsclasses 的 upLaTeX 分支用 **JY2 重建**：`\DeclareSymbolFont{mincho}{JY2}{mc}{m}{n}` +
    `\DeclareSymbolFontAlphabet{\mathmc}{mincho}` + bold 变体（等价还原数学模式汉字 `\mathmc/\mathgt`）；
@@ -53,12 +53,15 @@ upLaTeX 的正确编码是 JY2/JT2。
 ## 输入 / 输出
 
 - **输入**：OCR lines/coords JSON、源 PDF（取精确页幅、源图墨迹）
-- **输出**：`vert.tex`（`$VERT_TMP`，默认 `/opt/test/tmp_vert/run`）→ `uplatex` → `vert.dvi` → `dvipdfmx` → 目标 PDF
+- **输出**：`vert.tex`（`$VERT_TMP`，默认 `/tmp/vert_<输出文件名 stem>_run`）→ `uplatex` → `vert.dvi` → `dvipdfmx` → 目标 PDF
+- **退出码**：0 = 正常（含 SRC 缺省的 3 参数调试调用）/ 1 = 输入文件缺失或编译失败（#18；判据见
+  [governance/PIPELINE_BEHAVIOR.md](../governance/PIPELINE_BEHAVIOR.md) V6 —— uplatex 对正常成功编译也返回 rc=1，只把类加载期 JT1 报错列为容忍项）
 
 ## 约束
 
-1. 编译必须在 `VERT_TMP` 目录内执行（`uplatex vert.tex` + `dvipdfmx vert.dvi`，L916-917），
-   **不并行**跑两个 build_vert 实例（同一临时目录同名文件会互相覆盖）。
+1. 编译必须在 `VERT_TMP` 目录内执行（`uplatex vert.tex` + `dvipdfmx vert.dvi`，L936-937）；
+   临时目录默认按输出文件名 stem 分离（`/tmp/vert_<stem>_run`，#20 已修）-> **不同产物名的实例可并行**；
+   **同名产物**仍不能并行（共用 `vert.tex/dvi/pdf`），需显式用不同 `VERT_TMP` 分开。
 2. `\pagestyle{empty}`：页码不用 LaTeX 页脚机制，全部由 eso-pic 绝对定位画（见 [03_marginalia.md](03_marginalia.md)）。
 3. `\parindent=0pt`：竖排不做段首缩进（缩进由源书列断点自然表达）。
 4. 纸型：`\special{papersize=W,H}` 的 W/H = 目标 pt × **1.00375**（dvipdfmx 按 bp 解析，

@@ -11,12 +11,12 @@
 
 | 编号 | 文件 | 功能 | 实现锚点（build_vert.py） | 验收 |
 |---|---|---|---|---|
-| 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L852-892、编译 L916-917 | 编译零报错、字形与源书同款 |
-| 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | L45-94 参数拟合、L791-838 `page_tex`、L663-682 右缘复测 | 列数/列位/断点与源书一致 |
-| 03 | [marginalia.md](03_marginalia.md) | 书眉/页码/边注（eso-pic 带星版 + 墨迹实测定位） | L106-194（书眉页码）、L196-296（边注） | 位置 vs 源墨迹、无重叠发虚 |
-| 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底） | L386-661（常量/`_grid_fit`/`frame_geom`/`frame_tex`） | 内框/界行线 vs 源墨迹 |
-| 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L298-384（`pn_parse`/`pn_text`/`pn_sequence_fix`） | 纠正记录逐条复核 |
-| 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L684-788（`_ink_char_cols`/`_lin_fit`/`derot_rows`） | 旋转页列位/字号 vs 源书 |
+| 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L872-912、编译 L936-937 | 编译零报错、字形与源书同款 |
+| 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | L64-113 参数拟合、L811-858 `page_tex`、L682-702 右缘复测 | 列数/列位/断点与源书一致 |
+| 03 | [marginalia.md](03_marginalia.md) | 书眉/页码/边注（eso-pic 带星版 + 墨迹实测定位） | L125-213（书眉页码）、L215-315（边注） | 位置 vs 源墨迹、无重叠发虚 |
+| 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底） | L405-680（常量/`_grid_fit`/`frame_geom`/`frame_tex`） | 内框/界行线 vs 源墨迹 |
+| 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L317-403（`pn_parse`/`pn_text`/`pn_sequence_fix`） | 纠正记录逐条复核 |
+| 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L704-808（`_ink_char_cols`/`_lin_fit`/`derot_rows`） | 旋转页列位/字号 vs 源书 |
 
 ## 架构
 
@@ -64,9 +64,13 @@ source_pdf/wz6.pdf --(OCR, 官方 API)--> data/wz6/wz6_spotting_{lines,coords}.j
 | 越界 span / 矢量 | 0 / 0 | `verify_vert.py` |
 | 预期差异页 | 2 页（OCR 幻觉长行页、水印页，按内容特征自动识别） | `verify_vert.py` |
 | 版框 | 228/231 页（12 格 = 13 条线栅格） | build_vert 日志 |
-| 书眉 / 页码 / 边注 | 107 / 121 / 64 条 | build_vert 日志 |
-| 页码序列纠正 | 19 处（拟合 `value = 1.000*page + 176.0`） | build_vert 日志 |
-| 回归测试 | 201 全绿（`pytest src/test/unit src/test/invariants`） | `src/test/` |
+| 书眉 / 页码 / 边注 | 107 / 122 / 65 条 | build_vert 日志（#27 实测复核） |
+| 页码序列纠正 | 18 处（拟合 `value = 1.000*page + 176.0`） | build_vert 日志（#27 实测复核） |
+| 回归测试 | 209 全绿（unit 196 + invariants 13） | `src/test/` |
+
+> 条数为默认配置（`VERT_DEROT=1`）下的实测值。旧文档记的页码 121 / 边注 64 是**关掉旋转页还原**时的计数
+> （p159 旋转页少 1 条页码 + 1 条边注，实测对照见 [docs/vert_fix18_20_27_report.md](../../docs/vert_fix18_20_27_report.md)）；
+> 页码序列纠正 18 处与 derot 开关无关（两种配置都 18）。
 
 ## 运行
 
@@ -96,7 +100,7 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 | `VERT_DEROT` | 1 | 旋转坐标系页还原 |
 | `VERT_NCOL` | 自动 | 列容量（覆盖「最密页」列数） |
 | `VERT_LINE_COV` / `VERT_LINE_COV_LO` | 0.55 / 0.30 | 界行线覆盖率主阈值 / 淡线兜底阈值 |
-| `VERT_TMP` | `/opt/test/tmp_vert/run` | tex/dvi/pdf 临时目录 |
+| `VERT_TMP` | `/tmp/vert_<输出文件名 stem>_run` | tex/dvi/pdf 临时目录（按产物名分离，并发不共用；显式设置则用给的值） |
 | `VERT_FRAME_DEBUG` / `VERT_JIE_LOG` | 0 | 版框检测诊断 / 界行线日志 |
 
 ## 测试点
@@ -104,4 +108,4 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 1. **页数 1:1**（硬）：231 = 231 —— `verify_vert.py` 退出码 0
 2. **逐页字符量**：非预期差异页 0（wz6 p74/p231 为预期，见 `verify_vert.py` 的「预期差异页」自动识别机制）
 3. **越界**：全书 span/矢量 0 个超出页 rect
-4. **免回归**：改动后重跑 `verify_vert.py` + `pytest src/test/unit src/test/invariants`（横排 146 项不受影响）
+4. **免回归**：改动后重跑 `verify_vert.py` + `pytest src/test/unit src/test/invariants`（横排 201 项不受影响）

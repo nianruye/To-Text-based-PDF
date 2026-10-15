@@ -175,9 +175,14 @@ VERT_TMP=/tmp/gov_vert_full /usr/bin/python3 src/pipelines/build_vert.py \
    `spec/vertical/README.md` L66-68 记「书眉/页码/边注 107/121/64 条」「页码序列纠正 19 处」，`spec/vertical/05_pagenum_sequence.md` L3/L55 记 19 处；
    本次实测（产物与已验收版逐页全等）为 **107/122/65** 与 **18 处**；另 `build_vert.py` L666 注释写「真右缘 ≈546pt」而实测与 `spec/vertical/02_tate_layout.md` L44 为 **563.1pt**。
    建议后续单独一个 `docs:` commit 同步（本任务不越界改分部 spec）。
+   > **R1 已关闭（2026-10-15 竖排收尾修复）**：三个数字已独立复核并同步进 `spec/vertical/*` 与 `build_vert.py` 注释。
+   > 其中页码/边注的旧值 121/64 已定位来源 —— 是**关掉 `VERT_DEROT`** 时的计数（p159 旋转页少 1 条页码 + 1 条边注）；
+   > 页码纠正 18 处与 derot 开关无关；右缘真值 = 抽样页内框右线中位 563.1pt。详见 [docs/vert_fix18_20_27_report.md](vert_fix18_20_27_report.md)。
 2. **R2 治理文件中的第三方数字**：`AGENTS.md` #12 声称「ci.yml 设 PATH=/usr/bin」，实测 ci.yml 无 PATH 设置（本任务只如实记录，未改该行语义）。
 3. **R3 CI 备选方案 B 待主控决策**（第三节 3.3）：是否把竖排基线产物 + OCR JSON 入库以换取机器门禁。
 4. **R4 spec 锚点随行号漂移**（`docs/vert_arch_report.md` 遗留 3）：本次新增的契约 V9 锚点表同样基于 `ff4b5b7` 的 924 行；改 `build_vert.py` 后须同步 `spec/vertical/README.md` 与本节（已写入 `AGENTS.md` §4 第 4 条）。
+   > **R4 已按该规则执行（2026-10-15 竖排收尾修复）**：`build_vert.py` 现为 958 行；`spec/vertical/*` 与
+   > `PIPELINE_BEHAVIOR.md` V9 锚点已全部重算同步。**本文第二节的行号仍是 924 行版的历史记录**（核对基准已写明），查现行锚点请走上述两处。
 5. 竖排自身的 6 条工程遗留已按现有格式登记为 issue（`AGENTS.md` §6 #18-#26），其中 #21-#24 是版式保真类（改动会动全书断列/页数，需重跑基线），#18/#20/#27 为本次核对新发现。
 
 ## 六、约束遵守声明

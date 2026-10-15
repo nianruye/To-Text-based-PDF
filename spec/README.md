@@ -29,7 +29,8 @@
 | [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot）；验证脚本 `src/test/verify_vert.py` |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
-| [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留） |
+| [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留 R1-R4） |
+| [docs/vert_fix18_20_27_report.md](../docs/vert_fix18_20_27_report.md) | 竖排收尾修复报告（#18 退出码分级 + #20 临时目录按产物名分离 + #27 数字实测核对；含验收实测与渲染零变化对照） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
 | [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
 | [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（12 函数契约） |

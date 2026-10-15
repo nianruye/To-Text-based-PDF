@@ -1,8 +1,8 @@
 # 03 书眉 / 页码 / 边注（边缘小字绝对定位）
 
-**状态**：implemented（wz6 全书：书眉 107 条 / 页码 121 条 / 边注 64 条）
-**实现锚点**：`src/pipelines/build_vert.py` L106-122（`special_rows`）、L125-133（`src_gray`）、
-L135-161（`ink_extent`）、L163-194（`special_tex`）、L203-296（`note_rows`/`note_cols`/`note_tex`）
+**状态**：implemented（wz6 全书：书眉 107 条 / 页码 122 条 / 边注 65 条）
+**实现锚点**：`src/pipelines/build_vert.py` L125-141（`special_rows`）、L144-152（`src_gray`）、
+L154-180（`ink_extent`）、L182-213（`special_tex`）、L215-315（`note_rows`/`note_cols`/`note_tex`）
 **关联**：commit `ddc8761`（v2 书眉/页码/边注）；memory 笔记 `vert_pipeline_eso_pic_pitfalls`
 
 ## 目标
@@ -68,7 +68,7 @@ L135-161（`ink_extent`）、L163-194（`special_tex`）、L203-296（`note_rows
 
 ## 验收方法
 
-1. stdout 日志逐条核对（书眉 107 / 页码 121 / 边注 64 条）；
+1. stdout 日志逐条核对（书眉 107 / 页码 122 / 边注 65 条；#27 实测复核）；
 2. 抽页对照源书墨迹：p4 书眉「論持久戰」x557.0-567.5 y548.0-641.0；页码「一八〇」x557.5-567.0 y937.5-977.0；
    边注字列 x29.5-60.5；
 3. 无"逐页累积"：探针 PDF（只留 `\put` 层）文本提取，每页只应出现本页元素；

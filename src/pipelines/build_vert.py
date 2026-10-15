@@ -4,6 +4,8 @@
 用法: /usr/bin/python3 src/pipelines/build_vert.py <lines.json> <coords.json> <out.pdf> [src.pdf]
 env:  VERT_PAGES=3-12    只输出指定页(1-based, 如 '3-12' 或 '3,5')
       VERT_SPECIAL=0       关闭书眉/页码渲染(默认开, 需 src.pdf 测墨迹)
+      VERT_TMP=/dir        临时目录(默认 /tmp/vert_<输出文件名 stem>_run: 按产物名分离, 并发不共用)
+退出码: 0 = 正常(含 SRC 缺省的 3 参数调试调用); 1 = 输入文件缺失 / 编译失败(#18)
 管线: OCR(2x=144dpi px) -> 参数拟合(tarticle 竖排) -> uplatex+dvipdfmx -> PDF
 v2: 书眉/页码/边注 —— eso-pic \AddToShipoutPictureFG*(仅本页, 无星号会逐页累积) \put 绝对定位(逐字手工断列),
     坐标取源书墨迹实测(OCR bbox 对边缘小字偏 18-40pt 不可直接用); 边注按实测字列与 OCR 行右到左配对
@@ -13,7 +15,24 @@ import json, sys, os, subprocess, statistics, re
 SL = sys.argv[1]; CO = sys.argv[2]; OUT = sys.argv[3]
 SRC = sys.argv[4] if len(sys.argv) > 4 else None
 PAGES_ENV = os.environ.get('VERT_PAGES', '')
-TMP = os.environ.get('VERT_TMP', '/opt/test/tmp_vert/run')
+
+# ---------- 0) 临时目录 / 输入校验(#20 / #18) ----------
+# 临时目录按「输出文件名 stem」分离(#20): 并行跑不同书/不同产物名时不再共用 vert.tex/dvi/pdf
+#   (对标横排 #10 的路径分 build_name 方案)。显式设 VERT_TMP 时用用户给的路径(空串等同未设,
+#   同 VERT_NCOL 的 `or` 惯例)。同名产物并发仍会共用目录 -> 属预期(同横排方案: 冲突只在同名时)。
+TMP = os.environ.get('VERT_TMP') or '/tmp/vert_%s_run' % os.path.splitext(os.path.basename(OUT))[0]
+for _p, _kind in ((SL, 'lines'), (CO, 'coords')):
+    if not os.path.exists(_p):
+        print('[错误] %s 输入不存在: %s' % (_kind, _p), file=sys.stderr); sys.exit(1)
+if SRC is not None and not os.path.exists(SRC):
+    print('[错误] 源 PDF 不存在: %s' % SRC, file=sys.stderr); sys.exit(1)
+if SRC is None:
+    # 3 参数调试调用(无源 PDF)保持兼容: 只显式警告, 退出码仍 0(#18)
+    print('[警告] 未给源 PDF(argv[4] 缺省): 以下 4 项依赖源图墨迹的特性将静默关闭 ——\n'
+          '        1) 书眉/页码/边注渲染(VERT_SPECIAL)\n'
+          '        2) 版框线: 外框双边 + 界行线(VERT_FRAME)\n'
+          '        3) 版心右缘墨迹复测(VERT_RIGHT_INK, 回退 OCR 拟合值)\n'
+          '        4) 旋转坐标系页还原(VERT_DEROT)', file=sys.stderr)
 os.makedirs(TMP, exist_ok=True)
 
 sl = json.load(open(SL)); co = json.load(open(CO))
@@ -663,7 +682,8 @@ def frame_tex(pi):
 # ---------- 1.96) 版心右缘用源图墨迹复测(修 OCR 边缘列 bbox 右扩) ----------
 # 现象(实测 tmp_vert/right_fit.py): OCR 对「最右一列」的 bbox 系统性右扩 14-30pt(夹进版框右线/书眉
 #   页码带/扫描黑边), 逐页 max(正文列 x1) 中位 1164px 而 p90 1183px、max 1189px(= 扫描黑边右缘)。
-#   旧拟合 RIGHT = max(所有页所有正文列 x1) = 1189.8px = 594.9pt, 比版心真右缘(≈546pt)偏右 ~49pt ->
+#   旧拟合 RIGHT = max(所有页所有正文列 x1) = 1189.8px = 594.9pt, 比版心真右缘(抽样页内框右线中位
+#   563.1pt; 单页实例 p4 = 546.0pt)偏右 ~32pt ->
 #   后果: 每页第一列被画到版框之外(落进书眉/页码带)。修法: 版心右缘 = 版框内最右一条细竖线
 #   (源图墨迹实测, 抽样页中位; 源书正文列墨迹右缘正落在该线上, 实测 p4 列墨右缘 544.5 vs 线 545.5)。
 RIGHT_INK = os.environ.get('VERT_RIGHT_INK', '1') not in ('0', 'false', 'False') and src_doc is not None
@@ -916,9 +936,23 @@ print('[tex] %s (页 %s)' % (tex_path, sel))
 r = subprocess.run(['uplatex', '-interaction=nonstopmode', 'vert.tex'], cwd=TMP, capture_output=True, text=True)
 r2 = subprocess.run(['dvipdfmx', 'vert.dvi'], cwd=TMP, capture_output=True, text=True)
 dvi_pdf = os.path.join(TMP, 'vert.pdf')
-if os.path.exists(dvi_pdf):
+# 失败判据(#18, 实测标定 —— 不能只看 rc, 也不能只看产物):
+#   1) uplatex 对**正常成功**的全书编译也返回 rc=1: 唯一报错是类加载期
+#      "KANJI Encoding scheme `JT1' unknown."(preamble L884 已注明: tsize10.clo 内无法在文档内拦截,
+#      upLaTeX 下该命令本就被忽略), 实测成功编译恰为 1 行 '!' 且该行是它 -> 列为容忍项;
+#   2) nonstopmode 下真出错也照样输出 DVI/PDF -> 只查 vert.pdf 存在会漏判。
+#   判据 = dvipdfmx rc != 0 或 vert.pdf 未生成 或 uplatex 输出里有**容忍项之外**的 '!' 报错行。
+ERR_TOLERATED = ('KANJI Encoding scheme', 'JT1')     # 已知可容忍报错的特征子串
+err_bad = [l for l in r.stdout.splitlines()
+           if l.startswith('!') and not all(s in l for s in ERR_TOLERATED)]
+if r2.returncode == 0 and not err_bad and os.path.exists(dvi_pdf):
     os.replace(dvi_pdf, OUT)
     print('[完成] %s' % OUT)
-else:
-    print('[失败] uplatex rc=%s dvipdfmx rc=%s' % (r.returncode, r2.returncode))
-    print(r.stdout[-1500:])
+    sys.exit(0)
+print('[失败] uplatex rc=%s dvipdfmx rc=%s 意外报错 %d 行, %s' % (
+    r.returncode, r2.returncode, len(err_bad),
+    'vert.pdf 已生成' if os.path.exists(dvi_pdf) else 'vert.pdf 未生成'), file=sys.stderr)
+for l in err_bad[:10]:
+    print('  ' + l, file=sys.stderr)
+print(r.stdout[-1500:], file=sys.stderr)
+sys.exit(1)
