@@ -117,8 +117,10 @@ XSCALE = float(os.environ.get('VERT_XSCALE') or 0.87)   # 字模横向压缩系�
 def _put_tex(ch, x_pt, y_pt, F, xs=None):
     """单字 \\put 片段(pt, 页左上原点 y 向下)。xs = 横向压缩(默认 XSCALE)。
     xs<1 时用自带 q/<K> 0 0 1 0 0 cm ... Q 包住该字(只缩 x 保字高, 状态精确还原不污染后续内容,
-    见上方 §1.0a 根因说明); 传入的 x_pt 是缩放后字盒左缘的目标页坐标, 内部按 PAGE_ORIGIN_BP 反解。"""
+    见上方 §1.0a 根因说明); 传入的 x_pt 是缩放后字盒左缘的目标页坐标, 内部按 PAGE_ORIGIN_BP 反解。
+    括号走 §1.0c 的竖排形态替换(字号/位置一并校正), 其余字不受影响。"""
     xs = XSCALE if xs is None else xs
+    ch, F, x_pt, y_pt = _br_put(ch, x_pt, y_pt, F, xs)
     body = r'\fontsize{%spt}{%spt}\selectfont %s' % (round(F, 1), round(F, 1), _esc_ch(ch))
     if abs(xs - 1.0) > 1e-6:
         ks = ('%.4f' % xs).rstrip('0').rstrip('.')
@@ -268,6 +270,92 @@ def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=GAP_HANG, p_merge=P_MERGE, p_
                 T0 + (c2 + bg + (hratio if h2 else 0)) * m, tg if tg is not None else -1, out))
     return sorted(out.items())
 
+# ---------- 1.0c) 标点竖排形态(taskK-A: 括号还原) ----------
+# 用户反馈①: 源书 p3「（一九三八年五月）」的括号是**旋转 90 度的竖排专用形态**且比旁边字小;
+#   我们此前渲染的是未旋转的全角（）(字号=正文, 墨迹 0.936em 高)。
+# 实测(探针 tmp_vert/taskK/{shape_census,probe_vertcp}.py; 报告 docs/vert_punct_font_report.md):
+#   ① 30 页抽样 176 个「小墨迹块」做**保宽高比**模板匹配: （ -> U+FE35 命中 25 例(IoU 中位 0.596,
+#      次优候选 0.11)、） -> U+FE36 命中 27 例(0.574); 「」命中直角形 ﹁/﹂(p7 放大对照确认)。
+#      源书 ︵ 墨迹 17.5 x 7.0pt, 同列汉字墨高约 28pt(括号墨高仅 0.23 倍字高)。
+#      注: 早先按 OCR 行盒 x 直配墨迹列会错位(OCR 盒 x 与墨迹列差 20-40pt, 有等比缩放),
+#      故探针改用 RANSAC 仿射配列 + 连通域 + 保宽高比 IoU(colmap.py / inkcols.py / glyph.py)。
+#   ② 尺寸: Noto Serif CJK TC 的 ︵ 墨迹 = 0.936 x 0.286 em, 取 0.66F 时墨迹 18.2 x 6.4pt
+#      (源书 17.5 x 7.0 -> 宽 +4% / 高 -9%, 是「宽高同时最接近」的单一缩放); 【】〔〕 源书更小,
+#      分类型给 0.55 / 0.49(见 BR_SIZE)。
+#   ③ 码位可用性: Noto Serif CJK TC 提供 U+FE17/18/35/36/39/3A/3D/3E/3F/40/41/42/43/44 全套
+#      (fontTools cmap 实测), 且用本管线真 preamble 编译实测能正常出字并被 PDF 文本层提取。
+#   ④ 不用 \scalebox 旋转: 直接用竖排**码位**(字形本身就是旋转形态), 故无 taskJ2 的
+#      btrans/etrans 逆矩阵舍入泄漏问题(压缩仍走 §1.0a 的 q/K 0 0 1 0 0 cm ... Q)。
+VERT_FORMS = {'（': '︵', '）': '︶', '「': '﹁', '」': '﹂', '『': '﹃', '』': '﹄',
+              '【': '︗', '】': '︘', '〔': '︹', '〕': '︺', '《': '︽', '》': '︾',
+              '〈': '︿', '〉': '﹀'}
+# 各竖排码位在 em 盒内的墨迹 (墨宽, 墨高, 墨心 x, 墨心 y) —— NotoSerifCJK-Regular.ttc 第 4 面(TC)
+# 的 glyf bbox 实测。与 INK_RATIO 同属「字体绑定常量」: 换字体必须重测。
+# 要点: 开口形墨心在盒**下半**(cy≈0.04-0.14) / 闭口形在上半(cy≈0.62-0.72), 直角形 ﹁/﹄ 墨心
+# 不在盒中心(cx≈0.62/0.38) —— 不按墨心校正就直接摆到格心的话, 开口形会整格低 ~15pt(实测)。
+VERT_METRICS = {
+    '︵': (0.936, 0.286, 0.500, 0.087), '︶': (0.936, 0.287, 0.500, 0.673),
+    '﹁': (0.713, 0.306, 0.619, 0.070), '﹂': (0.713, 0.306, 0.382, 0.686),
+    '﹃': (0.658, 0.348, 0.634, 0.091), '﹄': (0.658, 0.348, 0.366, 0.669),
+    '︗': (0.926, 0.351, 0.500, 0.092), '︘': (0.926, 0.351, 0.500, 0.675),
+    '︹': (0.936, 0.250, 0.500, 0.042), '︺': (0.936, 0.250, 0.500, 0.718),
+    '︽': (0.932, 0.439, 0.500, 0.138), '︾': (0.932, 0.439, 0.500, 0.623),
+    '︿': (0.940, 0.431, 0.500, 0.133), '﹀': (0.940, 0.431, 0.500, 0.627),
+}
+BR_ON = os.environ.get('VERT_BR', '1') not in ('0', 'false', 'False')
+BR_SIZE_DEF = float(os.environ.get('VERT_BR_SIZE') or 0.66)   # 竖排括号字号/正文字号(源书 ︵/︶ 标定)
+BR_SIZE = {'︗': 0.55, '︘': 0.55, '︹': 0.49, '︺': 0.49}       # 源书实测: 【】〔〕 明显更小
+
+def _br_put(ch, x_pt, y_pt, F, xs=None):
+    """括号 -> 竖排形态(§1.0c)。返回 (渲染字, 渲染字号, x_pt', y_pt')。
+    非括号(或 VERT_BR=0)原样返回 —— 既有行为不变。
+    x_pt = 缩放后字盒左缘的页坐标(pt, 左起); y_pt = \\put 的 y(自页底起 = page_h - 墨基线)。
+    校正口径: 正文字号 F 的格心 = 盒左缘 + xs x F/2、基线上方 0.5F; 竖排字形按自身墨心
+    (VERT_METRICS 的 cx/cy x 渲染字号)摆回该格心。"""
+    if not BR_ON or ch not in VERT_FORMS:
+        return ch, F, x_pt, y_pt
+    xs = XSCALE if xs is None else xs
+    g = VERT_FORMS[ch]
+    F2 = round(F * BR_SIZE.get(g, BR_SIZE_DEF), 1)
+    _w, _h, cx, cy = VERT_METRICS[g]
+    x2 = x_pt + xs * (F / 2.0 - cx * F2)
+    y2 = y_pt + 0.5 * F - cy * F2
+    return g, F2, x2, y2
+
+# ---------- 1.0d) OCR 列拆分归位(taskK-B: 行首闭括号回上一列) ----------
+# 现象(实测, 全书 9 例): OCR 偶发把一列行尾的闭括号挂到**下一列的行首** ——
+#   p3「（一九三八年五月 | ）問題的提起」/ p43「「先生之志則大矣 | 」先生的看法」/ p161「（一九三八年十月 | ）同志們」
+#   / p193/p201 同型(日期行) —— 这正是用户看到的「同一页两处括号字号不一致(22.4 vs 29.8)」的**根因**:
+#   括号对分属两列, 两列字号本就不同(源书日期行是小字: 墨高 22.0pt vs 正文 29.5pt, 我们渲染
+#   25.0 vs 33.5 与源书一致), 分开看就像同页括号大小不一。
+# 依据: 竖排「行头禁则/行尾禁则」—— 闭括号不得出现在列首、开括号不得出现在列尾, 故「行首闭括号」
+#   必是列拆分错位, 该括号属于上一列行尾。
+# 做法: 页内按阅读序维护「未闭合开括号」栈; 行首闭括号若与栈顶同类 -> 移到上一行行尾。
+#   **只改文本, 不动 OCR 盒**: 实测两行的盒都覆盖该括号墨迹区, 移动后两列 步进 = 盒高/字数 反而
+#   更贴源书(p3 例: 8 字 34.75pt -> 9 字 30.9pt, 源书实测 30.5pt); 页内字符总量守恒。
+BR_OPEN_OF = {'）': '（', '」': '「', '』': '『', '〕': '〔', '】': '【', '》': '《', '〉': '〈'}
+
+def fix_split_brackets(rows):
+    """页内 OCR 行文本(阅读序) -> (新行文本列表, [(行号, 括号)] 归位记录)。
+    行首闭括号且页内(含前面的行)存在未闭合的同类开括号时, 该括号归位到上一行行尾。"""
+    out = list(rows)
+    stack = []                                # 未闭合开括号(按阅读序)
+    fixes = []
+    for i, t in enumerate(out):
+        while t and t[0] in BR_OPEN_OF and stack and stack[-1] == BR_OPEN_OF[t[0]] and i > 0 and out[i - 1]:
+            stack.pop()
+            out[i - 1] = out[i - 1] + t[0]
+            fixes.append((i, t[0]))
+            t = t[1:]
+            out[i] = t
+        for c in t:
+            if c in BR_OPEN_OF.values():
+                stack.append(c)
+            elif c in BR_OPEN_OF and stack and stack[-1] == BR_OPEN_OF[c]:
+                stack.pop()
+    return out, fixes
+
+
 # ---------- 1) 参数拟合 ----------
 def col_stats(k):
     """每列: (x0,x1,y0,y1,t)"""
@@ -277,6 +365,20 @@ def col_stats(k):
         xs = [q[0] for q in p]; ys = [q[1] for q in p]
         out.append((min(xs), max(xs), min(ys), max(ys), _norm_punct(t.strip())))
     return out
+
+# §1.0d 应用: 行首闭括号归位上一列(只改文本, 几何/OCR 盒不动; 全书 9 例, 见 §1.0d)
+_br_fix = []
+for _pi, _k in enumerate(keys):
+    _rows2, _fx = fix_split_brackets(sl.get(_k, []))
+    if _fx:
+        sl[_k] = _rows2
+        for _ri, _c in _fx:
+            _br_fix.append((_pi + 1, _ri + 1, _c))
+if _br_fix:
+    print('[禁则归位] 行首闭括号回上一列 %d 处: %s' % (
+        len(_br_fix), ', '.join('p%d行%d「%s」' % f for f in _br_fix)))
+else:
+    print('[禁则归位] 未检出(无行首闭括号待归位)')
 
 all_rows = {k: col_stats(k) for k in keys}
 
@@ -434,8 +536,10 @@ def special_tex(k, pi):
         for i, ch in enumerate(t):
             top = iy0 / 2.0 + i * step                  # 该字墨迹顶(pt, 页顶向下)
             y_put = page_h - top - gink + Y_CAL         # \put y 向上, 参考点≈墨迹底
+            # 括号走 §1.0c 竖排形态(书眉/页码基本不含括号, 为一致性同样处理; 此处无横向压缩 -> xs=1)
+            ch, _f2, _x2, _y2 = _br_put(ch, ix0 / 2.0 + X_CAL, y_put, font, xs=1.0)
             ch = ch.replace('%', r'\%').replace('#', r'\#').replace('&', r'\&').replace('_', r'\_')
-            put.append(r'\put(%.1f,%.1f){\fontsize{%spt}{%spt}\selectfont %s}' % (ix0 / 2.0 + X_CAL, y_put, font, font, ch))
+            put.append(r'\put(%.1f,%.1f){\fontsize{%spt}{%spt}\selectfont %s}' % (_x2, _y2, _f2, _f2, ch))
         out.append('\\AddToShipoutPictureFG*{%%\n  ' + '%%\n  '.join(put) + '}')
         print('  [%s] p%d %-10s 墨迹x%.1f-%.1f y%.1f-%.1f 字号%.1f 步进%.1f n%d' % (
             '页码' if kind == 'pn' else '书眉', pi + 1, t, ix0 / 2.0, ix1 / 2.0,
@@ -451,7 +555,13 @@ def special_tex(k, pi):
 #   且 (版心外: x0<100 且 x1 <= 最左正文列x0+2) 或 (* 开头的题注列)。
 NOTE_STEP_RATIO = 0.85      # 边注/正文 步进比上限
 NOTE_STEP_MIN = 15.0        # 步进下限 px(挡 OCR 噪声页: p231 尾部 JSON 残片 步进 1.1px)
-NOTE_INK_RATIO = 0.88       # Noto Serif CJK 单字墨高/字号(渲染端 ink 比, 由 probe 实测标定)
+NOTE_INK_RATIO = 0.88       # Noto Serif CJK 单字墨高/字号(渲染端 ink 比**中位**口径, probe 实测标定)
+# taskK-C 字号保护: 注释/页外小字按「中位墨高」定字号, 但满字(講/國/戰 这类占满字身的字)真实墨高
+#   可达 0.94 em —— 注释步进本来就紧(源书 墨高/步进 ≈ 0.95, 实测 p4 注 步进 20.5 而 字高 19.0),
+#   按中位口径定的字号会让满字互相压住(用户反馈②「注释部分字体有点重合」; 实测产物 p4 注
+#   「的講演」「這是毛澤」相邻字墨迹间隙 0.25-1.0pt vs 源书同处 1.5-2.0pt, 8x 放大看已粘连)。
+#   故按「满字墨高 <= 0.95 x 步进」压字号再重算步进(整段墨迹上下缘仍与源书对齐)。
+NOTE_INK_MAX = 0.94         # Noto CJK 满字墨高上限(em); 与中位口径 NOTE_INK_RATIO 区分使用
 
 def note_rows(k):
     """本页边注行 [(x0,x1,y0,y1,t)]; 书眉/页码优先认领, 剩下的版心外小字才算边注"""
@@ -541,12 +651,18 @@ def note_tex(k, pi, rows=None, zone=None, zone_y=None, tag='边注'):
         font = round(min(26.0, max(9.0, gh / 2.0 / NOTE_INK_RATIO)), 1)
         gink = NOTE_INK_RATIO * font                          # 渲染单字墨高(pt)
         step = round(min(st / 2.0, ((iy1 - iy0) / 2.0 - gink) / (n - 1)) if n > 1 else gink, 2)
+        # taskK-C 字号保护: 满字墨高(0.94 em)不得压过步进(见 NOTE_INK_MAX 说明)
+        if n > 1 and NOTE_INK_MAX * font > 0.95 * step:
+            font = round(max(9.0, 0.95 * step / NOTE_INK_MAX), 1)
+            gink = NOTE_INK_RATIO * font
+            step = round(min(st / 2.0, ((iy1 - iy0) / 2.0 - gink) / (n - 1)), 2)
         put = []
         for i, ch in enumerate(t):
             y_put = page_h - (iy0 / 2.0 + i * step) - gink + Y_CAL
+            ch, _f2, _x2, _y2 = _br_put(ch, ix0 / 2.0 + X_CAL, y_put, font, xs=1.0)   # §1.0c
             ch = ch.replace('%', r'\%').replace('#', r'\#').replace('&', r'\&').replace('_', r'\_')
             put.append(r'\put(%.1f,%.1f){\fontsize{%spt}{%spt}\selectfont %s}' % (
-                ix0 / 2.0 + X_CAL, y_put, font, font, ch))
+                _x2, _y2, _f2, _f2, ch))
         out.append('\\AddToShipoutPictureFG*{%%\n  ' + '%%\n  '.join(put) + '}')
         print('  [%s] p%d %-24s 字列x%.1f-%.1f y%.1f-%.1f 字高%.1f 字号%.1f 步进%.2f n%d' % (
             tag, pi + 1, t[:24], ix0 / 2.0, ix1 / 2.0, iy0 / 2.0, iy1 / 2.0, gh / 2.0, font, step, n))

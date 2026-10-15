@@ -18,12 +18,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _loader import load            # noqa: E402
 
 _CONSTS = ['PUNCT_HANG', 'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP', 'INK_RATIO', 'GAP_ON', 'GAP_HANG',
-           'P_MERGE', 'P_PUNCT', 'P_SKIPN', 'P_SKIPR', 'P_GAP', 'P_TOT', 'GAP_MAX']
+           'P_MERGE', 'P_PUNCT', 'P_SKIPN', 'P_SKIPR', 'P_GAP', 'P_TOT', 'GAP_MAX',
+           # taskK: _put_tex 现在会调 _br_put(括号竖排形态) —— 提取它及其常量(本文件断言不受影响)
+           'VERT_FORMS', 'VERT_METRICS', 'BR_ON', 'BR_SIZE_DEF', 'BR_SIZE']
 
 
 @pytest.fixture(scope='module')
 def ns():
-    return load('build_vert.py', ['char_cells', 'n_cells', 'fit_gaps', '_put_tex', '_esc_ch'],
+    return load('build_vert.py', ['char_cells', 'n_cells', 'fit_gaps', '_put_tex', '_esc_ch',
+                                  '_br_put'],
                 _CONSTS)
 
 

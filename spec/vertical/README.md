@@ -18,6 +18,7 @@
 | 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L555-642（`pn_parse`/`pn_text`/`pn_sequence_fix`） | 纠正记录逐条复核 |
 | 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L943-1048（`_ink_char_cols`/`_lin_fit`/`derot_rows`） | 旋转页列位/字号 vs 源书 |
 | 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP） | §1.0a L85-129（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex`）、§1.0b L130-270（`char_cells`/`fit_gaps`）、`col_puts` 调点 L1400-1455、落盘 L1841-1855 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
+| 08 | [08_punct_vertical_forms.md](08_punct_vertical_forms.md) | 标点竖排形态（括号 → U+FE35…U+FE40，字号 0.66 + 墨心回格心）+ OCR 列拆分归位（行首闭括号回上一列） | §1.0c L273-324（`VERT_FORMS`/`VERT_METRICS`/`BR_SIZE`/`_br_put`）、§1.0d L325-357（`BR_OPEN_OF`/`fix_split_brackets` + 应用点 L382-393）、§1.9 `note_tex` 字号保护（`NOTE_INK_MAX`） | p3 对照图 + 抽查 ≥5 页 + `verify_vert` PASS |
 
 > 锚点行号为 **2026-10-15 当前文件**实测（`grep -n '^# ---------- '`）；改 `build_vert.py` 后须同步本表。
 
