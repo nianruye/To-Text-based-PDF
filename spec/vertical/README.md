@@ -133,3 +133,16 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 |---|---|---|
 | 09_calibration §9 | 无版框书: 伪版心/伪槽格 + 逐页门限/纸型 + OCR 帧标定 + NF 源侧口径 | §1.06 `L596-640`、§1.975 `L1600-1745`、§1.98 NF 分支 `L1940-1960` |
 | 07/08(标定侧) | 无框路径的 `XSCALE` 宽高比口径 `_calib_xscale_w` | §1.956 `L2985-2998` |
+
+## taskP（2026-10-16）新增锚点
+
+| 新增函数/常量 | 行号锚点（`src/pipelines/build_vert.py`） |
+|---|---|
+| `_nf_lines` / `_nf_delines` / `_nf_ink`（印刷线去除） | 见 `## 1.06b` |
+| `_nf_box`（框优先伪版心） | §1.06b 之后 |
+| `_nf_hrow_page` / `_nf_hrow_puts`（横排页兜底） | §1.975b |
+| `_nf_rescue_rows`（短列补救） | §1.975（`page_puts` 内） |
+| `_put_tex(clamp=)` / `_pv_clamp_on`（页内夹取） | §1.0a 之后 |
+| `NF_ROW_FRAC` / `NF_POS_PRIOR` / `NF_HROW_*` / `FONT_*_FRAC` / `NF_BOX_*` | §1.975 常量块 |
+
+> 说明：本册锚点以**函数名**给出（行号随改动漂移，函数名稳定）；分部 spec 的旧行号锚点仍按 §4 规则同步。

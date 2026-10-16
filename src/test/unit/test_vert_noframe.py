@@ -25,10 +25,15 @@ from _loader import load            # noqa: E402
 
 _FUNCS = ['nf_body_rows', 'nf_join_rows', 'nf_edges', 'nf_fill_bands', 'nf_fit', 'nf_fit_align',
           '_nf_ink_gray', '_nf_page_px', '_nf_thr', '_calib_xscale_w', '_calib_med', '_runs',
-          '_band_union']
+          '_band_union',
+          # taskP: 印刷线去除 / 框版心 / 横排页兜底 / 行槽配平位置先验 / 页内夹取
+          '_nf_lines', '_nf_delines', '_nf_box', '_nf_hrow_page', '_align_rows_slots',
+          '_pv_clamp_on']
 # 说明: BAND_*/LONG_H_*/FRAG_OVL/页幅/_NF/_nf_cache 都是**由函数算出来或需按用例改**的全局量,
 #   统一用 mocks 注入(它们不是 ast 的纯字面量赋值, 直接从源码 exec 会缺依赖函数)。
-_CONSTS = ['NF_MIN_COL', 'NF_COV', 'NF_FIT_K', 'NF_FIT_RES', 'PT_PER_PX']
+_CONSTS = ['NF_MIN_COL', 'NF_COV', 'NF_FIT_K', 'NF_FIT_RES', 'PT_PER_PX',
+           'NF_LINE_CV', 'NF_LINE_RV', 'NF_LINE_VLEN', 'NF_LINE_HLEN', 'n_cells', 'char_cells',
+           'NF_BOX_WMIN', 'NF_BOX_HMIN', 'NF_HROW_AR', 'NF_HROW_CHAR', 'NF_POS_PRIOR']
 
 
 class _Doc:
@@ -51,7 +56,12 @@ WZ6_PAGE = (595.3, 1245.3)
 WZ7 = dict(PW_PX=1843.6, PH_PX=2886.0, page_w=921.8, page_h=1443.0, PT_PER_PX=2.0,
            LONG_H_FRAC=300.0 / 2490.6, BAND_R_PX=1843.6 * (1100.0 / 1190.6),
            BAND_L_PX=1843.6 * (100.0 / 1190.6), LONG_H_PX=2886.0 * (300.0 / 2490.6),
-           FRAG_OVL_PX=24.0, NF_MIN_COL=3, NF_COV=0.12, NF_FIT_K=(0.7, 1.6), NF_FIT_RES=0.5,
+           FRAG_OVL_PX=24.0, NF_MIN_COL=2, NF_COV=0.12, NF_FIT_K=(0.7, 1.6), NF_FIT_RES=0.5,
+           NF_LINE_CV=0.75, NF_LINE_RV=0.45, NF_LINE_VLEN=0.50, NF_LINE_HLEN=0.55,
+           NF_BOX_WMIN=0.35, NF_BOX_HMIN=0.35, NF_HROW_AR=2.0, NF_HROW_CHAR=0.60,
+           NF_POS_PRIOR=60.0, all_rows={}, _nf_box_cache={}, _nf_ink_cache={},
+           PUNCT_HANG={'，', '。', '、', '：', '；'}, VERT_FORMS={},
+           n_cells=lambda t: max(1, sum(1 for c in t if c not in {'，', '。', '、', '：', '；'})),
            _NF={'on': True}, _nf_cache={})
 
 
@@ -120,10 +130,16 @@ class TestEdges:
         assert e == [90.0, 130.0, 170.0, 210.0]
         assert [round(b - a, 3) for a, b in zip(e, e[1:])] == [40.0, 40.0, 40.0]
 
+    def test_two_bands_ok(self):
+        """2 列也能建槽(taskP: 源页 22「题辞」只有 2 列大字, 降 NF_MIN_COL 3->2 前被挡在 NF 外)"""
+        ns = _ns()
+        e, p = ns['nf_edges']([(100.0, 120.0), (140.0, 160.0)])
+        assert e == [90.0, 130.0, 170.0] and p == 40.0
+
     def test_too_few_bands(self):
         """带数 < 3 -> 不可用(该页交回流式)"""
         ns = _ns()
-        assert ns['nf_edges']([(100.0, 120.0), (140.0, 160.0)]) == (None, 0.0)
+        assert ns['nf_edges']([(100.0, 120.0)]) == (None, 0.0)
 
 
 class TestFillBands:
@@ -229,3 +245,83 @@ class TestXscaleW:
     def test_none_when_empty(self):
         ns = _ns()
         assert ns['_calib_xscale_w']([], {}, []) is None
+
+
+# ---------- taskP: 印刷线去除(§1.06b) ----------
+def _np():
+    import numpy as np
+    return np
+
+
+def _frame_ink(H=200, W=200):
+    """带框页合成墨迹: 粗竖框线 x=10..13 / x=186..189, 粗横线 y=10..13 / y=186..189,
+    框内两列文字(每列 4 个 16x16 的「字」)。"""
+    np = _np()
+    ink = np.zeros((H, W), bool)
+    ink[10:14, :] = True
+    ink[186:190, :] = True
+    ink[:, 10:14] = True
+    ink[:, 186:190] = True
+    for x0 in (40, 120):
+        for y0 in range(40, 160, 30):
+            ink[y0:y0 + 16, x0:x0 + 16] = True
+    return ink
+
+
+class TestNfLines:
+    def test_find_and_remove_frame_lines(self):
+        """框线(又长又直)被识别并删除; 文字笔画保留 —— 不去线则列带/字 run 统计被整页污染"""
+        ns = _ns()
+        ink = _frame_ink()
+        vd, hd = ns['_nf_lines'](ink)
+        assert len(vd) == 2 and len(hd) == 2
+        clean = ns['_nf_delines'](ink)
+        assert ink.sum() - clean.sum() > 0.8 * (10 * 190 * 2)      # 四条线基本被删净
+        assert clean[40:56, 40:56].all()                            # 文字笔画原样保留
+        assert not clean[:, 186:190].any()                          # 右框线清除
+
+    def test_text_strokes_not_taken_as_lines(self):
+        """文字列(窄但**不贯穿**)不算印刷线: 竖笔画覆盖率远低于 NF_LINE_CV"""
+        ns = _ns()
+        np = _np()
+        ink = np.zeros((200, 200), bool)
+        for y0 in range(20, 180, 24):                               # 疏排的字, 纵向不连续
+            ink[y0:y0 + 12, 60:76] = True
+        vd, hd = ns['_nf_lines'](ink)
+        assert vd == [] and hd == []
+        assert ns['_nf_delines'](ink) is ink                        # 未动(同一对象)
+
+
+# ---------- taskP: 横排页判据(§1.975b) ----------
+class TestHrowPage:
+    def test_horizontal_rows(self):
+        """行盒宽扁(w/h>=2)且占本页字数 60% 以上 -> 判横排页(字表/版权页)"""
+        ns = _ns()
+        rows = {'0': [(100, 1300, 50, 90, '嘀颗蛀炉鲈粮坟棍') , (100, 1300, 200, 240, '商類怪爐鱸糧墳褲')]}
+        ns['all_rows'] = rows
+        out = ns['_nf_hrow_page']('0', 0)
+        assert len(out) == 2
+
+    def test_vertical_page_not_hrow(self):
+        """竖排正文页(行盒高瘦)不误判"""
+        ns = _ns()
+        ns['all_rows'] = {'0': [(100, 200, 50, 2500, '正' * 40)]}
+        assert ns['_nf_hrow_page']('0', 0) == []
+
+    def test_few_horizontal_rows_not_page(self):
+        """横排行字数占比不足(竖排页里夹一行横排说明)不判横排页"""
+        ns = _ns()
+        ns['all_rows'] = {'0': [(100, 1300, 50, 90, '短行'),
+                                (100, 200, 100, 2500, '正' * 60)]}
+        assert ns['_nf_hrow_page']('0', 0) == []
+
+
+# ---------- taskP: 行/槽配平的位置先验 ----------
+# ---------- taskP: 页内夹取开关 ----------
+class TestClampOn:
+    def test_virtual_only(self):
+        """只伪槽格页夹取(有版框书 wz6 不走 -> 逐位不变)"""
+        ns = _ns()
+        assert ns['_pv_clamp_on']({'g': {'virtual': True}}) is True
+        assert ns['_pv_clamp_on']({'g': {'in_l': 40.0}}) is False
+        assert ns['_pv_clamp_on'](None) is False

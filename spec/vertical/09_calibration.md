@@ -285,3 +285,22 @@ VERT_CALIB_ONLY=1 /usr/bin/python3 src/pipelines/build_vert.py \
 3. 8 项标定不再回落（报告 §7 三列表）。
 4. `verify_vert` 增加逐页页幅对账（混纸型书不再把正确的逐页纸幅判 FAIL）。
 5. 测试：`src/test/unit/test_vert_noframe.py` 20 项 + 既有 296 项全绿（316）。
+
+
+## 10. taskP：无版框书 300 页实测补标定（2026-10-16）
+
+新增/修正的口径（全部只在 `NF_MODE` 生效；有版框书含 wz6 逐位不变）：
+
+| 项 | 口径 | 锚点 |
+|---|---|---|
+| 印刷线去除 | 竖线 = 逐像素列墨占比 > `NF_LINE_CV`(0.75) 且跨度 ≥ `NF_LINE_VLEN`(0.50)×页高；横线 = 行墨占比 > `NF_LINE_RV`(0.45) 且跨 ≥ `NF_LINE_HLEN`(0.55)×纸宽 | `_nf_lines` / `_nf_delines` |
+| 伪版心（框优先） | 有实测印刷框时用**框内缘**；框宽/高 ≥ `NF_BOX_WMIN/HMIN`(0.35)×页幅 | `_nf_box` / `_nf_frame` |
+| 槽内行墨迹下限（重试口径） | `NF_ROW_FRAC`(0.05)×槽宽 px；原口径被否决/不适配时才启用 | `_slots_of_edges(row_frac)` / `page_metrics_rf` |
+| 行/槽配平位置先验 | `NF_POS_PRIOR`(60)：cost += prior×\|行序−槽序\|；并与纯格数口径比较**取渲染字数多者** | `_align_rows_slots(prior)` / `page_puts` |
+| 字号合理性区间（NF） | `FONT_MIN_FRAC`(0.008)×页高 ~ `FONT_MAX_FRAC`(0.12)×页高（wz6 绝对量 10/60pt 是本册专用） | `_metrics_finish` |
+| 横排页判据/兜底 | 行盒 w/h ≥ `NF_HROW_AR`(2.0) 且横排行字数 ≥ `NF_HROW_CHAR`(0.60)×本页 → 逐行横排重建 + 行盒夹回页内 | `_nf_hrow_page` / `_nf_hrow_puts` |
+| 页内夹取 | 只伪槽格页；`\put` 的 y ∈ [F, 页高−0.94F]、x ∈ [0, 页宽−F]（括号形态变换**之后**夹） | `_put_tex(clamp=)` / `_pv_clamp_on` |
+| 拟合右缘夹取 | NF 时 `RIGHT_p ≤ 纸宽 − 1pt`（OCR 帧 x 尺度 1.07-1.20 会把右缘算到纸外） | §1.975 后的 `RIGHT_p` 块 |
+| 伪槽格最少列数 | `NF_MIN_COL` 3 → **2**（2 列时 `nf_edges` 用唯一一段列距定槽） | `NF_MIN_COL` / `nf_edges` |
+
+验收（数据见 [docs/vert_wz7_300_report.md](../docs/vert_wz7_300_report.md)）：300 页 字符量 98.7% / 整页丢失 0 / 越界 1 条（残留，逐条根因）/ 逐页页幅 0.01%；wz6 tex 逐字节相同。

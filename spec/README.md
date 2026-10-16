@@ -168,3 +168,4 @@ python3 src/test/verify_geom.py output/out.pdf data/wz2/wz2_spotting_coords.json
 2. 格式：目标/背景/方案/输入/输出/约束/测试点
 3. 更新本 README 索引
 4. 实现后写测试用例（`src/test/test_cases.py` 扩展）
+- taskP：wz7《金瓶梅詞話》300 页全量建排（无版框书第二本实战交付）—— 见 [docs/vert_wz7_300_report.md](../docs/vert_wz7_300_report.md) / [spec/vertical/09_calibration.md](vertical/09_calibration.md) §10。状态：implemented（2026-10-16）。
