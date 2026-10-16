@@ -20,3 +20,4 @@ uploads/
 font_classifier/
 page_numbers*.json
 tmp_vert/
+*.bak_*
