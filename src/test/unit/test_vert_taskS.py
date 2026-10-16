@@ -25,6 +25,7 @@ from _loader import load            # noqa: E402
 
 _NS_BASE = dict(
     PUNCT_HANG={'。', '，', '、', '：', '；', '？', '！'},
+    QFIX_QFAM=set('「」『』'),      # taskU-A 起 _trim_marks ④ 用(引號字不剔)
     PUNCT_CELL_THR=0.5,
     NF_SB_COV=0.05, NF_SB_DEN=0.12, NF_SB_PADX=0.80, NF_SB_PADY=1.50,
     NF_SB_RATIO=(0.5, 1.35), NF_SB_OWN=True, NF_SLOT_DBG=False,

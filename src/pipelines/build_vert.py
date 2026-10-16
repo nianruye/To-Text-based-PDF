@@ -316,8 +316,10 @@ GAP_MAX = 4          # 单列最多插几格(防异常放大)
 _gap_log = []        # 空隙检出记录(全书跑完落盘, VERT_GAP_REPORT)
 
 def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=None, p_merge=P_MERGE, p_punct=P_PUNCT,
-             p_skipn=P_SKIPN, p_r=P_SKIPR, p_g=P_GAP, p_t=P_TOT):
+             p_skipn=P_SKIPN, p_r=P_SKIPR, p_g=P_GAP, p_t=P_TOT, _align=None):
     """槽内墨迹 run + 文本 -> [(字符下标, 插入格数)]（taskJ-B 纯函数, DP）。
+    _align(taskU-A 只读旁路): 传 dict 时填**逐字 -> run 下标**的对齐结果('m' 转移), 不传则
+      与旧实现逐位相同(只是把「bg==0 早退」挪到回溯之后 —— 该分支本就无副作用)。
     runs: [(墨顶, 墨底)] pt(页顶向下); m: 步进 pt; T0/B: 槽实测墨迹顶/底 pt(用于预测与收口)。
     DP 状态 (字符下标 i, run 下标 j, 已插格数 g); 转移:
       m  字符 <- run 匹配    代价 = (|预测墨顶 - 实测墨顶| / m)^2
@@ -394,9 +396,9 @@ def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=None, p_merge=P_MERGE, p_punc
         c += p_t * abs(exp - (ncell + g))
         if c < best:
             best, bg = c, g
-    if best == INF or bg == 0:
+    if best == INF:
         return []
-    # 回溯: 'g' 转移 = 在该字符之前插一格
+    # 回溯: 'g' 转移 = 在该字符之前插一格; 'm' 转移 = 字符 <- run(taskU-A 的 _align 旁路)
     out = {}
     i, j, g = L, n, bg
     while (i or j or g):
@@ -406,7 +408,19 @@ def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=None, p_merge=P_MERGE, p_punc
         pi_, pj_, pg_, act = p
         if act == 'g':
             out[pi_] = out.get(pi_, 0) + 1
+        elif act == 'm' and _align is not None:
+            _align[pi_] = pj_
         i, j, g = pi_, pj_, pg_
+    if bg == 0:
+        # 无空隙: 与旧实现同(原地早退, 无副作用)。诊断表挪到早退之前(taskU-A: 该分支也要能看对齐)
+        if os.environ.get('VERT_GAP_DEBUG'):
+            print('    [DP] T0=%.1f B=%.1f m=%.2f n=%d L=%d ncell=%d exp=%.2f g=%d cost=%.2f'
+                  % (T0, B, m, n, L, ncell, exp, bg, best))
+            for i2, (c2, h2) in enumerate(cell):
+                print('        %2d %s cell%-2d hang%d  pred=%.1f  run=%.1f  al=%s' % (
+                    i2, t[i2], c2, h2, T0 + (c2 + (hratio if h2 else 0)) * m,
+                    tops[i2] if i2 < n else -1, (i2 in (_align or {})) and _align[i2] or '-'))
+        return []
     # 空隙位置修正: 插入点若落在挤格标点之前, 后移到该标点之后 —— 源书标点紧跟上字(墨在上格右下角),
     #   空隙在标点之后(实测 p14 問: 源书冒号墨迹 y380-387 贴着問的字脚, 空格在其后)。
     #   DP 对「标点前/标点后」两种插法代价完全相同(挤格标点不参与匹配), 不修正会随机落成前者。
@@ -1792,6 +1806,8 @@ if NF_MODE and src_doc is not None and RIGHT_p > PW_PX / 2.0 - 0.5:
 NF_SLOT_DBG = os.environ.get('VERT_NF_SLOT_DBG') == '1'   # 伪槽格逐槽统计诊断打印
 NF_HROW_AR = float(os.environ.get('VERT_NF_HROW_AR') or 2.0)   # 横排行判据: 行盒 宽/高 下限
 NF_HROW_CHAR = float(os.environ.get('VERT_NF_HROW_CHAR') or 0.60)   # 横排行字数占本页比下限
+# taskU-C: 见 page_puts 里 ok 的注释 —— 目录页走「残余列补救」而非 v2 流式的开关(默认关, 实测净损失字)
+TOC_RESCUE_OK = os.environ.get('VERT_TOC_RESCUE_OK', '0') not in ('0', 'false', 'False')
 NF_POS_PRIOR = float(os.environ.get('VERT_NF_POS_PRIOR') or 60.0)   # 行/槽配平的位置先验权重
 #   (只对伪槽格页生效; 单位与「格数差」同尺度 —— 整段平移 8 行 x 1 槽 = 8/15 x 60 = 32 > 跳行 2x8=16,
 #    故 DP 宁可原地跳过剩行, 见 _align_rows_slots 注释)
@@ -2405,6 +2421,10 @@ def _grid_from_bands(bands, il, ir, n=None):
     if not (0.9 * (ir - il) <= n * p <= 1.1 * (ir - il)): return None
     return e, p
 
+# 引號族(中文侧字形; 竖排形态由 §1.0c 的 VERT_FORMS 映射)。定义在此是因为 §1.976 的 _trim_marks
+#   ④ 要用它(§1.997 的引號判别也复用同一常量): 文本首/末字是引號 -> 列首/列尾那条小墨就是该字自己的墨。
+QFIX_QFAM = set('「」『』')
+
 def _trim_marks(keep, t, hbig, step):
     """槽首/槽尾的**引號类小墨**剔除 -> (字列顶, 字列底)(只 NF 路径用, 见 _slots_of_edges)。
     实测 wz7 源页 354(诗引號): 引號「 是 9.5pt 的小墨, 紧贴首字上方 7pt(0.27 步进), 而正文字
@@ -2416,16 +2436,19 @@ def _trim_marks(keep, t, hbig, step):
       ② 与邻字 run 的间隙 < 0.5 x 步进(引號在源书里是贴字的小墨, 不是一个整格);
       ③ **文本侧反证**: 本节首/末字不是挤格标点 —— 标点本来就小(实测末字「，」8pt), 不能当引號剔;
          若文本首/末字真是标点(如列末「：」), 该 run 就是那个标点, 保留。
+      ④ taskU-A 补(**引號字**): 文本首/末字是 引號「」『』 时**同样保留** —— 这条小墨就是该引號
+         自己的墨(竖排引號占一整格、墨是直角细笔画), 剔了会把整列顶/底挪一格(taskU 用户反馈
+         「﹁ 占字格 → 不齐」的一半来源)。OCR 把引號**读丢**的列(文本首字是真汉字)仍按 ①-③ 剔。
      尾端只有「」这类闭引號会被剔(实测列 585.5 末 run 812-822.5 是 」, 前一条 789.5 是「，」)。"""
     tp = keep[0][0]; bt = keep[-1][1]
     if len(keep) < 2 or hbig <= 0 or step <= 0:
         return tp, bt
-    if (t and t[0] not in PUNCT_HANG
+    if (t and t[0] not in PUNCT_HANG and t[0] not in QFIX_QFAM
             and (keep[0][1] - keep[0][0]) < 0.6 * hbig
             and (keep[1][0] - keep[0][1]) < 0.5 * step
             and (keep[1][1] - keep[1][0]) >= 0.6 * hbig):
         tp = keep[1][0]
-    if (t and t[-1] not in PUNCT_HANG
+    if (t and t[-1] not in PUNCT_HANG and t[-1] not in QFIX_QFAM
             and (keep[-1][1] - keep[-1][0]) < 0.6 * hbig
             and (keep[-1][0] - keep[-2][1]) < 0.5 * step
             and (keep[-2][1] - keep[-2][0]) >= 0.6 * hbig):
@@ -2680,11 +2703,13 @@ def _align_rows_slots(rows, slots, skip=8.0, prior=0.0):
     out.reverse()
     return out
 
-def _merge_col_rows(rows, step):
+def _merge_col_rows(rows, step, prov=None):
     """同一列的 OCR 断行合并(在分类/对齐之前做)。
     实测 p34: 「優勢兵力，採用包圍迂迴戰術」(y602-1464) 与「不能包圍其全部也包圍其」(y1564-2336)
     x 带 71.5-139.3 / 57.2-139.3 重叠 83% —— 是源书同一列被 OCR 在中间断开, 不合并则第二段
-    无槽可归被丢(该页少 11 字)。判据: x 带重叠 >= 60% 小者宽 且 y 相邻间距 <= 2.5 字步进。"""
+    无槽可归被丢(该页少 11 字)。判据: x 带重叠 >= 60% 小者宽 且 y 相邻间距 <= 2.5 字步进。
+    prov(taskU-A): 传 dict 时按合并结果的 id 记「文本顺序的 (源行 id, 该行文本长)」——
+      供 §1.997 把改字写回 all_rows 里**原始 OCR 行对象**(合并后的行是新建 tuple, 无法按对象回溯)。"""
     rows = sorted(rows, key=lambda r: -r[0])
     used = [False] * len(rows)
     out = []
@@ -2692,6 +2717,7 @@ def _merge_col_rows(rows, step):
         if used[i]: continue
         x0, x1, y0, y1, t = r
         used[i] = True
+        pieces = [(id(r), len(r[4]))]
         again = True
         while again:
             again = False
@@ -2701,17 +2727,19 @@ def _merge_col_rows(rows, step):
                 ov = min(x1, ox1) - max(x0, ox0)
                 if ov < 0.6 * min(x1 - x0, ox1 - ox0): continue
                 if 0 <= oy0 - y1 <= 2.5 * step:                # o 在本行之下
-                    t = t + ot; y1 = oy1
+                    t = t + ot; y1 = oy1; pieces.append((id(o), len(ot)))
                 elif 0 <= y0 - oy1 <= 2.5 * step:              # o 在本行之上
-                    t = ot + t; y0 = oy0
+                    t = ot + t; y0 = oy0; pieces.insert(0, (id(o), len(ot)))
                 else:
                     continue
                 x0 = min(x0, ox0); x1 = max(x1, ox1)
                 used[j] = True; again = True
-        out.append((x0, x1, y0, y1, t))
+        rr = (x0, x1, y0, y1, t)
+        out.append(rr)
+        if prov is not None: prov[id(rr)] = pieces
     return out
 
-def page_rows(k, m, pi):
+def page_rows(k, m, pi, prov=None):
     """本页 OCR 行分组 -> (正文行, 注/边行, 页外行)。正文/注按「字步进」一维二分(源书正文与
     双行小字注的步进比实测 1.5+: p162 正文 34.4pt vs 注 22.2pt); 页外行 = x 中心在内框外(书耳/篇名)。"""
     claimed = set()
@@ -2757,8 +2785,8 @@ def page_rows(k, m, pi):
         print('    [行分组] p%d 原始 %d -> 认领后 %d; 版心内 %d 页外 %d' % (
             pi + 1, len(all_rows[k]), len(inb), len(ins), len(out_rows)))
     step_px = statistics.median([(r[3] - r[2]) / float(len(r[4])) for r in inb]) if inb else 60.0
-    ins = _merge_col_rows(ins, step_px)
-    out_rows = _merge_col_rows(out_rows, step_px)
+    ins = _merge_col_rows(ins, step_px, prov)
+    out_rows = _merge_col_rows(out_rows, step_px, prov)
     if os.environ.get('VERT_NF_DBG'):
         print('    [行分组] p%d 合并后 版心内 %d 页外 %d (步进中位 %.1f)' % (
             pi + 1, len(ins), len(out_rows), step_px))
@@ -2967,7 +2995,7 @@ def _nf_hrow_puts(k, pi):
     print('  [横排页兜底] p%d %d 行 %d 字(源书该页是横排短行: 字表/版权页等)' % (pi + 1, len(rows), nch))
     return out, len(rows), nch
 
-def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=()):
+def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
     """无版框页: 未配对正文行的**残余墨迹列补救** -> tex 列表。
     背景(taskP): 段尾/詩行这类短列在墨迹列带检测(cov=0.12)里会漏检(nf_fill_bands 补不出的残余),
     于是「行数 > 槽数」, DP 配不上的行被静默丢弃 —— 实测源页 1206 两列 78 字整列不渲染。
@@ -3003,6 +3031,15 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=()):
         F0 = st['hm'] / INK_RATIO
         return not (Fmed > 0 and (F0 > 1.35 * Fmed or F0 < 0.5 * Fmed))
 
+    ph_pt = g['page_px'][1] / 2.0
+    def _ynwin(r):
+        """本行的 y 统计窗(taskU-C): 伪版心 y 范围 ∪ **该行自带 OCR y 带** —— 短行(目录页的
+        「第N回」、段尾短列)在伪版心**之上**时会被 it 截掉(实测源页 45: 伪版心顶 293.6 来自长行
+        (回目列), 而「第N回」墨迹在 240-322 -> 截掉后列顶算成 299 -> 整列被压 59pt、源书的两处
+        列内空档也检不出)。夹回纸幅内。"""
+        y0 = max(0.0, min(r[2] / 2.0 - 2.0, ph_pt)); y1 = max(0.0, min(r[3] / 2.0 + 2.0, ph_pt))
+        return min(it + 2.0, y0), max(ib - 2.0, y1)
+
     def _ocr_band(r):
         """**OCR 列框兜底**: 行自带 x 带 ± 一列距 -> 窗内最靠窗心的**未被占用**墨迹列带
         (宽 >= 8pt, 覆盖率 >= 0.04)。OCR x 有系统缩放(本书 1.07-1.20)与相位漂移, 故只用它**定邻域**,
@@ -3012,7 +3049,8 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=()):
         cx = (r[0] + r[1]) / 4.0                     # OCR 行 x 中心(px/2 = pt)
         wa = max(il, cx - pitch); wb = min(ir, cx + pitch)
         if wb - wa < 8: return None
-        sub = ink[ya:yb, int(wa * 2):int(wb * 2)]    # 全墨迹(伪槽格页版心内没有「残余」可言)
+        _y0, _y1 = _ynwin(r)
+        sub = ink[int(_y0 * 2):int(_y1 * 2), int(wa * 2):int(wb * 2)]   # 全墨迹(伪槽格页版心内没有「残余」可言)
         if sub.size == 0: return None
         colc = sub.mean(axis=0)
         best = None
@@ -3034,7 +3072,8 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=()):
             got = _ocr_band(rows[ri])
             if got:
                 a2, b2 = got
-                st2 = _band_stats(ink, a2, b2, it, ib)
+                _yy0, _yy1 = _ynwin(rows[ri])             # taskU-C: 用「行自带 y 带 ∪ 伪版心」统计
+                st2 = _band_stats(ink, a2, b2, _yy0, _yy1)
                 if _ok_stat(st2): a, b, st = a2, b2, st2
         if NF_SLOT_DBG:
             print('    [补救诊断] p%d 行[%d] %-12s -> %s' % (
@@ -3043,21 +3082,26 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=()):
                 else ('落空(OCR x %.1f-%.1f)' % (rows[ri][0] / 2, rows[ri][1] / 2))))
         if a is None: continue                       # 两条路都没有可信墨迹 -> 不渲染(不凭空补位)
         F = round(max(9.0, st['hm'] / INK_RATIO), 1)
-        Tb = max(st['top'] if st['top'] is not None else it + 2.0, it + 2.0)
-        Bb = min(st['bot'] if st['bot'] is not None else ib - 2.0, ib - 2.0)
+        _yy0, _yy1 = _ynwin(rows[ri])
+        Tb = max(st['top'] if st['top'] is not None else _yy0, 2.0)
+        Bb = min(st['bot'] if st['bot'] is not None else _yy1, ph_pt - 2.0)
         nc = n_cells(rows[ri][4])
         ink_h0 = INK_RATIO * F
         step = (max(1.0, min((Bb - Tb - ink_h0) / (nc - 1), (ib - it - 4.0 - ink_h0) / (nc - 1)))
                 if nc > 1 else 0.0)
         m2 = {'font': F, 'step_cap': max(step, 0.1), 'band_t': Bb, 'band_b': Bb, 'block_b': ib - 2.0,
               'w': ir - il, 'note': [], 'body': [], 'g': g, 'slots': []}
+        # taskU-C: 带上**本列墨迹 run 表** -> col_puts 里的 fit_gaps 才能检出列内空隙(源书目录页
+        #   「第N回 | 回目上半 | 回目下半」三段之间的空档就靠这条还原); 不带则整列按等格铺满。
         sl = {'x0': a, 'x1': max(b, a + 1.0), 'nr': st['nr'], 'hm': st['hm'],
-              'step': st['step'], 'top': Tb, 'bot': Bb}
+              'step': st['step'], 'top': Tb, 'bot': Bb,
+              'runs': _slot_runs(ink, a, b, it, ib)}
         p, _ = col_puts(rows[ri][4], (a + b) / 2.0, m2, sl, None, pi)
         puts += p
         nok += 1
-        print('    [短列补救] p%d %-14s 残余列 x%.1f-%.1f 字高%.1f -> 字号%.1f' % (
-            pi + 1, rows[ri][4][:14], a, b, st['hm'], F))
+        if placed is not None: placed.append(ri)
+        print('    [短列补救] p%d %-14s 残余列 x%.1f-%.1f 顶%.1f 底%.1f 字高%.1f -> 字号%.1f 步进%.1f' % (
+            pi + 1, rows[ri][4][:14], a, b, Tb, Bb, st['hm'], F, step))
     if nok:
         print('  [短列补救] p%d 未配对行 %d -> 渲染 %d' % (pi + 1, len(unmatched), nok))
     return puts
@@ -3150,9 +3194,18 @@ def page_puts(k, pi, m):
     # §1.975 短列补救(taskP, 只无版框路径): 行数 > 槽数时, 配不上的行会被静默丢弃 —— 实测
     #   源页 1206 因两列短列(段尾列)在列带检测(cov=0.12)里漏掉, 整列 78 字不渲染。
     #   补救 = 用「残余墨迹列」(已配对槽涂掉后仍有的墨迹)按阅读序配给未配对行, 有墨才渲染。
+    _rescued = []
     if _NF['on'] and len(pairs) < R:
-        puts += _nf_rescue_rows(pi, m, rows, slots, pairs, skip=_placed_rows)
-    ok = (not R) or (len(pairs) >= 0.8 * R)
+        puts += _nf_rescue_rows(pi, m, rows, slots, pairs, skip=_placed_rows, placed=_rescued)
+    # taskU-C: 「残余列补救落位的行」是否计入适配判据 —— **默认关**(VERT_TOC_RESCUE_OK=1 开)。
+    #   为什么要它: 目录页(源页 45 类)整页 13 列全由补救路径按源图墨迹列位/字号渲染(实测 12/13 行
+    #   落位、字号 29.4 与源书一致 + 列内两处空档检出), 但它 0 对槽 -> 旧判据判「不适配」而整页回退
+    #   v2 流式(流式按 OCR 行盒排 -> 「第N回」与回目挤成一列、无空档, 即用户反馈的「目录阅读性差」)。
+    #   为什么默认关(**实测净损失**): 开后在 4 页各少 10-30 字(源页 45 -18 / 58 -10 / 230 -12 /
+    #   294 -30, 全书字符量 128683 -> 128613)—— 补救路径"有墨才画", 配不上的列/字不渲染, 而 v2 流式
+    #   按 OCR 行盒把该页所有行都画出来。**宁可版式差也不丢字**, 故默认关并在报告里如实登记。
+    ok = ((not R) or (len(pairs) >= 0.8 * R)
+          or (TOC_RESCUE_OK and len(pairs) + len(_rescued) >= 0.8 * R))
     print('  [正文列] p%d %d 行 -> %d 槽 (槽 run %s) 字号 %.1f 墨带 %.1f-%.1f 上限 %.2f %s' % (
         pi + 1, R, len(pairs), [s['nr'] for s in slots],
         m['font'], m['band_t'], m['band_b'], m['step_cap'],
@@ -4181,6 +4234,339 @@ def fax_tex(i):
             '\\special{pdf:image width %.1fpt height %.1fpt (%s)}}}'
             % (dy, page_w * PT2BP, page_h * PT2BP, p))
 
+# ---------- 1.997) OCR 把竖排引號读成汉字「一」的源图墨迹判别(taskU-A) ----------
+# 现象(用户实测, wz7 源页 354 / 样本 key54): 源书列首的竖排引號 ﹁ 被 OCR 读成汉字「一」
+#   (`data/wz7/wz7_spotting_lines.json` key54 行6 = '一女不織兮男不耕，\n全憑賣俏做營生，',
+#   而源图那里是 ﹁)。全书 OCR 共 1630 个「一」, 其中一部分是引號误识。
+# 判据**只用源图墨迹形状**(不做文本猜测):
+#   ① 竖排引號 ﹁/﹂ 是**直角细笔画**(横画 + 竖画), 汉字「一」是**一条横线** —— 源图上实测
+#      (wz7 源页 354, 4x 灰度/Otsu 阈值, 逐墨块):
+#        ﹁  墨块 19.0 x 9.1pt, 竖画在墨块右端(vpos 0.94), 横画在顶端(hpos 0.07);
+#        ﹂  墨块 18.0 x 9.8pt, 竖画在左端(vpos 0.01), 横画在底端(hpos 0.69);
+#        一  墨块 15-19 x 2.4-2.9pt(只有一条横线, 高 = 笔画粗);
+#        本地字高(同列字 run 的 75 分位)约 23pt -> 「一」的墨高只有字高的 0.11-0.13 倍,
+#        而引號是 0.38-0.42 倍, 且**竖画证据**(逐 x 的 y 跨度 vmax 远大于其自身笔画厚 vmed)。
+#   ② 定位: 逐字 **复用渲染端的同一套对齐**(fit_gaps 的 DP, 见 _align 旁路) —— 不另立口径。
+#   ③ 保守门: 命中 run 必须紧贴前一条 run(间距 ∈ [0.5, 1.6] 步进, 即它确在列内正常格序列上),
+#      且形状三判据同时成立才改; 判据不成立一律**不动**(宁少改不误改)。
+# 替换是 **1:1 字符替换**(一 -> 「/」/『/』), 字数/格数不变 -> 列位/字距/字号全不变, 只有字形变
+#   (竖排形态由 §1.0c 的 VERT_FORMS 渲染)。只走无版框伪槽格页(有版框书如 wz6 一字不改)。
+QFIX_ON = os.environ.get('VERT_QFIX', '1') not in ('0', 'false', 'False')
+QFIX_MIN_RATIO = float(os.environ.get('VERT_QFIX_MIN_RATIO') or 0.25)   # 引號判据: 墨高/字高 下限
+QFIX_W_RATIO = float(os.environ.get('VERT_QFIX_W_RATIO') or 0.45)       # 引號判据: 墨宽/字高 下限(排标点)
+QFIX_VPOS = float(os.environ.get('VERT_QFIX_VPOS') or 0.70)             # 竖画位置: >= 该值 = 在右端(开口引號)
+QFIX_HPOS = float(os.environ.get('VERT_QFIX_HPOS') or 0.60)             # 横画位置: >= 该值 = 在底端(闭口引號)
+# 双引號 ﹃/﹄: 源书全书只有 14 个(OCR 全读对), 其墨高上限未标定(实测候选要么被并字 run 污染、要么
+#   与单体 ﹁﹂ 同高) -> **默认关**(宁少改不误改): 命中一律按单体 「/」 替换, 且高度超 QFIX_MAX_RATIO
+#   的直接不改。置 1 可开(仅对照用)。
+QFIX_DOUBLE = os.environ.get('VERT_QFIX_DOUBLE', '0') not in ('0', 'false', 'False')
+# 位置闸门(§1.997 ④): 墨块顶相对「本字渲染格顶」的**格内偏移**合法区间(步进倍数)。
+#   引號类小墨画在格内**偏下**处(实测 wz7: 墨顶 = 本格顶 + 0.36-0.42 步进, 与「，」同位), 而相邻格
+#   的墨顶会落在 +1.36 附近 —— 故用**非对称**区间把「本格」与「邻格」分开(实测 77 处判定的 dpos
+#   全在 [-0.1, 0.72], 而被位置闸门拦下的 1.0-1.5 全是「文本比源书少字 -> 整列错位」的不可信情形)。
+QFIX_MAX_RATIO = float(os.environ.get('VERT_QFIX_MAX_RATIO') or 0.60)   # 引號墨高/字高 上限(排除并字长 run)
+QFIX_POS_LO = float(os.environ.get('VERT_QFIX_POS_LO') or -0.25)
+QFIX_POS_HI = float(os.environ.get('VERT_QFIX_POS_HI') or 0.85)
+QFIX_NB = os.environ.get('VERT_QFIX_NB', '0') not in ('0', 'false', 'False')   # 旧「邻字反证」闸门(默认关, 见 §1.997 ④)
+_qfix_log = []          # 逐处修正记录(落盘对账)
+QFIX_DBG = os.environ.get('VERT_QFIX_DBG') == '1'   # 逐候选打印(判据调参用)
+_qfix_stat = {'cand': 0, 'dash': 0, 'fixed': 0, 'skip': 0, 'rej': {}}
+_qfix_all = []          # 逐候选记录(含判为「真一」者 —— 双向抽样核对误改率用)
+_qfix_recall = {'ocr_ok': 0, 'dropped': 0, 'missed': 0, 'other': 0}   # 召回对账(§1.997, 只统计)
+_qfix_miss = []         # 召回对账: 「引號墨对到『一』但未改」明细(上限 400)
+_qfix_pend = {}         # ri(id) -> 本列已判为引號的字符下标(召回对账要把它们排除)
+_qfix_other = []        # 召回对账: 「引號墨对到其它字」明细(上限 400)
+
+def _qfx_runbox(ink, sub_x0, sub_x1, y0, y1, sc):
+    """墨块窗口(pt: x 取该列带, y 取 run 的上下缘) -> 形状统计 dict 或 None。
+    形状口径(全部相对本墨块自身, 与扫描分辨率/纸型无关):
+      w/h    = 墨迹外接框宽/高(pt)
+      vmed   = 逐 x 的 y 跨度中位(= 笔画厚)
+      vmax   = 逐 x 的 y 跨度最大(= 竖画长度; 「一」的 vmax 就是笔画厚)
+      hmax   = 逐 y 的 x 跨度最大(= 横画长度)
+      vpos   = vmax 达到 0.8vmax 的那些 x 的归一化位置(0=左端, 1=右端)
+      hpos   = hmax 达到 0.8hmax 的那些 y 的归一化位置(0=顶端, 1=底端)"""
+    import numpy as np
+    xa, xb = int(sub_x0 * sc), int(sub_x1 * sc)
+    ya, yb = int(y0 * sc), int(y1 * sc)
+    if xb <= xa or yb <= ya: return None
+    sub = ink[ya:yb, xa:xb]
+    if sub.size == 0 or not sub.any(): return None
+    # x 投影 -> 只留「含本格中心」的那条 x-run(= 该格的墨), 撇掉邻列/邻字侵入的墨与噪点
+    _c = sub.any(axis=0)
+    _runs = []
+    _a = None
+    for _i, _v in enumerate(_c):
+        if _v and _a is None: _a = _i
+        elif not _v and _a is not None: _runs.append((_a, _i)); _a = None
+    if _a is not None: _runs.append((_a, len(_c)))
+    _mid = len(_c) // 2
+    _pick = None
+    for _p, _q in _runs:
+        if _p <= _mid < _q: _pick = (_p, _q); break
+    if _pick is None:
+        _pick = max(_runs, key=lambda t: t[1] - t[0])
+    sub = sub[:, _pick[0]:_pick[1]]
+    if sub.size == 0 or not sub.any(): return None
+    ys, xs = np.where(sub)
+    h = (ys.max() - ys.min() + 1) / sc
+    w = (xs.max() - xs.min() + 1) / sc
+    vv = []
+    for c in range(sub.shape[1]):
+        yy = np.where(sub[:, c])[0]
+        vv.append((yy.max() - yy.min() + 1) / sc if len(yy) else 0.0)
+    hh = []
+    for r in range(sub.shape[0]):
+        xx = np.where(sub[r, :])[0]
+        hh.append((xx.max() - xx.min() + 1) / sc if len(xx) else 0.0)
+    vmax = max(vv); hmaxv = max(hh)
+    if vmax <= 0 or hmaxv <= 0: return None
+    vh = [i for i, v in enumerate(vv) if v >= 0.8 * vmax]
+    hh2 = [i for i, v in enumerate(hh) if v >= 0.8 * hmaxv]
+    return {'w': w, 'h': h, 'vmax': vmax, 'vmed': statistics.median(vv),
+            'hmax': hmaxv, 'hmed': statistics.median(hh),
+            'x0': (xa + _pick[0]) / sc, 'x1': (xa + _pick[1]) / sc,
+            'vpos': (sum(vh) / len(vh)) / max(1, len(vv) - 1),
+            'hpos': (sum(hh2) / len(hh2)) / max(1, len(hh) - 1)}
+
+def _qfx_class(st, h_char):
+    """墨块形状 -> 'dash'(一) / 'open'(﹁/﹃) / 'close'(﹂/﹄) / None(不改)。
+    三条同源判据(相对本页本列字高 h_char): ① 墨高 >= 0.25 字高(一条横线只有笔画厚, 达不到);
+    ② 墨宽 >= 0.45 字高(排除标点「，。」与小碎墨); ③ 竖画/横画位置定开口闭口。"""
+    if not st or h_char <= 0: return None
+    if st['h'] < QFIX_MIN_RATIO * h_char: return 'dash'
+    if st['w'] < QFIX_W_RATIO * h_char: return None                 # 又小又窄 = 标点/碎墨
+    if st['vmax'] < QFIX_MIN_RATIO * h_char: return 'dash'          # 无竖画 = 横线
+    # 墨高上限(防「并字长 run」): 引號墨高只有字高的 0.36-0.49(实测 80 处判定), 而**相邻字粘连**
+    #   会并成一条高 run(实测 wz7 源页 30 的「……一入陰界者」: 「一」与下一字「入」的墨相碰 = 一条
+    #   h=20.0(0.87 x 字高) 的 run) —— 那种 run 的竖/横笔证据会碰巧像引號, 故按**高度上限**直接排除。
+    if st['h'] > QFIX_MAX_RATIO * h_char: return None
+    if st['vpos'] >= QFIX_VPOS and st['hpos'] <= 1.0 - QFIX_HPOS: return 'open'
+    if st['vpos'] <= 1.0 - QFIX_VPOS and st['hpos'] >= QFIX_HPOS: return 'close'
+    return None
+
+def _qfx_slot_runs(sl, ink, it, ib):
+    """该槽的 (墨迹 run 全表, 字列顶 T, 字列底 B)。
+    两点与渲染端**有意不同**:
+      ① **不套 _trim_marks**(§1.976): 本判别的目标正是「列首/列尾的引號墨」, 若先把它剔掉, 对齐
+         就会把「一」对到**下一个字**上(实测 wz7 页 355 的 ﹁ 被剔后 char0 对到 女 的 run)。
+         列顶/底交由 §1.976 用**文本侧证据**处理(引號字不剔, 见 _trim_marks ④)。
+      ② **用全高 run 表**(min_h=0, 不套 _slots_of_edges 的 4pt 碎片下限): 汉字「一」的墨高只有
+         2.4-2.9pt < 4pt —— 按渲染端的 rs 它根本不入表(实测 wz7 页 55 的「一場」列: run 表里没有
+         那条横线, 对齐只能把「一」判成"无墨"), 那样本判别就永远看不到「一」的墨。
+         故这里自取 `_slot_runs(min_h=0.0)` 的原表(与 _slots_of_edges 的 raw 同参)。"""
+    return _slot_runs(ink, sl['x0'], sl['x1'], it, ib, min_h=0.0), sl['top'], sl['bot']
+
+def nf_fix_quotes(k, pi, m):
+    """本页 OCR 文本里的「一」逐处按**源图墨迹形状**判别, 只把形状确为引號者改回 「/」/『/』。
+    返回修正处数(原地改 all_rows[k] 的文本; 1:1 替换不动任何几何量)。"""
+    if not QFIX_ON or not m or not m['g'].get('virtual'): return 0
+    rows_all = all_rows.get(k) or []
+    if not any('一' in r[4] for r in rows_all): return 0
+    prov = {}
+    body, _note, _out = page_rows(k, m, pi, prov=prov)
+    if not body: return 0
+    rows = sorted(body, key=lambda r: -r[0])
+    slots = sorted(m['body'], key=lambda s: -s['x1'])
+    if _SPECIAL_BLOCK.get(k):
+        slots = [s for s in slots if not _band_blocked(s['x0'], s['x1'], _SPECIAL_BLOCK[k])]
+    R, C = len(rows), len(slots)
+    if not C: return 0
+    if 1.7 * C <= R <= 2.3 * C: return 0            # 双行小字页: 槽内再分左右子列, 对齐口径不同
+    ink = _frame_ink(pi, m['g'])
+    _sc = 2.0                                        # 源图墨迹像素 = 2x pt(144dpi, §0)
+    cap = m['step_cap']
+    h_ink = INK_RATIO * m['font']
+    pairs = _align_rows_slots(rows, slots,
+                              prior=(NF_POS_PRIOR if (m['g'].get('virtual') and NF_POS_PRIOR > 0) else 0.0))
+    fixes = {}                                       # ri -> [(字符下标, 新字, 证据 dict)]
+    for ri, si in pairs:
+        text = rows[ri][4]; sl = slots[si]
+        if '一' not in text or len(text) < 2: continue
+        runs, T, B = _qfx_slot_runs(sl, ink, m['g']['in_t'], m['g']['in_b'])
+        if len(runs) < 3 or T is None or B is None: continue
+        step = sl.get('step') or cap
+        if step <= 1.0: continue
+        al = {}
+        _gaps = fit_gaps(runs, text, step, T, B, h_ink=h_ink, _align=al)
+        if not al: continue
+        # 逐字「渲染格号」(与 col_puts 同口径): 渲染端把 char i 摆在 cell (i + 之前插入的空格格数)
+        _gb = [0] * (len(text) + 1)
+        for _ci, _e in _gaps:
+            if 0 <= _ci <= len(text): _gb[_ci] += _e
+        _gpre = []                                   # _gpre[i] = 本字**之前**(含第 i 位)插入的空格格数
+        _gpre.append(_gb[0])
+        for _k in range(1, len(text) + 1):
+            _gpre.append(_gpre[-1] + _gb[_k])
+        h_char = _big_hm(runs)
+        if h_char <= 0: continue
+        # 召回对账(只统计, 不改判据): 本列**所有小墨 run** 里判为引號的, 其对齐到的字符是什么?
+        #   「引號字」= 文本里本就有引號(OCR 读对) / 「一」= 本判别的目标 / 无 = OCR 读丢了引號。
+        for i, ch in enumerate(text):
+            if ch != '一': continue
+            j = al.get(i)
+            if j is None or j >= len(runs):
+                if QFIX_DBG:
+                    print('    [QFIX-DBG] p%d 列x%.1f-%.1f 字%d/%d %r 未对齐(run 数 %d) -> 跳过'
+                          % (pi + 1, sl['x0'], sl['x1'], i, len(text), text[max(0, i - 5):i + 6],
+                             len(runs)))
+                continue
+            _qfix_stat['cand'] += 1
+            # ③ 列内正常格序列证据: 与**相邻字符**对到的 run 间距 ∈ [0.5, 1.6] 步进(该墨块确在列
+            #    的字格序列上)。按字符取而非按 run 表取 —— 全高 run 表里有笔画碎片/点画, 相邻 run
+            #    可能只是同一字的一部分。
+            dgs = []
+            for _nb in (i - 1, i + 1):
+                _jj = al.get(_nb)
+                if _jj is not None and _jj < len(runs):
+                    dgs.append(abs(runs[j][0] - runs[_jj][0]) / step)
+            if not dgs:
+                _qfix_stat['skip'] += 1
+                continue
+            dg = min(dgs)
+            if not (0.5 <= dg <= 1.6):
+                _qfix_stat['skip'] += 1
+                continue
+            st = _qfx_runbox(ink, sl['x0'], sl['x1'], runs[j][0] - 0.5, runs[j][1] + 0.5, _sc)
+            cls = _qfx_class(st, h_char)
+            if QFIX_DBG:
+                print('    [QFIX-DBG] p%d 列x%.1f-%.1f 字%d/%d %r j=%d dg=%.3f char_h=%.2f st=%s -> %s'
+                      % (pi + 1, sl['x0'], sl['x1'], i, len(text), text[max(0, i - 4):i + 5], j, dg,
+                         h_char, st and dict((kk, round(vv, 2)) for kk, vv in st.items()), cls))
+            # ④ **位置闸门**(本判别的正确性依据): 命中墨块必须落在「本字在本列被渲染到的那一格」上。
+            #    渲染端 col_puts 是**按格号摆放**的(char i 摆在 cell (i + 之前插入的空格格数), 与
+            #    源书格序一一对应), 故只有「墨块 y ≈ 本字的渲染格位」时, 把该字改成引號才等于
+            #    「把源图该格的字形改成引號」—— 否则改的是别格的字(实测反例: 文本比源书少一个字的
+            #    列, DP 会把 char i 对到 cell i 的墨上, 而该格在源书里是 OCR 读丢的那个引號)。
+            #    判据 = |墨块顶 - 本字渲染格顶| <= QFIX_POS_TOL x 步进。
+            _pred_i = T + (i + _gpre[i]) * step
+            _dpos = (runs[j][0] - _pred_i) / step
+            if not (QFIX_POS_LO <= _dpos <= QFIX_POS_HI):
+                if QFIX_DBG:
+                    print('        [QFIX-DBG·pos] 字%d/%d %r 墨顶%.1f 预测格位%.1f (T%.1f +%d格 x%.1f) '
+                          '格内偏移 %.2f 格 越界(%.2f..%.2f)' % (
+                              i, len(text), text[max(0, i - 4):i + 5], runs[j][0], _pred_i,
+                              T, i + _gpre[i], step, _dpos, QFIX_POS_HI))
+                _qfix_stat['skip'] += 1
+                continue
+            # ④b 旧口径(可选, 默认关): 与它相邻的字不得落在「宽而扁的小墨」上。
+            _nb_bad = False
+            if QFIX_NB:
+                for _nb in (i - 1, i + 1):
+                    _jj = al.get(_nb)
+                    if _jj is None or _jj >= len(runs): continue
+                    _st2 = _qfx_runbox(ink, sl['x0'], sl['x1'], runs[_jj][0] - 0.5, runs[_jj][1] + 0.5, _sc)
+                    if _st2 and _st2['h'] < QFIX_MIN_RATIO * h_char and _st2['w'] >= QFIX_W_RATIO * h_char:
+                        _nb_bad = True
+                        if QFIX_DBG:
+                            print('        [QFIX-DBG·nb] 邻字 %r 对到宽扁小墨 h=%.1f w=%.1f' % (
+                                text[_nb], _st2['h'], _st2['w']))
+                        break
+            _rec = {'page': pi + 1, 'key': k, 'idx': i, 'nchar': len(text), 'cls': cls,
+                    'ctx': text[max(0, i - 6):i + 7], 'col_cx': round((sl['x0'] + sl['x1']) / 2.0, 1),
+                    'mark_x': [round(st['x0'], 1), round(st['x1'], 1)] if st else None,
+                    'mark_y': [round(runs[j][0], 1), round(runs[j][1], 1)],
+                    'w': round(st['w'], 2) if st else None, 'h': round(st['h'], 2) if st else None,
+                    'vpos': round(st['vpos'], 3) if st else None,
+                    'hpos': round(st['hpos'], 3) if st else None,
+                    'h_char': round(h_char, 2), 'step': round(step, 2), 'dg': round(dg, 3),
+                    'dpos': round(_dpos, 3), 'nb_bad': _nb_bad}
+            if cls == 'dash':                        # 真「一」: 与反证无关(不改), 先出
+                _qfix_all.append(_rec)
+                _qfix_stat['dash'] += 1
+                continue
+            if _nb_bad:
+                _rec['cls'] = 'rej_nb'
+                _qfix_all.append(_rec)
+                _qfix_stat['skip'] += 1
+                continue
+            if cls is None:
+                _qfix_all.append(_rec)
+                _qfix_stat['skip'] += 1
+                continue
+            _rec['cls'] = cls + ('2' if (QFIX_DOUBLE and st['h'] >= 0.55 * h_char) else '')
+            _qfix_all.append(_rec)
+            dbl = bool(QFIX_DOUBLE and st['h'] >= 0.55 * h_char)     # 双层引號(﹃/﹄)的墨高更大
+            new = ('『' if dbl else '「') if cls == 'open' else ('』' if dbl else '」')
+            fixes.setdefault(ri, []).append((i, new, st, runs[j], dg, h_char, step, len(text)))
+            _qfix_pend.setdefault(id(rows[ri]), []).append(i)
+        _used = {}
+        for _ci, _ji in al.items():
+            _used.setdefault(_ji, _ci)
+        _fixed_ci = set(z for z in _qfix_pend.get(id(rows[ri]), []))
+        for _j, _r in enumerate(runs):
+            if (_r[1] - _r[0]) >= 0.45 * h_char: continue        # 只查「小墨」候选(廉价预筛)
+            _ci = _used.get(_j)
+            if _ci is not None and text[_ci] in QFIX_QFAM:
+                _qfix_recall['ocr_ok'] += 1; continue
+            _st3 = _qfx_runbox(ink, sl['x0'], sl['x1'], _r[0] - 0.5, _r[1] + 0.5, _sc)
+            if _qfx_class(_st3, h_char) not in ('open', 'close'):
+                continue
+            if _ci is None:
+                _qfix_recall['dropped'] += 1
+            elif _ci in _fixed_ci:
+                _qfix_recall['ocr_ok'] += 1          # 本轮判为引號并已改(等价于"已读对")
+            elif text[_ci] == '一':
+                _qfix_recall['missed'] += 1
+                if len(_qfix_miss) < 400:
+                    _qfix_miss.append({'page': pi + 1, 'idx': _ci, 'nchar': len(text),
+                                       'ctx': text[max(0, _ci - 6):_ci + 7],
+                                       'col_cx': round((sl['x0'] + sl['x1']) / 2.0, 1),
+                                       'mark_x': [round(_st3['x0'], 1), round(_st3['x1'], 1)] if _st3 else None,
+                                       'mark_y': [round(_r[0], 1), round(_r[1], 1)],
+                                       'w': round(_st3['w'], 2) if _st3 else None,
+                                       'h': round(_st3['h'], 2) if _st3 else None,
+                                       'vpos': round(_st3['vpos'], 3) if _st3 else None,
+                                       'hpos': round(_st3['hpos'], 3) if _st3 else None,
+                                       'h_char': round(h_char, 2), 'step': round(step, 2),
+                                       'a_cls': _qfx_class(_st3, h_char), 'key': k})
+            else:
+                _qfix_recall['other'] += 1
+                if len(_qfix_other) < 400:
+                    _qfix_other.append({'page': pi + 1, 'idx': _ci, 'ch': text[_ci],
+                                        'ctx': text[max(0, _ci - 6):_ci + 7],
+                                        'mark_x': [round(_st3['x0'], 1), round(_st3['x1'], 1)] if _st3 else None,
+                                        'mark_y': [round(_r[0], 1), round(_r[1], 1)],
+                                        'w': round(_st3['w'], 2) if _st3 else None,
+                                        'h': round(_st3['h'], 2) if _st3 else None,
+                                        'vpos': round(_st3['vpos'], 3) if _st3 else None,
+                                        'hpos': round(_st3['hpos'], 3) if _st3 else None,
+                                        'h_char': round(h_char, 2), 'key': k})
+    if not fixes: return 0
+    # 写回: 合并行是新建 tuple, 按 prov 拆回**原始 OCR 行对象**再替换(1:1 字符替换, 长度不变)
+    widx = dict((id(r), n) for n, r in enumerate(rows_all))
+    newrows = list(rows_all)
+    nfix = 0
+    for ri, items in fixes.items():
+        pieces = prov.get(id(rows[ri])) or []
+        for (i, new, st, run, dg, h_char, step, ntl) in items:
+            acc = 0
+            for sid, ln in pieces:
+                if acc <= i < acc + ln:
+                    o = i - acc
+                    n0 = widx.get(sid)
+                    if n0 is None: break
+                    r0 = newrows[n0]
+                    if o >= len(r0[4]) or r0[4][o] != '一': break
+                    newrows[n0] = (r0[0], r0[1], r0[2], r0[3], r0[4][:o] + new + r0[4][o + 1:])
+                    nfix += 1
+                    _qfix_stat['fixed'] += 1
+                    _qfix_log.append({'page': pi + 1, 'key': k,
+                                      'col_x0': round(sl['x0'], 1), 'col_x1': round(sl['x1'], 1),
+                                      'col_cx': round((sl['x0'] + sl['x1']) / 2.0, 1),
+                                      'mark_x': [round(st['x0'], 1), round(st['x1'], 1)],
+                                      'idx': i, 'nchar': ntl,
+                                      'char': new, 'ctx': r0[4][max(0, o - 6):o + 7],
+                                      'mark_y': [round(run[0], 1), round(run[1], 1)],
+                                      'w': round(st['w'], 2), 'h': round(st['h'], 2),
+                                      'vpos': round(st['vpos'], 3), 'hpos': round(st['hpos'], 3),
+                                      'h_char': round(h_char, 2), 'step': round(step, 2), 'dg': round(dg, 3)})
+                    break
+                acc += ln
+    if nfix:
+        all_rows[k] = newrows
+    return nfix
+
 # ---------- 2) 每页内容 ----------
 def page_tex(k, drop_notes=False):
     """一页: 正文列(从右到左)逐列渲染, \\par 强制断列(列断点=源书)
@@ -5206,6 +5592,12 @@ for i, pg in enumerate(sel):
             all_rows[k] = [r for r in all_rows[k] if id(r) not in _cl]
             _SPECIAL_BLOCK[k] = _blk
         _sp_puts = _sp
+    # §1.997 引號误识修正(taskU-A): 在本页任何渲染之前, 按**源图墨迹形状**把 OCR 读成「一」的
+    #   竖排引號改回 「/」/『/』(1:1 替换, 不动文本长度/格数/列位); 只无版框伪槽格页走这里。
+    if NF_MODE and pm is not None:
+        _nq = nf_fix_quotes(k, pg - 1, pm)
+        if _nq:
+            print('  [引號判别] p%d 源图墨迹判定 %d 处「一」实为引號 -> 已改回' % (pg, _nq))
     ok_ = False
     if pm:
         rows_, nrows_, orows_ = page_rows(k, pm, pg - 1)
@@ -5301,6 +5693,22 @@ if _gap_log:
         len(_gap_log), sum(g['extra'] for g in _gap_log), len(_pg), _rep))
 else:
     print('[空隙] 未检出(或 VERT_GAP=0)')
+
+# ---------- 2.52) 引號误识修正清单落盘(taskU-A) ----------
+# 逐处记录(页/列 x/字序/证据: 墨块 w·h·vpos·hpos·本地字高·步进) -> JSON, 供人工复核误改率。
+if _qfix_log or _qfix_stat['cand'] or _qfix_all:
+    _qf = os.environ.get('VERT_QFIX_REPORT') or os.path.join(TMP, 'qfix.json')
+    json.dump({'on': bool(QFIX_ON), 'stat': _qfix_stat, 'recall': _qfix_recall,
+               'crit': {'min_ratio': QFIX_MIN_RATIO, 'w_ratio': QFIX_W_RATIO,
+                        'vpos': QFIX_VPOS, 'hpos': QFIX_HPOS, 'double': bool(QFIX_DOUBLE)},
+               'items': sorted(_qfix_log, key=lambda g: (g['page'], g['idx'])),
+               'cands': sorted(_qfix_all, key=lambda g: (g['page'], g['idx'])),
+               'miss': _qfix_miss, 'other': _qfix_other},
+              open(_qf, 'w', encoding='utf8'), ensure_ascii=False, indent=1)
+    print('[引號判别] 候选 %d 处 -> 判定为引號并改回 %d / 判为真「一」%d / 证据不足跳过 %d -> %s' % (
+        _qfix_stat['cand'], _qfix_stat['fixed'], _qfix_stat['dash'], _qfix_stat['skip'], _qf))
+    print('[引號判别·召回] 源图引號墨: 文本已读对 %d / OCR 读丢(文本无此字) %d / 对到「一」但未判为引號 %d / 其它 %d'
+          % (_qfix_recall['ocr_ok'], _qfix_recall['dropped'], _qfix_recall['missed'], _qfix_recall['other']))
 
 # ---------- 2.55) 影印页清单落盘(§1.995c; 验证端 --expect-low 的输入 = 这里的数据驱动结果) ----------
 if _FAX:

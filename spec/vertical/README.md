@@ -192,3 +192,17 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 > taskQ 只改 `nf_fit_align` 的**择优**与标定的**应用/落地**（不改拟合公式、不改任何输出判据），
 > 故 02 tate_layout / 03 marginalia / 04 frame_lines 三个分部的锚点无需改写；上表行号以函数名为准
 > （`build_vert.py` 的行号随改动漂移）。
+
+## taskU（2026-10-17）新增锚点：引號误识判别 / 引號占格 / 目录页
+
+| 分部 | 内容 | 锚点（`src/pipelines/build_vert.py`） |
+|---|---|---|
+| 13_vert_quotes_toc §2 | 引號误识判别（形状三判据 + 墨高上限 + 位置闸门 + fit_gaps `_align` 旁路） | §1.997 `_qfx_runbox` / `_qfx_class` / `_qfx_slot_runs` / `nf_fix_quotes`（主循环调用点：`_page_specials` 之后） |
+| 13_vert_quotes_toc §2 | 逐候选/修正清单/召回对账落盘 | §2.52（`qfix.json`） |
+| 13_vert_quotes_toc §3 | 引號占格口径：文本首/末字是引號时**不剔**列首/列尾小墨 | §1.976 `_trim_marks` ④（常量 `QFIX_QFAM` 定义在其前） |
+| 13_vert_quotes_toc §4 | 目录页：补救列带补 `runs` + y 统计窗 = 伪版心 ∪ 该行 OCR y 带 + 适配判据开关 | `_nf_rescue_rows`（`_ynwin`）/ `page_puts` 的 `ok`（`TOC_RESCUE_OK`，默认 0） |
+| 13_vert_quotes_toc（开关） | `VERT_QFIX` / `VERT_QFIX_MAX_RATIO` / `_MIN_RATIO` / `_W_RATIO` / `_VPOS` / `_HPOS` / `_POS_LO` / `_POS_HI` / `_DOUBLE` / `_DBG` / `_REPORT` / `VERT_TOC_RESCUE_OK` | §1.997 / §1.98 常量块 |
+
+> taskU 的引號判别只走**无版框伪槽格页**（`m['g']['virtual']`），有版框书（wz6）不在影响面内
+> （实测 `vert.tex` md5 逐字节相同）；`_trim_marks` ④ 同理（该函数只被 `page_puts` 调用）。
+> 目录页的补救路径改动默认关，开启会丢字（见 13 §4）。行号以函数名为准。
