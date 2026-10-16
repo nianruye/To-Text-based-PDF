@@ -5,6 +5,10 @@
 env:  VERT_PAGES=3-12    只输出指定页(1-based, 如 '3-12' 或 '3,5')
       VERT_SPECIAL=0       关闭书眉/页码渲染(默认开, 需 src.pdf 测墨迹)
       VERT_TMP=/dir        临时目录(默认 /tmp/vert_<输出文件名 stem>_run: 按产物名分离, 并发不共用)
+      VERT_LAT=0           关闭西文(纯拉丁)行侧排渲染; VERT_LATFONT/VERT_LATFONT_PFB=TeX 拉丁字体名/
+                           对应 Type1 字形文件(默认 ptmr8t / utmr8a.pfb); VERT_LAT_FONT=0 回到
+                           CJK 全角 ASCII 老口径(对照用); VERT_DISP_RATIO=1.4 标题/署名字高倍率判据
+      VERT_FAX=0           关闭影印页整页贴图; VERT_FAX_IPC_MULT/VERT_FAX_CHAR_MULT 判据倍率
 退出码: 0 = 正常(含 SRC 缺省的 3 参数调试调用); 1 = 输入文件缺失 / 编译失败(#18)
 管线: OCR(2x=144dpi px) -> 参数拟合(tarticle 竖排) -> uplatex+dvipdfmx -> PDF
 v2: 书眉/页码/边注 —— eso-pic \AddToShipoutPictureFG*(仅本页, 无星号会逐页累积) \put 绝对定位(逐字手工断列),
@@ -2823,6 +2827,8 @@ def page_puts(k, pi, m):
     rows, _nrows, _orows = page_rows(k, m, pi)
     rows = sorted(rows, key=lambda r: -r[0])
     slots = sorted(m['body'], key=lambda s: -s['x1'])
+    if _SPECIAL_BLOCK.get(k):                    # §1.995: 已被特殊行占用的 x 带不再参与配对
+        slots = [s for s in slots if not _band_blocked(s['x0'], s['x1'], _SPECIAL_BLOCK[k])]
     R, C = len(rows), len(slots)
     if C and 1.7 * C <= R <= 2.3 * C:                    # 双行小字页: 槽内再分左右子列
         ink = _frame_ink(pi, m['g'])
@@ -2944,6 +2950,8 @@ def page_puts_loose(k, pi, g, quiet=False):
     # 列带(源图墨迹) -> 伪槽(统计口径与 page_metrics 同: run 高 4..3×中位)
     slots = []
     for a, b in _ink_bands(ink, il, ir, it, ib, cov=0.12):
+        if _SPECIAL_BLOCK.get(k) and _band_blocked(a, b, _SPECIAL_BLOCK[k]):
+            continue                             # §1.995: 特殊行占用的带(西文行/标题署名列)
         st = _band_stats(ink, a, b, it, ib)
         slots.append(dict(st, x0=a, x1=b))
     slots.sort(key=lambda s: -s['x1'])                       # 阅读序: 右 -> 左
@@ -3082,6 +3090,842 @@ def note_puts_frame(k, pi, m, nrows, orows):
                 pi + 1, lft[0][4][:16]))
     return out
 
+# ---------- 1.995) 西文行侧排 / 标题署名行 / 影印页整页贴图(taskR / taskR2) ----------
+# taskR2 增量(源页 29 逐项复核后修 2 项 + 复核 2 项):
+#   · §1.995a 西文行改**拉丁 TFM 字体**(ptmr8t, 见下方 LAT_TFM 一节)—— 改前 tate 模式把 ASCII 映射成
+#     CJK 字体的全角字形(文本层 U+FF37/字形 0.745x0.46em 又宽又扁), 源书是半角比例拉丁(0.68x0.66)。
+#   · §1.995a 破折号单独成片: 字号由该 run **实测长**反算(源书两条破折号本身不等长 54.0/37.5pt),
+#     沿/横位取该 run 墨心实测(探针标定字形长比/墨心偏移)。
+#   · §1.995a 单位口径: 源图量出来的是 bp, TeX 坐标/字号是 TeX pt(1bp = 1.00375pt) -> 源坐标 x PT2BP
+#     (改前 1:1 塞, 744pt 长的行沿行缩 0.37% = 行尾差 2.8-5pt); 基线也**逐片实测**(源书该行自身
+#     不共线: 两条破折号墨心差 3.3pt、逐字横差随 y 从 +3.7 漂到 0.0)。
+#   · §1.995b 标题/署名行复核: 用户报「侯健字号偏小 3.45x vs 4.7x / 金瓶梅論位置微偏」—— 实测
+#     **源图墨迹**(不用 OCR poly: 该 poly 对 侯健 高估 24%): 侯健 源墨高 76.5/77.2pt vs 产物 78.5
+#     (已对, 偏差 +1.7%), 金瓶梅論 列位/字高逐字相符(见 docs/vert_wz7_layout3_report.md §2)。
+#     残留 = 竖直落位 +2.0pt(标题)/ +8.3pt(侯健), 根因是 col_puts 的 INK_ASC 是**全库字中位**
+#     (0.954em) 而竖排逐字墨顶比例自变(实测 金 0.918 / 侯 0.862), 修法见报告遗留 1。
+# 背景(用户拿 wz7 源页 29「金瓶梅論」侯健 著 那页与源书逐项对照, 报 3 类问题):
+#   ① 西文整行被当竖排列**逐字竖拆**(每个字母占一格, 破折号竖成一竖线) —— 源书是**整行侧排**
+#      (把页面逆时针转 90° 才能正读: 行首在页顶、自上而下读、字头朝页右)。
+#      实测(tmp_vert/taskR/m2.py + en_cw/ccw.png 两向对照): 源页 29 该行墨迹带 x 665.2-690.0,
+#      y 381.8-1125.0; 把源图**逆时针**转 90° 时该行正读("—We receive but what we give.—Coleridge"),
+#      顺时针转 90° 得到镜像倒序 —— 故字形是**顺时针旋转 90°**(等价说法: 页面逆时针转可正读)。
+#   ② 标题/署名行(源书字号显著大于正文)**被 clamp 回正文尺寸**: wz7 p29 源书「金瓶梅論」单字墨高
+#      44.2pt(正文 22.5pt, 1.96 倍)、「侯健」78.0pt(3.47 倍); 现管线走 §1.99 框内兜底, 其字号上限被
+#      压到 1.35 x 本页字号中位(实测日志「残余列 x713.5-724.5 字高33.5 -> 字号38.7」, 真值 50/88)。
+#   ③ p5-28 是源书里的**影印页**(翻印旧版, 排版与本书现代排印完全不同), OCR 读不出内容(全书正文页
+#      OCR 字数中位 613, 这 24 页只有 0-123), 用户明确要求「整页贴源图, 不重建」。
+#
+# 判据全部**数据驱动**(不写死页号; 用户给的页号只用于验证判据):
+#   · 西文行(§1.995a): 拉丁字母数 >= VERT_LAT_MIN_CH(4) 且 CJK 字数 <= VERT_LAT_MAX_CJK(1)
+#     且 拉丁占比 >= VERT_LAT_MIN_RATIO(0.7)。实测 wz7 全书 4029 条 OCR 行: 3990 条拉丁占比 0.0,
+#     占比 >= 0.3 的 39 条里**只有 1 条是纯西文行**(源页 29 占比 0.91); 其余 38 条是「中文里夹西文词」
+#     (占比 0.30-0.72, 如「Literary Terms: a Dictionary 則有更清楚的說明：」) —— 这类行是**汉字列**,
+#     整行旋转会错(源书对夹在汉字列里的西文词也旋转, 但那属「词级侧排」, 不在本任务范围, 见报告遗留)。
+#   · 标题/署名行(§1.995b): 该行**源图墨迹实测**字高 / 本页正文行字高中位 >= VERT_DISP_RATIO(1.4)。
+#     正文行字高中位取本页「长行(>= 8 字)」逐行实测的中位(不用 m['font']: 伪槽格页的 m['font'] 会被
+#     大字号槽带偏, 实测源页 29 m['font']=51.4 而真正文 25.6)。
+#   · 影印页(§1.995c): 「每 OCR 字对应的源图墨迹面积」= 墨迹像素 / (OCR 非空白字数+1) 超全书正文页
+#     中位 VERT_FAX_IPC_MULT(2.5) 倍 **且** OCR 字数 < VERT_FAX_CHAR_MULT(0.5) 倍全书正文页中位。
+#     实测 wz7(0.75x 灰度 Otsu 口径, 正文页中位 110px/字, 正文页 = OCR 字数 >= 100 的 227 页):
+#     **命中 70 页**(p1-4 封面/空白+插图, p5-28 影印页, 其余 42 页为插图/空白/图版), 命中页面积比
+#     中位 748.7(范围 8.1-2916.3), 未命中页中位 1.00(最大 2.13 @p295) —— 判据线 2.5 两侧余量
+#     3.8 倍; 命中页最大字数 123(p24) vs 字数判据线 308.5 -> 未误伤正文(普查脚本
+#     tmp_vert/taskR2/fax_stats.py, 与管线落盘 fax_pages.json 逐页一致)。第二个条件(OCR 字数)是
+#     **独立**的第二道闸: 只有「读不出内容」的页才贴图, 免得把「OCR 恰好漏字的正文页」也换成图片。
+LAT_SP_ON = os.environ.get('VERT_LAT', '1') not in ('0', 'false', 'False')
+LAT_MIN_CH = int(os.environ.get('VERT_LAT_MIN_CH') or 4)
+LAT_MIN_RATIO = float(os.environ.get('VERT_LAT_MIN_RATIO') or 0.7)
+LAT_MAX_CJK = int(os.environ.get('VERT_LAT_MAX_CJK') or 1)
+DISP_RATIO = float(os.environ.get('VERT_DISP_RATIO') or 1.4)
+FAX_ON = os.environ.get('VERT_FAX', '1') not in ('0', 'false', 'False')
+FAX_IPC_MULT = float(os.environ.get('VERT_FAX_IPC_MULT') or 2.5)
+FAX_CHAR_MULT = float(os.environ.get('VERT_FAX_CHAR_MULT') or 0.5)
+FAX_DPI = int(os.environ.get('VERT_FAX_DPI') or 150)
+FAX_SC = float(os.environ.get('VERT_FAX_SC') or 0.75)   # 判据扫描用的渲染倍率(相对 72dpi)
+
+def _is_cjk_ch(c):
+    o = ord(c)
+    return (0x3400 <= o <= 0x4DBF) or (0x4E00 <= o <= 0x9FFF) or (0xF900 <= o <= 0xFAFF)
+
+def _nonspace(t):
+    return ''.join(c for c in t if not c.isspace())
+
+def latin_row(t):
+    """该 OCR 行是否「纯西文行」-> (bool, 拉丁数, CJK 数, 拉丁占比)。判据见 §1.995 注释。"""
+    s = _nonspace(t)
+    if not s:
+        return False, 0, 0, 0.0
+    nl = sum(1 for c in s if ('a' <= c <= 'z') or ('A' <= c <= 'Z'))
+    nc = sum(1 for c in s if _is_cjk_ch(c))
+    r = nl / float(len(s))
+    return (nl >= LAT_MIN_CH and nc <= LAT_MAX_CJK and r >= LAT_MIN_RATIO), nl, nc, r
+
+# --- 源图墨迹带定位(只定邻域, 列位/跨度量实测) ---
+def _ink_band_at(ink, cx_pt, y0_pt, y1_pt, pitch, gmax=1.6, gap_frac=0.25):
+    """源图墨迹里「含 x=cx_pt 的列带」+ 带内**真实墨迹 bbox** -> (x0,x1,y0,y1) pt 或 None。
+    OCR 坐标对 NF 页有系统性缩放/漂移(本书 1.07-1.20 倍), 故只拿 OCR x 定邻域, 列位与跨度全取实测。
+    带的边界用「空隙」判据而非「覆盖率」: 从 cx 向两侧走, 连续空白 > gap_frac x 列距即停 ——
+    覆盖率判据会漏掉**又细又短的墨迹列**(实测 p29 英文行的 'b' 升部只占一列 2pt 宽, cov>0.02 判据
+    把它切掉, 行带量成 26.0pt, 而真值 30.8pt —— 字号因此偏小 16%)。返回的是带内墨迹的实际 bbox。"""
+    import numpy as np
+    H, W = ink.shape
+    xa = int(max(0.0, (cx_pt - gmax * pitch)) * 2); xb = int(min(W / 2.0, cx_pt + gmax * pitch) * 2)
+    ya = int(max(0.0, y0_pt - 10.0) * 2); yb = int(min(H / 2.0, y1_pt + 10.0) * 2)
+    if xb - xa < 8 or yb - ya < 8:
+        return None
+    sub = ink[ya:yb, xa:xb]
+    on = sub.any(axis=0)
+    if not on.any():
+        return None
+    gap = max(6, int(gap_frac * pitch * 2))
+    ci = int(min(max(cx_pt * 2 - xa, 0), len(on) - 1))
+    if not on[ci]:
+        idx = np.where(on)[0]
+        ci = int(idx[np.argmin(np.abs(idx - ci))])
+    a = ci
+    z = 0
+    while a > 0:
+        if on[a - 1]:
+            a -= 1; z = 0
+        else:
+            z += 1
+            if z > gap:
+                break
+            a -= 1
+    b = ci
+    z = 0
+    while b + 1 < len(on):
+        if on[b + 1]:
+            b += 1; z = 0
+        else:
+            z += 1
+            if z > gap:
+                break
+            b += 1
+    band = sub[:, a:b + 1]
+    cols = np.where(band.any(axis=0))[0]
+    rows_ = np.where(band.any(axis=1))[0]
+    if not cols.size or not rows_.size:
+        return None
+    return ((xa + a + int(cols.min())) / 2.0, (xa + a + int(cols.max()) + 1) / 2.0,
+            (ya + int(rows_.min())) / 2.0, (ya + int(rows_.max()) + 1) / 2.0)
+
+def _band_runs(ink, x0, x1, y0, y1, min_h=2.0):
+    """带内 y 向墨迹 run -> [(top,bot)] pt(用于取字高/字距中位)"""
+    ya, yb = int(y0 * 2), int(y1 * 2)
+    xa, xb = int(x0 * 2), int(x1 * 2)
+    if yb <= ya or xb <= xa:
+        return []
+    m = ink[ya:yb, xa:xb].any(axis=1)
+    out = []
+    for a, b in _runs(m, 1):
+        if (b - a) < 2 * min_h:
+            continue
+        out.append(((ya + a) / 2.0, (ya + b + 1) / 2.0))
+    return out
+
+def _band_runs4(ink, x0, x1, y0, y1, min_h=2.0):
+    """同 _band_runs, 但每个 run 连**横向跨度**一起给 -> [(top, bot, x0, x1)] pt。
+    破折号要用: 它的横位逐条不同(实测 p29 两条的墨心在行带内分别落在 0.37 / 0.48 带位),
+    只能逐 run 实测; 竖排正文的 run 只要 top/bot, 故另立函数(不动 _band_runs 的返回形状 ——
+    col_puts/fit_gaps 都按 (top,bot) 二元组解包)。"""
+    import numpy as np
+    ya, yb = int(y0 * 2), int(y1 * 2)
+    xa, xb = int(x0 * 2), int(x1 * 2)
+    if yb <= ya or xb <= xa:
+        return []
+    sub = ink[ya:yb, xa:xb]
+    out = []
+    for a, b in _runs(sub.any(axis=1), 1):
+        if (b - a) < 2 * min_h:
+            continue
+        seg = sub[a:b + 1, :]
+        cols = np.where(seg.any(axis=0))[0]
+        out.append(((ya + a) / 2.0, (ya + b + 1) / 2.0,
+                    (xa + int(cols.min())) / 2.0, (xa + int(cols.max()) + 1) / 2.0))
+    return out
+
+# --- 旋转落点常数(探针实测) ---
+# q 0 -1 1 0 0 0 cm 这个 cm 会把 \\put 的坐标**整体重写**: 出图位置只由 (e,f) 与 put 决定, 且
+#   ink 左上角(页坐标 pt, 页左上原点) = (put_y + e + KX, put_x - f + KY) —— KX/KY 与纸型有关
+#   (实测: 921.8x1443pt 纸 KX=-1297.0; 705x1083.8pt 纸 KX=-939.0), 故**建排前探针实测一次**。
+#   探针 = 用本管线真 preamble 编译一页, 单个旋转 40pt 'H'(平直笔画, 左右无侧边空隙), 量墨迹左上角。
+# taskR2 扩: 同页再放一个 40pt 破折号(put 沿**横**向偏 150pt, 与 H 的墨迹互不干扰), 量它的
+#   ① 沿行墨长 / 字号(em) ② 墨心相对 pen 的沿行偏移(em) ③ 墨心相对 pen 的横向偏移(em) ——
+#   破折号必须**按源图该 run 实测长**定字号(源书两条破折号本身不等长: 54.0 / 37.5pt), 且它在
+#   行带内的横位逐条不同, 只能逐条实测落位。
+_ROT_K = {'KX': None, 'KY': None, 'base_h': None,
+          'dash_len': None, 'dash_ca': None, 'dash_cc': None}
+def _rot_anchor(preamble, tmp, page_w_pt, page_h_pt, verbose=True):
+    """探针标定 (KX, KY) + 破折号几何常数。已在缓存里则直接返回。返回 (KX, KY) 或 None(探针失败)。
+    探针落点未知(这正是要标定的量), 故取 (e,f) 的三个候选值各出一页 —— 三者中必有一页把字
+    落在纸内(候选按「KX ≈ -页高 + 146」的初估排布, 该初估在 4 种纸型上实测偏差 <= 1.2pt)。"""
+    if _ROT_K['KX'] is not None and _ROT_K['base_h'] == round(page_h_pt, 2):
+        return _ROT_K['KX'], _ROT_K['KY']
+    import numpy as np
+    import fitz
+    px, py = 0.0, 0.0                           # put 位置(不影响旋转后的落点, 取 0 免混淆)
+    tx, ty = 0.28 * page_w_pt, 0.45 * page_h_pt  # 期望落点(页内安全区)
+    e0 = round(page_h_pt - 146.0 + tx - py, 1)
+    f0 = round(px - ty, 1)
+    PS = 40.0                                   # 探针字号(TeX pt)
+    py2 = py + 150.0                            # 破折号 put: 沿横向偏开(put 第二坐标 = 页 x)
+    pages = []
+    for de in (0.0, 130.0, 260.0):
+        pages.append('\\AddToShipoutPictureFG*{\n  \\put(%g,%g)'
+                     '{\\special{pdf:literal direct q 0 -1 1 0 %g %g cm}'
+                     '\\fontsize{40pt}{40pt}\\selectfont H\\special{pdf:literal direct Q}}%%\n}\n\\null\n'
+                     '\\AddToShipoutPictureFG*{\n  \\put(%g,%g)'
+                     '{\\special{pdf:literal direct q 0 -1 1 0 %g %g cm}'
+                     '\\fontsize{40pt}{40pt}\\selectfont —\\special{pdf:literal direct Q}}%%\n}\n\\null\n'
+                     % (px, py, e0 + de, f0, px, py2, e0 + de, f0))
+    pdir = os.path.join(tmp, 'rot_probe')
+    os.makedirs(pdir, exist_ok=True)
+    tex = preamble + '\n\\newpage\n'.join(pages) + '\\end{document}\n'
+    open(os.path.join(pdir, 'rotprobe.tex'), 'w', encoding='utf8').write(tex)
+    r = subprocess.run(['uplatex', '-interaction=nonstopmode', 'rotprobe.tex'],
+                       cwd=pdir, capture_output=True, text=True)
+    r2 = subprocess.run(['dvipdfmx', 'rotprobe.dvi'], cwd=pdir, capture_output=True, text=True)
+    pp = os.path.join(pdir, 'rotprobe.pdf')
+    if r2.returncode != 0 or not os.path.exists(pp):
+        print('  [西文侧排] 旋转探针编译失败(uplatex rc=%s dvipdfmx rc=%s) -> 西文行不渲染'
+              % (r.returncode, r2.returncode))
+        return None
+    d = fitz.open(pp)
+    S = 2.0
+    def _bbox(sub):
+        ys = np.where(sub.any(axis=1))[0]; xs = np.where(sub.any(axis=0))[0]
+        return (xs.min() / S, (xs.max() + 1) / S, ys.min() / S, (ys.max() + 1) / S)
+    for i, de in enumerate((0.0, 130.0, 260.0)):
+        pix = d[i].get_pixmap(matrix=fitz.Matrix(S, S), colorspace=fitz.csGRAY)
+        a = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
+        ink = a < 150
+        if not ink.any():
+            continue
+        ys = np.where(ink.any(axis=1))[0]; xs = np.where(ink.any(axis=0))[0]
+        x0, y0 = xs.min() / S, ys.min() / S
+        kx, ky = round(x0 - py - (e0 + de), 2), round(y0 - px + f0, 2)
+        if verbose:
+            print('  [西文侧排] 旋转探针: 墨迹左上(%.2f,%.2f) @ put(%.0f,%.0f) e=%.1f f=%.1f -> KX %.2f KY %.2f'
+                  % (x0, y0, px, py, e0 + de, f0, kx, ky))
+        # 破折号: 只在其 put(横向偏 py2) 的落点附近量(与 H 的墨迹隔开 150pt)
+        em = PS * PT2BP
+        pen_x0 = py2 + (e0 + de) + kx               # 破折号 put 对应的 pen 坐标(与正文同一映射)
+        pen_y0 = px - f0 + ky
+        w0 = max(0, int((pen_x0 - 60) * S)); w1 = int((pen_x0 + 60) * S)
+        bb = _bbox(ink[:, w0:w1])
+        if bb[1] > bb[0]:
+            dx0, dx1 = bb[0] + w0 / S, bb[1] + w0 / S
+            dy0, dy1 = bb[2], bb[3]
+            _ROT_K['dash_len'] = round((dy1 - dy0) / em, 4)
+            _ROT_K['dash_ca'] = round(((dy0 + dy1) / 2.0 - pen_y0) / em, 4)
+            _ROT_K['dash_cc'] = round(((dx0 + dx1) / 2.0 - pen_x0) / em, 4)
+            if verbose:
+                print('  [西文侧排] 破折号探针: 墨长 %.1fpt(%.3f em) 沿心 %.1f 横心 %.1f -> 长比 %.3f '
+                      '沿偏 %.3f em 横偏 %.3f em'
+                      % (dy1 - dy0, (dy1 - dy0) / em, (dy0 + dy1) / 2.0, (dx0 + dx1) / 2.0,
+                         _ROT_K['dash_len'], _ROT_K['dash_ca'], _ROT_K['dash_cc']))
+        d.close()
+        _ROT_K['KX'], _ROT_K['KY'], _ROT_K['base_h'] = kx, ky, round(page_h_pt, 2)
+        return kx, ky
+    d.close()
+    print('  [西文侧排] 旋转探针三页均出纸(纸 %.0fx%.0f 与初估不符) -> 西文行不渲染'
+          % (page_w_pt, page_h_pt))
+    return None
+
+def _latin_metrics(text, font_path):
+    """串的字体几何(em 口径, fontTools 轮廓): {adv 前进总量, x0/x1 墨迹前后缘(相对字首原点), ymin/ymax 墨迹上下缘(相对基线)}。
+    口径与渲染一致: 逐字按 hmtx advance 前进(与本管线探针实测 2.3% 内一致), 墨迹取轮廓 bbox 并集。"""
+    from fontTools.ttLib import TTFont, TTCollection
+    from fontTools.pens.boundsPen import BoundsPen
+    if font_path.lower().endswith('.ttc'):
+        col = TTCollection(font_path)
+        idx = 0
+        for i, f in enumerate(col.fonts):
+            if 'TC' in (f['name'].getDebugName(4) or ''):
+                idx = i
+        font = col.fonts[idx]
+    else:
+        font = TTFont(font_path)
+    upem = float(font['head'].unitsPerEm)
+    gs = font.getGlyphSet(); cmap = font.getBestCmap()
+    x = 0.0
+    ymin, ymax, x0, x1 = 1e9, -1e9, 1e9, -1e9
+    for ch in text:
+        gn = cmap.get(ord(ch))
+        if gn is None:
+            continue
+        bp = BoundsPen(gs); gs[gn].draw(bp)
+        if bp.bounds:
+            b = [v / upem for v in bp.bounds]
+            ymin = min(ymin, b[1]); ymax = max(ymax, b[3])
+            x0 = min(x0, x + b[0]); x1 = max(x1, x + b[2])
+        x += font['hmtx'][gn][0] / upem
+    if ymax < ymin or x1 < x0:
+        return None
+    return {'adv': x, 'x0': x0, 'x1': x1, 'ymin': ymin, 'ymax': ymax}
+
+def _latin_groups(runs, F_hint):
+    """源行墨迹 run 序列 -> 「词组」(按大空隙切) [(y0,y1)] 沿行页坐标。
+    判据: 相邻 run 的空隙 >= 0.5 x 字号 即断词 —— 实测 wz7 p29 该行**词间**空隙 26-28pt、
+    词内字母间 0.8-4.5pt(字号 28.5), 两类相差 6 倍以上, 阈值取中间不会混。"""
+    if not runs:
+        return []
+    thr = 0.5 * F_hint
+    out = []; cur = [runs[0]]
+    for a, b in runs[1:]:
+        if a - cur[-1][1] >= thr:
+            out.append((cur[0][0], cur[-1][1])); cur = []
+        cur.append((a, b))
+    out.append((cur[0][0], cur[-1][1]))
+    return out
+
+def _align_words_groups(words, groups, F):
+    """词(按空白切) ↔ 源图词组 单调配对 -> [(词下标, 词组下标)]。
+    代价 = |本字体词宽 - 源词组宽| / 源词组宽(fontTools 前进量, 与渲染同字体); 跳过罚 0.45 ——
+    只在两边条数不等(OCR 丢/并词)时靠 DP 找最合理的错位, 与 _align_rows_slots 同一路数。"""
+    W, G = len(words), len(groups)
+    if not W or not G:
+        return []
+    if W == G:
+        return [(i, i) for i in range(W)]
+    def w_nat(t):
+        m = _lat_metrics(t) if LAT_FONT_ON else _latin_metrics(t, _FONT_PATH)
+        return ((m['x1'] - m['x0']) if m else 0.5 * len(t)) * F
+    INF = 1e9
+    dp = [[INF] * (G + 1) for _ in range(W + 1)]
+    bt = [[None] * (G + 1) for _ in range(W + 1)]
+    dp[0][0] = 0.0
+    for i in range(W + 1):
+        for j in range(G + 1):
+            if dp[i][j] >= INF:
+                continue
+            if i < W and j < G:
+                gw = max(1.0, groups[j][1] - groups[j][0])
+                c = dp[i][j] + abs(w_nat(words[i]) - gw) / gw
+                if c < dp[i + 1][j + 1]:
+                    dp[i + 1][j + 1] = c; bt[i + 1][j + 1] = (i, j, 1)
+            if i < W and dp[i][j] + 0.45 < dp[i + 1][j]:
+                dp[i + 1][j] = dp[i][j] + 0.45; bt[i + 1][j] = (i, j, 0)
+            if j < G and dp[i][j] + 0.45 < dp[i][j + 1]:
+                dp[i][j + 1] = dp[i][j] + 0.45; bt[i][j + 1] = (i, j, 0)
+    out = []
+    i, j = W, G
+    while i > 0 or j > 0:
+        p = bt[i][j]
+        if p is None:
+            break
+        pi_, pj_, took = p
+        if took:
+            out.append((pi_, pj_))
+        i, j = pi_, pj_
+    out.reverse()
+    return out
+
+# --- 西文行的字体(taskR2): 拉丁 TFM(Type1) vs CJK 字体的 tate ASCII ---
+# 背景(taskR2 复核实测): tate 模式下 CJK 字体的 ASCII 走 JT2 编码 -> **全角**字形 —— 文本层是
+#   U+FF37 等全角码位, 字形 0.745em 宽 x 0.46em 高(又宽又扁); 源书是半角比例拉丁(0.68 x 0.66)。
+#   改用 TeX 的 TFM 拉丁字体(默认 ptmr8t = Times/Nimbus Roman, 与源书铅字拉丁同族): ASCII 走
+#   TFM 度量 = 半角比例宽度, 文本层码位是 ASCII; 非 ASCII(破折号等)无 TFM 字形 -> 自动回落 CJK。
+LAT_TFM = os.environ.get('VERT_LATFONT') or 'ptmr8t'              # 渲染用的 TeX 字体名
+LAT_PFB = os.environ.get('VERT_LATFONT_PFB') or 'utmr8a.pfb'      # 对应的 Type1 字形文件(度量用)
+LAT_FONT_ON = os.environ.get('VERT_LAT_FONT', '1') not in ('0', 'false', 'False')
+LAT_DASH = '—―–'                       # 破折号类(源书为长横线; CJK 字形的竖排形态 = 竖线, 与源书同)
+_LAT = {'gs': None, 'err': False}
+_LAT_ENC = None
+
+def _lat_gs():
+    """拉丁 TFM 对应的 Type1 字形集(kpsewhich 解析, 与 dvipdfmx 同一查找链)。失败 -> None(记一次日志)。"""
+    if _LAT['gs'] is not None or _LAT['err']:
+        return _LAT['gs']
+    p = _calib_font_path(LAT_PFB)
+    if not p:
+        _LAT['err'] = True
+        print('  [西文侧排] 拉丁字形文件 %s 找不到(kpsewhich) -> 西文行不渲染' % LAT_PFB)
+        return None
+    from fontTools.t1Lib import T1Font
+    _LAT['gs'] = T1Font(p).getGlyphSet()
+    return _LAT['gs']
+
+def _lat_enc():
+    """ASCII -> 字形名(AdobeStandard; 0x20-0x7E 与 TeX T1(8t) 一致, 仅三处引号按 T1 修正 ——
+    渲染走 8t 编码, 名字取错会量到别的字形)。"""
+    global _LAT_ENC
+    if _LAT_ENC is None:
+        from fontTools.encodings.StandardEncoding import StandardEncoding as SE
+        d = {}
+        for c in range(0x20, 0x7F):
+            n = SE[c]
+            if n and n != '.notdef':
+                d[c] = n
+        d[ord("'")] = 'quoteright'; d[ord('`')] = 'quoteleft'
+        _LAT_ENC = d
+    return _LAT_ENC
+
+_T1W = {}
+def _tfm_widths():
+    """TFM 逐字前进量 {T1 槽位: em} —— TeX 排版**真正**用的宽度(与轮廓 hmtx 略有出入)。
+    TFM 结构(全部大端; "字" = 4 字节): 前 12 个 2 字节字段(lf,lh,bc,ec,nw,nh,nd,ni,nl,nk,ne,np)
+    = 24 字节, 其中 lh 含前 6 字 -> header 共 lh 字; 接着 char_info(bc..ec 各 4 字节: 首字节 =
+    width 表下标), 再 width 表 nw x4 字节(fix_word: 值/2^20 = 占 design size 的比例 = em 数)。
+    ASCII 在 T1(8t) 里槽位 = 码位(0x20-0x7E 与 AdobeStandard 同), 故直接按 ord(c) 查。"""
+    if _T1W:
+        return _T1W
+    p = _calib_font_path(LAT_TFM + '.tfm')
+    if not p:
+        return _T1W
+    import struct
+    d = open(p, 'rb').read()
+    lf, lh, bc, ec, nw, nh, nd, ni, nl, nk, ne, npar = struct.unpack('>12H', d[:24])
+    ci0 = 24 + 4 * lh                             # 前 12 个 2 字节字段(24B) + lh 个 4 字节字
+    wt0 = ci0 + 4 * (ec - bc + 1)
+    if nw and len(d) >= wt0 + 4 * nw:
+        wtab = struct.unpack('>%dI' % nw, d[wt0:wt0 + 4 * nw])
+        for c in range(bc, min(ec, 255) + 1):
+            wi = struct.unpack('>I', d[ci0 + 4 * (c - bc):ci0 + 4 * (c - bc) + 4])[0] >> 24
+            if wi < nw:
+                _T1W[c] = wtab[wi] / float(1 << 20)
+    if not _T1W:
+        print('  [西文侧排] TFM 宽度表解析失败(%s) -> 词宽按字形近似' % LAT_TFM)
+    return _T1W
+
+def _lat_metrics(text):
+    """拉丁字体 em 口径度量 {adv, x0, x1, ymin, ymax}(与 _latin_metrics 同形同口径):
+    逐字按 **TFM 前进量**推进(渲染同一份数据), 墨迹取 Type1 轮廓 bbox 并集(单位 1000 em)。
+    缺字形的字符(非 ASCII: 破折号等)按 0.8 em 估 —— 它们由调用方拆成单独一片走 CJK 字体。"""
+    gs = _lat_gs()
+    if gs is None:
+        return None
+    from fontTools.pens.boundsPen import BoundsPen
+    enc = _lat_enc(); wt = _tfm_widths()
+    x = 0.0
+    ymin, ymax, x0, x1 = 1e9, -1e9, 1e9, -1e9
+    for ch in text:
+        gn = enc.get(ord(ch))
+        if gn is None or gn not in gs:
+            x0 = min(x0, x + 0.10); x1 = max(x1, x + 0.70)
+            x += 0.80
+            continue
+        g = gs[gn]; bp = BoundsPen(gs); g.draw(bp)
+        if bp.bounds:
+            b = [v / 1000.0 for v in bp.bounds]
+            ymin = min(ymin, b[1]); ymax = max(ymax, b[3])
+            x0 = min(x0, x + b[0]); x1 = max(x1, x + b[2])
+        w = wt.get(ord(ch))
+        x += w if w is not None else 0.5
+    if ymax < ymin or x1 < x0:
+        return None
+    return {'adv': x, 'x0': x0, 'x1': x1, 'ymin': ymin, 'ymax': ymax}
+
+def _latin_put(text, F, pen_x, pen_y, track=0.0, latin=True):
+    """一行(或一个词/一片)西文侧排 -> 单个 \\put 片段。F/pen 单位 = pt(页左上原点; 由调用方换算)。
+    track = 片内逐字追加的字距(pt): 本字体词宽比源书窄(源书是铅字拉丁文, 字形更宽),
+      逐片把字距补到源书该片的墨迹宽度 —— 片首锚点不动, 片尾也对齐源书。
+    latin=True: 用 TeX 拉丁字体(半角比例宽度 + ASCII 文本层); False: 用 CJK 字体(破折号竖排形态)。
+    旋转用**精确整数矩阵** 0/-1/1(无任何数值逆/舍入), 图形状态用 q...Q 精确还原(与 §1.0a 同源,
+    累积残差 0 —— 不用 graphicx 的 \\scalebox/\\rotatebox: 其 btrans/etrans 走数值逆矩阵, 见 §1.0a)。
+    文本按原样输出(空格保留); 字号用 \\fontsize{F}{F} 单倍行距。"""
+    if abs(track) > 0.05 and len(text) > 1:
+        text = ('\\kern%.2fpt' % track).join(text)
+    if latin:
+        sel = ('\\font\\vlat=%s at %spt \\fontsize{%spt}{%spt}\\selectfont\\vlat '
+               % (LAT_TFM, round(F, 2), round(F, 1), round(F, 1)))
+    else:
+        sel = '\\fontsize{%spt}{%spt}\\selectfont ' % (round(F, 1), round(F, 1))
+    body = ('\\special{pdf:literal direct q 0 -1 1 0 0 0 cm}' + sel + _esc_ch(text)
+            + '\\special{pdf:literal direct Q}')
+    return '\\put(%.2f,%.2f){%s}' % (pen_y - _ROT_K['KY'], pen_x - _ROT_K['KX'], body)
+
+def _lat_pieces(word):
+    """词 -> [('t'|'d', 文本)]: 破折号单独成片(要按源图该 run 实测长定字号、逐条定横位)。"""
+    out, cur = [], ''
+    for ch in word:
+        if ch in LAT_DASH:
+            if cur:
+                out.append(('t', cur)); cur = ''
+            out.append(('d', ch))
+        else:
+            cur += ch
+    if cur:
+        out.append(('t', cur))
+    return out
+
+def _assign_runs(runs4, widths):
+    """源图 run 序列 -> [(i0, i1)]: 按各片自然宽(pt) 单调切分 run 序列的 DP(与 _align_words_groups 同路数)。
+    代价 = |该片对应的 run 段墨迹跨度 - 片自然宽| / 片自然宽。用途: 词里有破折号时, 把它在源图 run
+    序列里对应的那一段切出来(它的长度与横位都是逐条实测的, 不能靠均值)。"""
+    n, k = len(runs4), len(widths)
+    if k <= 1 or n <= 1:
+        return [(0, max(0, n - 1))]
+    INF = 1e9
+    sp = [[0.0] * (n + 1) for _ in range(n + 1)]
+    for i in range(n):
+        for j in range(i + 1, n + 1):
+            sp[i][j] = runs4[j - 1][1] - runs4[i][0]
+    dp = [[INF] * (k + 1) for _ in range(n + 1)]
+    bt = [[None] * (k + 1) for _ in range(n + 1)]
+    dp[0][0] = 0.0
+    for i in range(n + 1):
+        for g in range(k):
+            if dp[i][g] >= INF:
+                continue
+            for j in range(i + 1, n - (k - g - 1) + 1):
+                w = max(1.0, widths[g])
+                c = dp[i][g] + abs(sp[i][j] - w) / w
+                if c < dp[j][g + 1]:
+                    dp[j][g + 1] = c; bt[j][g + 1] = (i, g)
+    if dp[n][k] >= INF:
+        return [(0, n - 1)]
+    out, i, g = [], n, k
+    while g > 0:
+        p0, pg = bt[i][g]
+        out.append((p0, i - 1)); i, g = p0, pg
+    out.reverse()
+    return out
+
+def _latin_tex(k, pi, pen_w, ink_pt, ink, verbose=True):
+    """纯西文行 -> 旋转 \\put 列表(逐**片**绝对定位)。几何全取源图墨迹实测:
+      ① 字号: 源行墨迹横向(垂直于行)实测宽 / 本字体同串墨迹上下缘比(Type1 轮廓口径);
+      ② 基线: 源行墨迹左缘 - 字体墨迹下缘 x 字号(整行共用一条基线);
+      ③ 片位: 源行墨迹 run 按「大空隙 = 词间」切成词组, 逐词把**该词的墨迹起点**对齐到源书位置;
+         词里有破折号 -> 按 run 序列切出破折号那一段, 破折号单独一片: **字号由该 run 实测长反算**,
+         沿/横位取该 run 实测(两条破折号本身不等长: 实测 54.0 / 37.5pt)。
+    为什么锚词/锚片而不是「整行等距拉伸」: 实测源书该行**词间空隙 26-28pt / 词内字母空隙 1.0-4.5pt**
+    (比值 > 6), 整行等距拉伸会把词的节奏拉平(源书的词界感消失); 锚定后词界与源书逐词对得上。
+    taskR2(复核实测): 拉丁走 TFM 字体(ptmr8t) -> 半角比例宽度 + ASCII 文本层(改前是全角 U+FF37)。"""
+    if _ROT_K['KX'] is None:
+        return []
+    if LAT_FONT_ON and _lat_gs() is None:
+        return []
+    dash_ok = _ROT_K['dash_len'] is not None and _ROT_K['dash_ca'] is not None \
+        and _ROT_K['dash_cc'] is not None
+    if not dash_ok and any(c in LAT_DASH for c in pen_w):
+        print('  [西文侧排] 破折号探针未取到(长比/偏移缺失) -> 破折号按行内字号整词渲染')
+    # 整行字号: 只按**拉丁字母**的墨迹上下缘定(破折号另按自身 run 定字号, 不参与)
+    lat_txt = ''.join(c for c in pen_w if c not in LAT_DASH)
+    m = _lat_metrics(lat_txt) if LAT_FONT_ON else _latin_metrics(lat_txt, _FONT_PATH)
+    if not m or m['ymax'] - m['ymin'] <= 0:
+        return []
+    x0, x1, y0, y1 = ink_pt
+    # 单位口径(taskR2): 源图量出来的都是 **bp**(OCR px/2), 而 TeX 坐标/字号是 TeX pt(1bp = 1.00375pt)。
+    #   渲染落点 = TeX 坐标 x 0.99627 -> 源坐标要 x PT2BP 才是等价的 TeX 坐标(改前整行按 1:1 塞,
+    #   744pt 长的行会**沿行缩 0.37%** = 行尾差 2.8-5pt, 实测逐词递增大致的 -0.8 -> -3.5pt)。
+    F = (x1 - x0) / (m['ymax'] - m['ymin']) * PT2BP         # bp 墨高 -> TeX 字号
+    pen_x = x0 * PT2BP - m['ymin'] * F
+    runs4 = _band_runs4(ink, ink_pt[0], ink_pt[1], ink_pt[2], ink_pt[3])
+    runs = [(a, b) for a, b, _x0, _x1 in runs4]
+    words = [w for w in re.split(r'[ 　\t]+', pen_w.strip()) if w]
+    groups = _latin_groups(runs, F)
+    pairs = _align_words_groups(words, groups, F)
+    if not pairs:
+        return []
+    W = _lat_metrics if LAT_FONT_ON else (lambda t: _latin_metrics(t, _FONT_PATH))
+    puts = []
+    for wi, gj in pairs:
+        word = words[wi]
+        pieces = _lat_pieces(word) if dash_ok else [('t', word)]
+        g0, g1 = groups[gj]
+        gruns = [r for r in runs4 if r[0] >= g0 - 0.01 and r[1] <= g1 + 0.01]
+        # 各片的自然宽(TeX pt): 破折号按 0.8 em 估(它单列成片, 不参与宽度对齐)
+        pwd = []
+        for kind, txt in pieces:
+            mm = W(txt) if (kind == 't' and txt) else None
+            pwd.append(((mm['x1'] - mm['x0']) * F) if mm else 0.8 * len(txt) * F)
+        # 词内切分: 片数 > 1 时按自然宽在 run 序列上切(破折号片 = 它自己那一段 run)
+        segs = _assign_runs(gruns, pwd) if len(pieces) > 1 else [(0, max(0, len(gruns) - 1))]
+        if len(segs) != len(pieces):
+            pieces, segs = [('t', word)], [(0, max(0, len(gruns) - 1))]
+        for (kind, txt), (i0, i1) in zip(pieces, segs):
+            if not gruns or i1 < i0:
+                continue
+            sub = gruns[i0:i1 + 1]
+            s0, s1 = sub[0][0], sub[-1][1]
+            if kind == 'd':
+                # 破折号: 字号由该 run 实测长反算(字形长比 = 探针实测), 沿/横位 = 该 run 墨心实测
+                Fd = (s1 - s0) / _ROT_K['dash_len'] * PT2BP
+                cc = _ROT_K['dash_cc']; ca = _ROT_K['dash_ca']
+                xc = (min(r[2] for r in sub) + max(r[3] for r in sub)) / 2.0
+                puts.append(_latin_put(txt, Fd, xc * PT2BP - cc * Fd,
+                                       (s0 + s1) / 2.0 * PT2BP - ca * Fd, 0.0, latin=False))
+                if verbose:
+                    print('  [西文侧排] p%d 破折号: 源 run %.1f-%.1f(长%.1f) 横心%.1f -> 字号%.1f'
+                          % (pi + 1, s0, s1, s1 - s0, xc, Fd))
+                continue
+            mw = W(txt)
+            if not mw:
+                continue
+            gy0 = s0 * PT2BP - mw['x0'] * F                    # 该片墨迹起点对齐源书(TeX pt 口径)
+            # 基线也**逐片实测**(taskR2): 源书该行的横位不是一条直线 —— 实测两条破折号(同一字形)
+            #   的墨心在行带内差 3.3pt(p29: 672.7 @y382 / 676.1 @y947), 逐字对的横差也随 y 从 +3.7
+            #   漂到 0.0 —— 源书自身有 ~0.3 度的倾斜/逐词排版差。整行共用一条基线会把这个偏移留在
+            #   每片身上(±4pt), 故每片按**该片实测墨迹下缘**定自己的基线。
+            wx0 = min(r[2] for r in sub)
+            pen_xw = wx0 * PT2BP - mw['ymin'] * F
+            gw = (s1 - s0) * PT2BP                             # 源书该片墨迹宽
+            nw = (mw['x1'] - mw['x0']) * F                     # 本字体该片自然墨迹宽
+            # 片内字距: 只补「本字体字形比源书窄」这部分; 逐字字距夹在 +-0.25 em(护栏)。
+            tr = 0.0
+            if len(txt) > 1:
+                tr = max(-0.25 * F, min(0.25 * F, (gw - nw) / (len(txt) - 1)))
+            puts.append(_latin_put(txt, F, pen_xw, gy0, tr, latin=LAT_FONT_ON))
+    if verbose:
+        print('  [西文侧排] p%d 「%s」字号%.1f 基线 x%.1f 源墨迹 %.1fx%.1f(横x沿行) '
+              '源墨迹 run %d -> 词组 %d / 文本词 %d -> 落位 %d'
+              % (pi + 1, pen_w[:24], F, pen_x, x1 - x0, y1 - y0, len(runs), len(groups), len(words), len(puts)))
+    return puts
+
+# --- 特殊行专用渲染(标题/署名: 字号与位置全取源图实测) ---
+def _display_put(t, F, xc, top, step, g, sl, pi):
+    """标题/署名行: 走 col_puts 同一套逐字渲染(标点挤格/横向压缩同源), 但字号/列位/列顶/步进
+    **用源图实测值**(不经 §1.99 的 1.35 x 页字号上限 —— 那条是给「粘连长 run 把字高测成整列高」
+    设的兜底, 大字号行会连真值一起被压掉, 实测 wz7 p29 标题被压到 26-38pt 而真值 50/88pt)。"""
+    m2 = {'font': F, 'step_cap': max(step, 0.1), 'band_t': top, 'band_b': sl['bot'],
+          'block_b': sl['bot'], 'w': g['in_r'] - g['in_l'], 'note': [], 'body': [],
+          'g': g, 'slots': []}
+    p, _b = col_puts(t, xc, m2, sl, None, pi)
+    return p
+
+_FONT_PATH = None      # 由标定趟填(见 §1.956 之后的 _ffile)
+_SPECIAL_BLOCK = {}    # k -> [(x0,x1)] 本页已被特殊行占用的 x 带(正常路径不再落位)
+_SPECIAL_STAT = {'latin': 0, 'disp': 0, 'pages': {}}
+
+def _band_blocked(x0, x1, blocks):
+    """带 (x0,x1) 是否已被特殊行占用(重叠 > 50% 带宽即算占用)。"""
+    for a, b in blocks:
+        ov = min(x1, b) - max(x0, a)
+        if ov > 0.5 * (x1 - x0):
+            return True
+    return False
+
+def _page_specials(k, pi, g, ink, rows, verbose=True):
+    """本页「特殊行」(纯西文行 / 标题署名行)检测 + 渲染 -> (puts, blocked_x, claimed)
+    · g   = 本页伪版心/版框 dict(用 in_l/in_r/in_t/in_b 限行, pitch 定邻域窗)
+    · ink = 本页墨迹(bool, 2x px); rows = 本页 OCR 行(源图坐标系 2x px, 与 ink 同单位)
+    · blocked_x = 已占用 x 带(pt) —— 调用方把它交给正常渲染路径**剔除**(否则行↔槽/带配对会整体错位)
+    · claimed   = 已认领的行对象 id 集(调用方从 all_rows 里摘掉)
+    只有 NF 路径调用(有版框书/wz6 不走这里)。"""
+    if not rows:
+        return [], [], set()
+    il, ir = g['in_l'] * 2.0, g['in_r'] * 2.0
+    it, ib = g['in_t'] * 2.0, g['in_b'] * 2.0
+    pitch = g.get('pitch') or (g['in_r'] - g['in_l']) / max(1, N_COL_FRAME)
+    # 候选行: 行心在版心 x 带内(页外行/书眉走各自路径), 单块(非合并残片)
+    cand = [r for r in rows
+            if len(r[4]) >= 1 and '\n' not in r[4] and il - 6 <= (r[0] + r[1]) / 2.0 <= ir + 6]
+    if not cand:
+        return [], [], set()
+    # ---- 逐行量墨迹带(只定邻域用 OCR x; 带宽/带顶/带底/字高全取源图实测) ----
+    info = {}
+    for r in cand:
+        cx = (r[0] + r[1]) / 4.0                    # OCR 行心 px -> pt
+        bd = _ink_band_at(ink, cx, r[2] / 2.0, r[3] / 2.0, pitch)
+        if bd is None:
+            continue
+        runs = _band_runs(ink, bd[0], bd[1], bd[2], bd[3])
+        hs = sorted(b - a for a, b in runs if b - a >= 3.0)
+        info[id(r)] = {'bd': bd, 'runs': runs, 'hm': (hs[len(hs) // 2] if hs else 0.0)}
+    # ---- 正文行字高基准: 长行(>= 8 字)逐行实测字高的中位 ----
+    body_hs = sorted(info[id(r)]['hm'] for r in cand
+                     if len(r[4]) >= 8 and id(r) in info and info[id(r)]['hm'] > 0)
+    if not body_hs:
+        return [], [], set()
+    body_h = body_hs[len(body_hs) // 2]
+    # ---- 分类 ----
+    lat_rows, disp_rows = [], []
+    for r in cand:
+        if id(r) not in info:
+            continue
+        ok, nl, nc, ratio = latin_row(r[4])
+        if LAT_SP_ON and ok:
+            lat_rows.append(r); continue
+        # 「字高」必须由**逐字 run** 支撑: 粘连长 run(相邻字墨相连/残余印刷线)会把整列连成一条 ->
+        #   字高被量成整列高(实测 p157/p282/p294 的正文行被量出 88-757pt, 是正文 26pt 的 3-19 倍)。
+        #   判据 = run 数与本行**排版格数**相称(>= 0.6x): 真大字号行(标题 4 字 4 run / 署名 2 字 2 run)
+        #   天然满足, 粘连行(16 字 3-6 run)被挡下。run 高另夹 3x 本行 run 高中位(与 _band_stats 同口径)。
+        if len(r[4]) >= 2:
+            rr = info[id(r)]['runs']
+            hh = sorted(b - a for a, b in rr)
+            hmed0 = hh[len(hh) // 2] if hh else 0.0
+            cap = max(40.0, 3.0 * hmed0)
+            kept = [b - a for a, b in rr if 4.0 <= b - a <= cap]
+            hm = sorted(kept)[len(kept) // 2] if kept else 0.0
+            if (len(rr) >= 0.6 * n_cells(r[4]) and hm >= DISP_RATIO * body_h):
+                disp_rows.append(r)
+    # 标题/署名行**稀少性**护栏: 大字号行只应是页内的少数行(章题页 1-3 条)。实测 wz7 p291 那类
+    #   「年号大字 + 小字正文」页若把正文当基准, 会出现大批「大字号行」—— 那是整页字号分层, 不是标题,
+    #   交给既有步进分类处理(不在这里动)。判据 = 大字号行数 <= max(1, 25% 长行数)。
+    n_long = sum(1 for r in cand if len(r[4]) >= 8)
+    if len(disp_rows) > max(1, int(0.25 * n_long)):
+        if verbose and disp_rows:
+            print('    [特殊行] p%d 大字号行 %d 条 > 上限(长行 %d 的 25%%) -> 不作标题处理'
+                  % (pi + 1, len(disp_rows), n_long))
+        disp_rows = []
+    if not (lat_rows or disp_rows):
+        return [], [], set()
+    if _ROT_K['KX'] is None and lat_rows:
+        if _rot_anchor(preamble, TMP, page_w, page_h, verbose) is None:
+            lat_rows = []
+            if not disp_rows:
+                return [], [], set()
+    puts, blocks, claimed = [], [], set()
+    for r in lat_rows:
+        bd = info[id(r)]['bd']
+        p = _latin_tex(k, pi, r[4], bd, ink, verbose)
+        if not p:
+            continue
+        puts += p; blocks.append((bd[0], bd[1])); claimed.add(id(r))
+        _SPECIAL_STAT['latin'] += 1
+    for r in disp_rows:
+        bd = info[id(r)]['bd']
+        runs = info[id(r)]['runs']
+        if len(runs) < 2:
+            continue
+        rr0 = info[id(r)]['runs']
+        hh0 = sorted(b - a for a, b in rr0)
+        hm0 = hh0[len(hh0) // 2] if hh0 else 0.0
+        cap0 = max(40.0, 3.0 * hm0)
+        kp = sorted(b - a for a, b in rr0 if 4.0 <= b - a <= cap0)
+        hm = kp[len(kp) // 2] if kp else info[id(r)]['hm']
+        F = round(hm / INK_RATIO, 1)
+        ds = sorted(b - a for a, b in zip([x[0] for x in runs], [x[0] for x in runs][1:]) if 0 < b - a < 3 * hm)
+        step0 = ds[len(ds) // 2] if ds else F * 0.95
+        sl = {'x0': bd[0], 'x1': bd[1], 'nr': len(runs), 'hm': hm, 'step': step0,
+              'top': runs[0][0], 'bot': runs[-1][1], 'runs': runs}
+        p = _display_put(r[4], F, (bd[0] + bd[1]) / 2.0, runs[0][0], step0, g, sl, pi)
+        puts += p; blocks.append((bd[0], bd[1])); claimed.add(id(r))
+        _SPECIAL_STAT['disp'] += 1
+        if verbose:
+            print('  [标题署名] p%d 「%s」字号 %.1f(正文 %.1f 的 %.2f 倍) 列 x%.1f-%.1f 顶%.1f 底%.1f 步进%.1f'
+                  % (pi + 1, r[4][:14], F, body_h / INK_RATIO, F / max(1e-6, body_h / INK_RATIO),
+                     bd[0], bd[1], runs[0][0], runs[-1][1], step0))
+    if claimed:
+        _SPECIAL_STAT['pages'][pi] = {'latin': len(lat_rows), 'disp': len(disp_rows),
+                                      'body_h': round(body_h, 2)}
+    return puts, blocks, claimed
+
+def _special_applies(k):
+    return bool(_SPECIAL_BLOCK.get(k))
+
+# --- 影印页整页贴图(§1.995c) ---
+def _fax_inkpx(i):
+    """该源页的墨迹像素数(FAX_SC 倍灰度 Otsu 口径)。判据只用**比值**(页面积归一化在调用方做),
+    故渲染倍率越低越省时: 实测 0.75x 与 1.5x 的判据值同量级(同页线性缩放)。"""
+    import numpy as np
+    import fitz
+    pg = src_doc[i]
+    pix = pg.get_pixmap(matrix=fitz.Matrix(FAX_SC, FAX_SC), colorspace=fitz.csGRAY)
+    a = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
+    hist = np.bincount(a.ravel(), minlength=256).astype(float)
+    tot = hist.sum()
+    s_all = (np.arange(256) * hist).sum()
+    wB = np.cumsum(hist); sB = np.cumsum(np.arange(256) * hist); wF = tot - wB
+    thr = int(np.argmax(np.where((wB > 0) & (wF > 0),
+                                 (s_all * wB / tot - sB) ** 2 / (wB * wF + 1e-9), -1)))
+    return float((a < thr).sum()), pix.width, pix.height
+
+FAX_REF_MIN_CH = int(os.environ.get('VERT_FAX_REF_MIN_CH') or 100)   # 「正文页」样本下限(OCR 字数)
+FAX_REF_MIN_N = int(os.environ.get('VERT_FAX_REF_MIN_N') or 3)        # 参考样本不足此数 -> 不判贴图页
+
+def fax_decide(nch, ipc):
+    """纯判据: 每页 (OCR 非空白字数, 每字墨迹面积) -> {0based页: (nch, ipc, 倍数)}。
+    参考量全部取**本书自身**(不写死页码/绝对值):
+      ref_ch = 全书「正文页」(OCR 字数 >= FAX_REF_MIN_CH) 的字数中位
+      ref    = 同批页的「每字墨迹面积」中位
+    命中 = 每字墨迹面积 > FAX_IPC_MULT x ref **且** OCR 字数 < FAX_CHAR_MULT x ref_ch。
+    样本不足(正文页 < FAX_REF_MIN_N)时返回空 —— 无参考量就不判(不硬猜)。"""
+    tx = sorted(v for v in nch.values() if v >= FAX_REF_MIN_CH)
+    if len(tx) < FAX_REF_MIN_N:
+        return {}
+    ref_ch = tx[len(tx) // 2]
+    vals = sorted(ipc[i] for i in ipc if nch.get(i, 0) >= FAX_REF_MIN_CH)
+    if len(vals) < FAX_REF_MIN_N:
+        return {}
+    ref = vals[len(vals) // 2]
+    out = {}
+    for i in sorted(ipc):
+        if ipc[i] > FAX_IPC_MULT * ref and nch.get(i, 0) < FAX_CHAR_MULT * ref_ch:
+            out[i] = (nch.get(i, 0), round(ipc[i], 1), round(ipc[i] / ref, 2))
+    return out
+
+_FAX_PAGES = None
+def fax_pages(verbose=True):
+    """影印页判据 -> {0based页: (nch, ipc, 倍数)}; 无影印页则 {}。判据见 §1.995c 注释 + fax_decide。"""
+    global _FAX_PAGES
+    if _FAX_PAGES is not None:
+        return _FAX_PAGES
+    _FAX_PAGES = {}
+    if not (FAX_ON and NF_MODE and src_doc is not None):
+        return _FAX_PAGES
+    nch = {}
+    for k in keys:
+        nch[int(k)] = sum(1 for t in sl[k] for c in t if not c.isspace())
+    ipc = {}
+    for i in range(len(keys)):
+        inkpx, pw, ph = _fax_inkpx(i)
+        ipc[i] = inkpx / (nch.get(i, 0) + 1.0)
+    _FAX_PAGES = fax_decide(nch, ipc)
+    tx = sorted(v for v in nch.values() if v >= FAX_REF_MIN_CH)
+    ref = sorted(v for v in (ipc[i] for i in range(len(keys)) if nch.get(i, 0) >= FAX_REF_MIN_CH))
+    ref = ref[len(ref) // 2] if ref else 0.0
+    ref_ch = tx[len(tx) // 2] if tx else 0
+    if verbose:
+        print('[影印页] 判据: 每 OCR 字墨迹面积 > %.1f x 全书正文页中位(%.0fpx) 且 OCR 字数 < %.1f x 中位(%d)'
+              % (FAX_IPC_MULT, ref, FAX_CHAR_MULT, ref_ch))
+        if _FAX_PAGES:
+            print('[影印页] 命中 %d 页: %s' % (
+                len(_FAX_PAGES), ', '.join('p%d(%d字,%.1fx)' % (i + 1, v[0], v[2])
+                                           for i, v in sorted(_FAX_PAGES.items()))))
+        else:
+            print('[影印页] 未命中任何页')
+    return _FAX_PAGES
+
+_FAX_IMG = {}
+def fax_image(i):
+    """影印页图: 落 TMP/fax/ 并返回路径。
+    口径: 源页本身就是**扫描图**(整页一张 JPEG, 实测 1229x1914 ≈ 96dpi) —— 直接取源页那张图的
+    原始字节落盘(dvipdfmx 走 DCTDecode 原样嵌入: 零重编码、零质量损失, 且体积 = 源书自身的图).
+    只有源页没有内嵌图(矢量页)时才按 FAX_DPI 渲染一次(FAX_DPI 只在这个分支用到)。"""
+    if i in _FAX_IMG:
+        return _FAX_IMG[i]
+    import fitz
+    d = os.path.join(TMP, 'fax')
+    os.makedirs(d, exist_ok=True)
+    pg = src_doc[i]
+    imgs = pg.get_images(full=True)
+    if imgs:
+        xref = max(imgs, key=lambda im: im[2] * im[3])[0]
+        info = src_doc.extract_image(xref)
+        p = os.path.join(d, 'p%d.%s' % (i + 1, info['ext']))
+        with open(p, 'wb') as f:
+            f.write(info['image'])
+    else:
+        from PIL import Image
+        pix = pg.get_pixmap(matrix=fitz.Matrix(FAX_DPI / 72.0, FAX_DPI / 72.0), colorspace=fitz.csGRAY)
+        im = Image.frombytes('L', (pix.width, pix.height), pix.samples)
+        p = os.path.join(d, 'p%d.jpg' % (i + 1))
+        im.save(p, quality=82)
+    _FAX_IMG[i] = p
+    return p
+
+def fax_tex(i):
+    """影印页 -> tex 片段: 整页铺源图(不重建)。页面尺寸由调用方按本页纸型设好。
+    用 dvipdfmx 的**原样图片 special**(`pdf:image width ..pt height ..pt (file)`, 与 graphicx 的
+    dvipdfmx 驱动同一算子)而不用 \\includegraphics: ① 竖排 preamble 不引入 graphicx
+    (本管线的 tarticle+uplatex 下 graphicx 默认装 dvips 驱动, 实测 jpg 直接报 "Cannot determine
+    size of graphic"); ② 尺寸/落点可控(见下)。
+    落点标定(探针实测): 该算子的 (width,height) 按 **TeX pt -> bp** 折算(×0.99627 即 1/PT2BP),
+    故写页幅 x PT2BP; 图片下缘落在 put 点**下方** (纸幅-\\paperheight 之差) = page_h x (PT2BP-1)
+    -> put 的 y 取**负**该量。实测 921.8x1443pt 纸: put_y=-5.41 -> 图 bbox (0.00,0.01,921.84,1443.00)
+    与页幅逐位相合; 705x1083.8pt 纸: put_y=-4.06 -> (0,-0.04,704.96,1083.80) 同合。"""
+    p = fax_image(i)
+    dy = -page_h * (PT2BP - 1.0)
+    # 必须用**带星**的 \AddToShipoutPictureBG*(只作用于本页): 无星版会逐页累积
+    #   (实测: 贴图页之后每页都被铺上该图 —— 与 §2 里 FG* 的注记同因)。
+    return ('\\AddToShipoutPictureBG*{\\put(0,%.2f){'
+            '\\special{pdf:image width %.1fpt height %.1fpt (%s)}}}'
+            % (dy, page_w * PT2BP, page_h * PT2BP, p))
+
 # ---------- 2) 每页内容 ----------
 def page_tex(k, drop_notes=False):
     """一页: 正文列(从右到左)逐列渲染, \\par 强制断列(列断点=源书)
@@ -3131,6 +3975,9 @@ def page_tex(k, drop_notes=False):
         t = t.replace('%', r'\%').replace('#', r'\#').replace('&', r'\&').replace('_', r'\_')
         segs.append('{\\fontsize{%spt}{%spt}\\selectfont %s\\par}' % (f, pg_pitch, t))
     return '\n'.join(segs)
+
+_FAX = fax_pages()          # §1.995c 影印页判据(建排前跑一次: 判据只依赖源图墨迹 + OCR 字数)
+_FAX_DONE = []              # 本次实际出图的影印页(1-based, 落盘/对账用)
 
 sel = []
 if PAGES_ENV:
@@ -3657,6 +4504,7 @@ _brdef = []
 
 # (a) 字体文件 + fontTools 纯几何量(VERT_METRICS / PUNCT_INK): 换字体自动重标, 无需真渲染
 _ffile = _calib_font_path(FONT_MC)
+_FONT_PATH = _ffile          # §1.995: 西文行的字体几何(fontTools)与渲染用的是同一字体文件
 _gchars = sorted(set(VERT_FORMS.values())) + sorted(PUNCT_INK)
 _book_chars = sorted(set(ch for kk in keys for r in all_rows[kk] for ch in r[4]
                          if 0x3400 <= ord(ch) <= 0x9FFF))
@@ -3895,6 +4743,20 @@ parts = [preamble]
 n_frame_pg = 0
 for i, pg in enumerate(sel):
     k = keys[pg-1]
+    # §1.995c 影印页: 整页贴源图, **不重建**(用户明确要求)。纸型按本页源页尺寸逐页设(同 §1.975 逐页纸型),
+    #   图按本页纸幅铺满; 不加书眉/页码/版框/正文(整页就是那张影印件)。
+    if NF_MODE and src_doc is not None and (pg - 1) in _FAX:
+        _pw, _ph = _nf_page_px(pg - 1)
+        page_w, page_h = _pw / PT_PER_PX, _ph / PT_PER_PX
+        parts.append('\\setlength{\\paperheight}{%.1fpt}\\setlength{\\paperwidth}{%.1fpt}\n'
+                     '\\special{papersize=%.1fpt,%.1fpt}' % (
+                         page_h, page_w, round(page_w * 1.00375, 1), round(page_h * 1.00375, 1)))
+        parts.append(fax_tex(pg - 1))
+        parts.append('\\null')
+        _FAX_DONE.append(pg)
+        if pg != sel[-1]:
+            parts.append('\\newpage')
+        continue
     # §1.975 无版框书: **逐页纸型** —— 同一册里可夹多种开本(实测 wz7 有 922x1437 / 892x1323 /
     #   705x1084 三种)。\put 坐标以「页真左下角」为原点, 故页幅一改, 本页所有绝对定位随之对齐;
     #   \special{papersize} 逐页改媒体框(dvipdfmx 支持文档中途改, 实测 2 页不同纸型输出正确)。
@@ -3915,6 +4777,7 @@ for i, pg in enumerate(sel):
         _om2 = round(_rp2 - TH_pt - 70, 1)
         parts.append('\\setlength{\\oddsidemargin}{%.1fpt}\\setlength{\\evensidemargin}{%.1fpt}'
                      % (_om2, _om2))
+    _sp_puts = []                                   # §1.995 本页特殊行 \put(每页重置)
     dr = derot_rows(k, pg - 1, all_rows[k])      # §1.97: OCR 旋转坐标系页还原(只影响本页)
     if dr is not None: all_rows[k] = dr
     parts.append('%% ===== 源第 %d 页 (key %s) =====' % (pg, k))
@@ -3934,6 +4797,18 @@ for i, pg in enumerate(sel):
                 parts.append('\\newpage')
             continue
     pm = page_metrics(pg - 1) if (V_FRAME and V_FRAME_LAYOUT and src_doc is not None) else None
+    # §1.995 特殊行(西文行/标题署名行, 只 NF 路径): 在本页任何渲染之前认领出去 —— 它们既不在
+    #   正文列配对里(会被竖拆成逐字一格), 也被「本页正文字号」的兜底上限压住。认领方式:
+    #   ① 行对象从 all_rows[k] 摘掉(下游 page_rows 自然看不到); ② x 带记进 _SPECIAL_BLOCK,
+    #   正常路径(§1.98 槽 / §1.99 带)不再往这些带里落位 —— 不这么做的话「行↔带」配对会整体错位
+    #   (实测 p29 的 3 条特殊带正好是最右 3 条, 12 条正文行会去占前 12 条带 -> 左端 3 列落空)。
+    if NF_MODE and src_doc is not None and LAT_SP_ON and (pm is not None):
+        _g_sp = pm['g']
+        _sp, _blk, _cl = _page_specials(k, pg - 1, _g_sp, _nf_ink(pg - 1), all_rows[k])
+        if _cl:
+            all_rows[k] = [r for r in all_rows[k] if id(r) not in _cl]
+            _SPECIAL_BLOCK[k] = _blk
+        _sp_puts = _sp
     ok_ = False
     if pm:
         rows_, nrows_, orows_ = page_rows(k, pm, pg - 1)
@@ -3971,8 +4846,8 @@ for i, pg in enumerate(sel):
                     print('    [无框伪槽格·重试] p%d 重试口径适配但渲染 %d 字 < %s -> 不采纳, 走兜底'
                           % (pg, len(puts2_), _whyA.strip()))
     if ok_:
-        if puts_:
-            parts.append('\\AddToShipoutPictureFG*{%\n  ' + '%\n  '.join(puts_) + '}')
+        if puts_ or _sp_puts:
+            parts.append('\\AddToShipoutPictureFG*{%\n  ' + '%\n  '.join(puts_ + _sp_puts) + '}')
         parts.append('\\null')
         n_frame_pg += 1
         if SPECIAL:
@@ -3992,8 +4867,8 @@ for i, pg in enumerate(sel):
             gl = nf_frame(pg - 1, k)
         if gl:
             puts2, _np2 = page_puts_loose(k, pg - 1, gl)
-            if puts2:
-                parts.append('\\AddToShipoutPictureFG*{%\n  ' + '%\n  '.join(puts2) + '}')
+            if puts2 or _sp_puts:
+                parts.append('\\AddToShipoutPictureFG*{%\n  ' + '%\n  '.join(puts2 + _sp_puts) + '}')
                 parts.append('\\null')
                 n_frame_pg += 1
                 if SPECIAL:
@@ -4004,6 +4879,8 @@ for i, pg in enumerate(sel):
                 continue
     body = page_tex(k, SPECIAL)
     parts.append('\\null' if not body else body)
+    if _sp_puts:                            # 特殊行(西文侧排/标题署名)单开一张 FG 图(该分支原本无 FG 图)
+        parts.append('\\AddToShipoutPictureFG*{\n  ' + '%\n  '.join(_sp_puts) + '}')
     if SPECIAL:
         parts += special_tex(k, pg - 1)     # 书眉/页码: eso-pic 绝对定位(shipout 叠加, 不占流)
         parts += note_tex(k, pg - 1)        # 边注: 同上(版心外小字注)
@@ -4027,6 +4904,16 @@ if _gap_log:
         len(_gap_log), sum(g['extra'] for g in _gap_log), len(_pg), _rep))
 else:
     print('[空隙] 未检出(或 VERT_GAP=0)')
+
+# ---------- 2.55) 影印页清单落盘(§1.995c; 验证端 --expect-low 的输入 = 这里的数据驱动结果) ----------
+if _FAX:
+    _fj = os.environ.get('VERT_FAX_REPORT') or os.path.join(TMP, 'fax_pages.json')
+    json.dump({'pages': _FAX_DONE, 'detected': dict((str(i + 1), v) for i, v in sorted(_FAX.items())),
+               'crit': {'ipc_mult': FAX_IPC_MULT, 'char_mult': FAX_CHAR_MULT, 'dpi': FAX_DPI}},
+              open(_fj, 'w', encoding='utf8'), ensure_ascii=False, indent=1)
+    print('[影印页] 实际贴图 %d 页(检出 %d) -> %s' % (len(_FAX_DONE), len(_FAX), _fj))
+    print('[影印页] 这 %d 页按设计**不重建文本** -> verify_vert 请用 --expect-low %s'
+          % (len(_FAX_DONE), ','.join(str(x) for x in _FAX_DONE)))
 
 tex_path = os.path.join(TMP, 'vert.tex')
 open(tex_path, 'w', encoding='utf8').write('\n'.join(parts))

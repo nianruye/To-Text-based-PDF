@@ -32,8 +32,23 @@ taskP / taskP2 为该路径新增/修正的锚点：
 | 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP）+ **taskP2 实测文本框夹取**（§1.0a3） | §1.0a L168-199（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex` L238）、§1.0a2 L200-217（`BOLD_W`/`_vb`）、§1.0a3 L218-237（`TXTBOX_*`/`_txtbox_clamp_y` L234）、§1.0b L260-405（`char_cells` L156/`fit_gaps` L284）、`col_puts` L2486、落盘 L3887 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
 | 08 | [08_punct_vertical_forms.md](08_punct_vertical_forms.md) | 标点竖排形态（括号 → U+FE35…U+FE40 + 墨心回格心）+ OCR 列拆分归位（行首闭括号回上一列） | §1.0c L406-472（`VERT_FORMS`/`VERT_METRICS`/`BR_SIZE`/`_br_put` L459）、§1.0d L473-506（`BR_OPEN_OF`/`fix_split_brackets` L486 + 应用点 L517-528）、§1.9 `note_tex` L1005 | p3 对照图 + 抽查 ≥5 页 + `verify_vert` PASS |
 | 09 | [09_calibration.md](09_calibration.md) | **参数自标定 + 纸型无关化**（建排前从源图墨迹 + OCR + 字体文件测出本书参数：列数/字宽压缩/标点/括号/字体绑定组；所有「绝对量」门限改相对页幅/字步进 §8） | §0.5 L41-121、§1.05 L591-620、§1.85 L879-877、§1.954 L1436-1496、§1.955 L1497-1565、§1.96a L1566-1591、§1.956 L3093-3884（字体几何 L3255、源图样本 L3362、探针 L3469）；测试 `test_vert_calib.py` + `test_vert_paper_agnostic.py` | wz6 对账表（`N_COL_FRAME` 精确 12、`XSCALE` 0.863）+ 等价性 21 项 0.0000% + wz7 预检（列数 16/纸型/安全降级）+ `verify_vert` PASS |
+| 10 | [10_west_latin_fax.md](10_west_latin_fax.md) | **西文行侧排 / 标题署名行 / 影印页整页贴图**（只 NF 路径）：纯西文行判据 + 逐词/逐片实测落位 + 拉丁 TFM 字体口径 + 破折号单独成片；大字号行按源图墨迹实测渲染；影印页两道独立闸 + 整页贴源图（原始 JPEG 零重编码） | §1.995 L3093-3926（见上一节锚点表）；测试 `test_vert_taskR.py` | p29 西文行逐词对账（Δ沿起 0.00pt）+ 源页 5-28 全部贴图 + 未命中页不误判（分离度 3.8 倍）+ `verify_vert` PASS |
 
-> 锚点行号为 **2026-10-16（taskP2 wz7 300 页收尾后）当前文件**实测（`grep -n '^# ---------- '` / `grep -n '^def '`）；
+## 特殊行与影印页（§1.995，taskR / taskR2）实现锚点
+
+只 NF 路径调用（有实测版框的书/wz6 不走这一段）—— 「整行西文侧排」「标题/署名行按源图实测渲染」
+「影印页整页贴源图」三类版面元素。taskR2 改了其中的西文行口径（拉丁 TFM 字体 + 破折号单独成片 + bp/TeX pt 换算
++ 逐片实测基线），标题署名/影印页判据不变（本轮只复核 + 量化残留）。
+
+| 分部 | 锚点 | 说明 |
+|---|---|---|
+| §1.995a 西文行 | §1.995 L3093（判据/常量 L3136）、`latin_row` L3154、`_ink_band_at` L3165、`_band_runs4` L3228、`_rot_anchor` L3260、`_latin_groups` L3369、`_align_words_groups` L3384、字体一节 L3431（`_lat_gs` L3438/`_lat_enc` L3451/`_tfm_widths` L3467/`_lat_metrics` L3493）、`_latin_put` L3521、`_lat_pieces` L3540、`_assign_runs` L3554、`_latin_tex` L3587 | taskR2: 拉丁走 ptmr8t（半角/比例 + ASCII 文本层）、破折号单独成片按 run 实测长定字号、源坐标 ×PT2BP、逐片基线 |
+| §1.995b 标题署名行 | `_display_put` L3675、`_band_blocked` L3689、`_page_specials` L3697 | 字号/列位/列顶取源图实测；残留 = 竖直落位 +2.0/+8.3pt（见报告 §6 遗留 1） |
+| §1.995c 影印页贴图 | `_fax_inkpx` L3807、`fax_decide` L3826、`fax_pages` L3848、`fax_image` L3880、`fax_tex` L3907 | 两道独立闸（每字墨迹面积 ×2.5 且 字数 ×0.5）；命中 70 页（分离度 3.8 倍）；贴图页不重建文本 |
+
+> 详细口径/验收见 [10_west_latin_fax.md](10_west_latin_fax.md) 与 [docs/vert_wz7_layout3_report.md](../../docs/vert_wz7_layout3_report.md)。
+
+> 锚点行号为 **2026-10-16（taskR2 后）当前文件**实测（`grep -n '^# ---------- '` / `grep -n '^def '`）；
 > 改 `build_vert.py` 后须同步本表。
 
 ## 架构
