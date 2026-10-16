@@ -18,6 +18,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 | 伪槽格统计 / 行槽配平 | §1.98 L2027-2118（`_slots_of_edges` L2105）、L2152-2200（`_metrics_finish` L2152）、`_align_rows_slots` L2286、`page_rows` L2367（taskP2: NF 页注行数不得超过注槽数 +1） |
 | 列渲染 / 夹取 / 兜底 | `col_puts` L2486、`_pv_clamp_on` L2479、`_put_tex` L238、`_nf_hrow_page` L2570/`_nf_hrow_puts` L2586（横排页兜底）、`_nf_rescue_rows` L2619（残余列补救）、`page_puts` L2714（taskP2: 列框兜底重排）、`page_puts_loose` L2821 |
 | 逐页纸型 / 右缘 | 建排主循环 L3770-3795（taskP2: 小开本页右缘按本页纸宽夹取） |
+| **短列检出 / 标点占格 / 引號修剪**（taskS） | §1.0a0 L157-165（`PUNCT_CELL`/`_punct_own`）、§1.976 L1813-2077（`NF_SB_*`/`_big_hm` L1947/`_sb_ref_hm` L1962/`_sb_band` L1976/`nf_short_bands` L2030/`_sb_pitch` L2067）、`_trim_marks` L2408、调用点 `_nf_frame` L2316 / `_metrics_finish` / `page_puts` L3113、标定 `_calib_punct_cell` L4415 |
 
 ## Spec 文件
 
@@ -33,6 +34,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 | 08 | [08_punct_vertical_forms.md](08_punct_vertical_forms.md) | 标点竖排形态（括号 → U+FE35…U+FE40 + 墨心回格心）+ OCR 列拆分归位（行首闭括号回上一列） | §1.0c L406-472（`VERT_FORMS`/`VERT_METRICS`/`BR_SIZE`/`_br_put` L459）、§1.0d L473-506（`BR_OPEN_OF`/`fix_split_brackets` L486 + 应用点 L517-528）、§1.9 `note_tex` L1005 | p3 对照图 + 抽查 ≥5 页 + `verify_vert` PASS |
 | 09 | [09_calibration.md](09_calibration.md) | **参数自标定 + 纸型无关化**（建排前从源图墨迹 + OCR + 字体文件测出本书参数：列数/字宽压缩/标点/括号/字体绑定组；所有「绝对量」门限改相对页幅/字步进 §8） | §0.5 L41-121、§1.05 L591-620、§1.85 L879-877、§1.954 L1436-1496、§1.955 L1497-1565、§1.96a L1566-1591、§1.956 L3093-3884（字体几何 L3255、源图样本 L3362、探针 L3469）；测试 `test_vert_calib.py` + `test_vert_paper_agnostic.py` | wz6 对账表（`N_COL_FRAME` 精确 12、`XSCALE` 0.863）+ 等价性 21 项 0.0000% + wz7 预检（列数 16/纸型/安全降级）+ `verify_vert` PASS |
 | 10 | [10_west_latin_fax.md](10_west_latin_fax.md) | **西文行侧排 / 标题署名行 / 影印页整页贴图**（只 NF 路径）：纯西文行判据 + 逐词/逐片实测落位 + 拉丁 TFM 字体口径 + 破折号单独成片；大字号行按源图墨迹实测渲染；影印页两道独立闸 + 整页贴源图（原始 JPEG 零重编码） | §1.995 L3093-3926（见上一节锚点表）；测试 `test_vert_taskR.py` | p29 西文行逐词对账（Δ沿起 0.00pt）+ 源页 5-28 全部贴图 + 未命中页不误判（分离度 3.8 倍）+ `verify_vert` PASS |
+| 11 | [11_short_col_punct_cell.md](11_short_col_punct_cell.md) | **短列检出（又曰：类低覆盖短列）** + **标点占格口径按本书标定** + 引號类小墨修剪：覆盖率分母换成「本行自身墨迹窗」+ 密度/字高三道判据；`PUNCT_CELL` 由源图逐槽反推（wz7=1 占格 / wz6=0 挤格） | §1.0a0 L157、§1.976 L1813-2077、`_trim_marks` L2408、`col_puts` 标点推进、`_calib_punct_cell` L4415；测试 `test_vert_taskS.py` | key54 两个 `又曰：` 落位 Δ≤2pt、空隙 4/5 列与源书同位置同格数、wz7 300 页 PASS（字符量 98.2%→98.4%）、wz6 逐字节零回归 |
 
 ## 特殊行与影印页（§1.995，taskR / taskR2）实现锚点
 

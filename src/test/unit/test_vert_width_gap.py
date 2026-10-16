@@ -20,15 +20,26 @@ from _loader import load            # noqa: E402
 _CONSTS = ['PUNCT_HANG', 'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP', 'INK_RATIO', 'GAP_ON', 'GAP_HANG',
            'P_MERGE', 'P_PUNCT', 'P_SKIPN', 'P_SKIPR', 'P_GAP', 'P_TOT', 'GAP_MAX',
            'BOLD_W',
+           # taskS: 标点占格模型(§1.0a0) —— 挤格/占格两口径的格号与 DP 锚点
+           'PUNCT_CELL_THR',
            # taskK: _put_tex 现在会调 _br_put(括号竖排形态) —— 提取它及其常量(本文件断言不受影响)
            'VERT_FORMS', 'VERT_METRICS', 'BR_ON', 'BR_SIZE_DEF', 'BR_SIZE']
+
+_FUNCS = ['char_cells', 'n_cells', 'fit_gaps', '_put_tex', '_esc_ch', '_br_put', '_vb',
+          # taskS: 标点占格开关(挤格/占格两模型的唯一判据)
+          '_punct_own']
 
 
 @pytest.fixture(scope='module')
 def ns():
-    return load('build_vert.py', ['char_cells', 'n_cells', 'fit_gaps', '_put_tex', '_esc_ch',
-                                  '_br_put', '_vb'],
-                _CONSTS)
+    """wz6 口径(兜底): PUNCT_CELL=0 = 标点挤格不占格 —— 既有断言全部锁这一口径。"""
+    return load('build_vert.py', _FUNCS, _CONSTS, mocks={'PUNCT_CELL': 0.0})
+
+
+@pytest.fixture(scope='module')
+def ns_own():
+    """taskS 占格口径(实测 wz7): PUNCT_CELL=1 = 标点独占一格。"""
+    return load('build_vert.py', _FUNCS, _CONSTS, mocks={'PUNCT_CELL': 1.0})
 
 
 # ---------- A. 横向压缩 ----------
