@@ -3114,6 +3114,11 @@ def page_puts(k, pi, m):
             if (_tp, _bt) != (sl['top'], sl['bot']):
                 sl = dict(sl); sl['top'], sl['bot'] = _tp, _bt
         xc = (sl['x0'] + sl['x1']) / 2.0
+        if os.environ.get('VERT_TT_DBG'):
+            print('    [TT-DBG] p%d 槽 x%.1f-%.1f top=%s bot=%s step=%s hm=%s | F=%.2f INK_ASC=%.3f '
+                  'INK_RATIO=%.3f PUNCT_DY=%.2f PUNCT_SIZE=%.2f | 文本 %s' % (
+                      pi + 1, sl['x0'], sl['x1'], sl.get('top'), sl.get('bot'), sl.get('step'),
+                      sl.get('hm'), m['font'], INK_ASC, INK_RATIO, PUNCT_DY, PUNCT_SIZE, rows[ri][4][:20]))
         p, prev_bot = col_puts(rows[ri][4], xc, m, sl, prev_bot, pi)
         puts += p
     # §1.975c 列框兜底重排(taskP2, 只无版框伪槽格页): 行数 > 槽数时, 未配对的行先尝试归到本页
@@ -4412,6 +4417,26 @@ def _calib_punct_pos(src_small):
     return (_calib_med([s[5] for s in pun]), _calib_med([s[6] for s in pun]),
             _calib_med([s[4] for s in pun if s[4] is not None]))
 
+def _calib_punct_ink(probe, base):
+    """探针实测墨心 -> PUNCT_INK(标点锚点偏移)覆盖表(taskT, 只 NF 用)。纯函数。
+    返回 (新表, 覆盖个数, 覆盖项「轮廓 cy vs 渲染 cy」差的**中位**: em)。
+    为什么需要: PUNCT_INK 原来只取 fontTools 的**水平字形轮廓**墨心, 而 tate 模式实际画出的字形
+      在字盒里另有落位(竖排字体按自身 vertical 原点排版) —— 实测本册差 0.16em 量级
+      (。: 轮廓 cy 0.380em vs 渲染实测 0.544em; ，0.404 vs 0.575), 折成 0.16em x 标点字号
+      ≈ 5.9pt, 就是「标点贴前字、离后字远」的最后一段残差(PUNCT_DY 修好后仍余 -3.75pt)。
+      探针与渲染同 preamble、同 \\put 口径(锚点 = 字盒左缘/基准线), 故实测值可直接用。
+    base 里没有的字(探针未跑到)保持原值 —— 不混口径。"""
+    out = dict(base)
+    dif, n = [], 0
+    for ch in sorted(base):
+        if ch in probe:
+            _w, _h, _cx, _cy, _a, _as = probe[ch]
+            out[ch] = (round(_cx, 4), round(-_cy, 4))
+            dif.append(abs(_cy + base[ch][1]))         # |渲染 cy - 轮廓 cy|
+            n += 1
+    return out, n, (statistics.median(dif) if dif else None)
+
+
 def _calib_punct_cell(srec):
     """标点是否**独占一格**的标定(taskS, §1.956)-> 估计值中位 或 None。
     口径(逐列反推, 不必先知道哪个 run 是标点): 一列的墨迹跨度对应
@@ -4586,7 +4611,45 @@ def _calib_ink_box(ink, ta, tb, xa, xb):
     xs = np.where(sub.any(axis=0))[0]
     return (xs[-1] - xs[0] + 1) / 2.0, float(sub.sum()) / 4.0
 
-def _calib_src_page(pi, k):
+def _calib_own_marks(cc, t, cells, T0, step, x0, pitch, h_med, np_min=8):
+    """**占格书**(PUNCT_CELL>=0.5)的标点样本: 逐标点取「本格中心」的连通域并集 ->
+    [(ch, 'punct', 高比, 宽比, d_top, d_cy, d_cx)]。d_* 相对**前一字格顶**(= col_puts 的锚点,
+    与 §1.956 的 PUNCT_DY/GAP_HANG/PUNCT_DX 同一坐标语义)。
+    为什么不走 DP 配对(_calib_match_small): 那条路靠「预测位置」找标点, 而预测用的 GAP_HANG 本身
+      正是待标定量 -> 占格书(标点离锚点 1.5 格)的真标点恰好踩在容差边缘(实测 |Δ|=15.6pt vs 容差
+      15.9pt), DP 于是改选**前字笔画碎片**(代价 0.6 ≪ 15.6), 实测 wz7 p43「兩大類。」的量测值
+      4.5pt vs 真值 10.0pt(源图墨迹直接探测) -> PUNCT_DY 中位被拉低约 0.35 格(全长 300 页 p43
+      24 例: 0.969 vs 真值 1.45)。
+    格内取墨为什么不需要预测: 行列栅格(T0/step)只由槽内墨迹 run 定, 与标点无关; 占格书里每个字的
+      墨心都在**自己那一格**的中心附近, 标点墨心也在自己那格 -> 按「墨心落在哪一格」分类即可。
+    不做尺寸窗筛选: ！：；？ 的墨高与正文相当(字体轮廓 0.62-0.78em), 尺寸窗会把整类滤掉; 并集若
+      高过正文墨高(0.98x)判为「本格判据失效」(栅格漂移/两字并作一块) -> 弃样, 不乱收。"""
+    out = []
+    for i, ch in enumerate(t):
+        c, hang = cells[i]
+        if not hang:
+            continue
+        lo, hi = T0 + c * step, T0 + (c + 1) * step
+        sel = [z for z in cc if lo <= (z[0] + z[1]) / 2.0 <= hi]
+        if not sel:
+            continue
+        top = min(z[0] for z in sel); bot = max(z[1] for z in sel)
+        xs0 = min(z[6] for z in sel); xs1 = max(z[7] for z in sel)
+        if sum(z[8] for z in sel) < np_min:
+            continue
+        h = bot - top
+        if h > 0.98 * h_med:                     # 高过正文墨高 -> 本格判据失效, 弃样
+            continue
+        cy = (top + bot) / 2.0
+        cx = (xs0 + xs1) / 2.0
+        w = xs1 - xs0
+        a_top = T0 + (c - PUNCT_CELL) * step     # 锚点 = 前一字格顶(= col_puts 的 (k-1) 格)
+        out.append((ch, 'punct', h / h_med, w / h_med,
+                    (top - a_top) / step, (cy - a_top) / step, (cx - x0) / pitch))
+    return out
+
+
+def _calib_src_page(pi, k, marks=True):
     """源书一页的标定样本 -> dict 或 None(无版框/无正文槽)。
     复用 §1.98 的槽/行配对(与渲染同一套几何): 槽 runs + OCR 文本 + char_cells(格号) ->
       · body  = [(墨高px, 墨宽px, 墨面积px)]  逐字(只取「单体字」run: 高 ∈ 0.8-1.25 × 本槽中位;
@@ -4657,6 +4720,8 @@ def _calib_src_page(pi, k):
         if len(rs) >= 6:
             srec.append((len(t), sum(1 for c in t if c in PUNCT_HANG), step, T0, Bv,
                          _big[len(_big) // 2] if _big else h_med))
+        if not marks:                             # 第一趟(只收槽格记录, 供 PUNCT_CELL 标定)
+            continue
         if step <= 1.0:
             continue
         # 小字(挤格标点/括号): 用**二维连通域**而不是槽的 y 投影 —— 挤格标点的 y 区间常落在前一字
@@ -4667,28 +4732,36 @@ def _calib_src_page(pi, k):
         if zy1 - zy0 < 8:
             continue
         lab, _nn = ndimage.label(ink[zy0:zy1, xa:xb])
-        marks = []
+        marks, cc = [], []
         for kk, so in enumerate(ndimage.find_objects(lab), 1):
             if so is None:
                 continue
             h_ = (so[0].stop - so[0].start) / 2.0
             w_ = (so[1].stop - so[1].start) / 2.0
             npx = int((lab[so] == kk).sum())
-            if not (1.5 <= h_ <= 0.62 * h_med and 1.0 <= w_ <= 0.9 * h_med and npx >= 8):
-                continue
             if so[1].start <= 1 or so[1].stop >= xb - xa - 1:     # 贴窗口边 = 被裁的碎片
                 continue
             top = (zy0 + so[0].start) / 2.0
             bot = (zy0 + so[0].stop) / 2.0
             cxx = (xa + so[1].start + xa + so[1].stop) / 4.0      # 墨心 x(pt)
             # 形态分类: 括号是「扁长条」(源书 ︵ ≈ 17.5x7pt, w/h≈2.5), 标点是紧凑小块(w/h<=1.8)
+            cc.append((top, bot, cxx, w_, h_, 'punct', (xa + so[1].start) / 2.0,
+                       (xa + so[1].stop) / 2.0, npx))
+            if not (1.5 <= h_ <= 0.62 * h_med and 1.0 <= w_ <= 0.9 * h_med and npx >= 8):
+                continue
             marks.append((top, bot, cxx, w_, h_, 'brk' if w_ >= 1.8 * h_ else 'punct'))
         cells = char_cells(t)
+        if _punct_own():
+            # 占格书(taskT): 标点独占一格 -> 用「格内中心」选墨, 不靠 DP 预测(见 _calib_own_marks);
+            #   括号(kind='brk')仍走下面的 DP —— 它们的样本口径不变, 只是不再与标点抢匹配。
+            small += _calib_own_marks(cc, t, cells, T0, step, sl['x0'], pitch, h_med)
         preds = []
         for i, ch in enumerate(t):
             c, hang = cells[i]
             # 标点的锚点格号 = 前一字格 (= 本格 - PUNCT_CELL; 与 fit_gaps.pred 同一语义),
             #   让 d_cy/d_top 的口径与 PUNCT_CELL 无关(标定趟本身要在 PUNCT_CELL 定下来之前跑)
+            if _punct_own() and hang:
+                continue          # 占格书: 标点样本由 _calib_own_marks 出, 这里只留括号(见该函数)
             if hang or ch in VERT_FORMS:
                 ref = 'top' if hang else 'center'
                 y = (T0 + (c - (PUNCT_CELL if hang else 0.0) + GAP_HANG) * step) if hang \
@@ -4832,6 +4905,24 @@ def _calib_fam_count(samples):
                 c[f] = c.get(f, 0) + 1
     return c
 if SRC and os.environ.get('VERT_CALIB_CACHE') in (None, ''):
+    # (b0) 第一趟: **只收槽格记录**(不跑连通域配对) —— PUNCT_CELL 的唯一输入。
+    #   为什么必须先定 PUNCT_CELL 再采样本(taskT): 占格书里标点独占一格, 而标定趟起初不知道
+    #   PUNCT_CELL(兜底 0 = 挤格) -> 小字配对的预测锚点偏一格, 真标点踩在容差边缘, DP 改选前字
+    #   笔画碎片 -> PUNCT_DY/GAP_HANG/PUNCT_SIZE 全被带偏(实测 wz7: d_cy 中位 0.969 vs 真值 1.45,
+    #   即标点被摆在离前字太近的位置 -> 用户多轮反馈「标点跟字体重合」)。槽格记录只由墨迹 run 定,
+    #   与标点无关, 故可先算。(_calib_src_page 内部按 marks=False 提前返回, page_metrics 有缓存。)
+    for _pg in CALIB_SAMP:
+        _r = _calib_src_page(_pg - 1, keys[_pg - 1], marks=False)
+        if _r:
+            _src_slots += _r.get('slots') or []
+    if _src_slots:
+        _pc_est = _calib_punct_cell(_src_slots)
+        if _pc_est is not None:
+            _calib_vals['PUNCT_CELL'] = 1.0 if _pc_est >= PUNCT_CELL_THR else 0.0
+            PUNCT_CELL = _calib_vals['PUNCT_CELL']        # 第二趟采样前生效(见 §1.0 n_cells 注)
+            print('[标定B] 标点占格: 源图侧 %d 槽记录 -> 估计中位 %.3f(阈值 %.1f) -> PUNCT_CELL=%.0f (%s)'
+                  % (len(_src_slots), _pc_est, PUNCT_CELL_THR, PUNCT_CELL,
+                     '标点独占一格' if PUNCT_CELL else '挤格(与前字同格, wz6 口径)'))
     for _pg in CALIB_SAMP:
         _r = _calib_src_page(_pg - 1, keys[_pg - 1])
         if not _r:
@@ -4890,13 +4981,7 @@ if SRC and os.environ.get('VERT_CALIB_CACHE') in (None, ''):
 # (b2) 标点是否**独占一格**(taskS): 逐槽从源图墨迹反推(见 _calib_punct_cell)。
 #   为什么单独一步: 它决定「格」的口径(n_cells/char_cells/fit_gaps/col_puts 全用它), 而 wz6 的
 #   挤格口径与 wz7 的占格口径在源图上都自洽 —— 只能按本书实测二选一, 不能沿用上一本的常数。
-if _src_slots:
-    _pc_est = _calib_punct_cell(_src_slots)
-    if _pc_est is not None:
-        _calib_vals['PUNCT_CELL'] = 1.0 if _pc_est >= PUNCT_CELL_THR else 0.0
-        print('[标定B] 标点占格: 源图侧 %d 槽样本 -> 估计中位 %.3f(阈值 %.1f) -> PUNCT_CELL=%.0f (%s)'
-              % (len(_src_slots), _pc_est, PUNCT_CELL_THR, _calib_vals['PUNCT_CELL'],
-                 '标点独占一格' if _calib_vals['PUNCT_CELL'] else '挤格(与前字同格, wz6 口径)'))
+#   taskT 起**提前到采样之前**(见 (b0)): 占格与否决定小字样本怎么取, 不能等采完样再算。
 
 # (c) 探针渲染(源图侧不可用时不跑: 标定值都算不出来, 白白编译一趟)
 _probe = {}
@@ -4907,6 +4992,18 @@ if _src_body:
     _probe, _pdesc = _calib_probe(preamble, _body_c + sorted(PUNCT_HANG) + sorted(set(VERT_FORMS.values())),
                                   _note_c, TMP, page_w=page_w, page_h=page_h)
     print('[标定B] 探针渲染: %s' % _pdesc)
+    # (c2) PUNCT_INK(标点锚点偏移)口径 —— **只 NF 改用探针渲染实测墨心**(taskT)。
+    #   为什么: fontTools 读的是**水平字形的轮廓几何**, 而 tate 模式实际画出的字在字盒里另有落位
+    #   (竖排字体按自身 vertical 原点排版), 两者墨心差 0.16em(实测本册 。: 轮廓 cy 0.380em vs
+    #   渲染实测 0.544em; ，0.404 vs 0.575) —— 差 0.16em x Fp ≈ 5.9pt, 正是「标点贴前字」的最后
+    #   一段残差(修 PUNCT_DY 之后仍余 -3.75pt, 见报告 §4)。
+    #   探针的口径与 _put_tex 的调用方完全同源(同一 preamble、同一 \put 点=字盒左缘/基准线)。
+    #   wz6(有版框书)保持 fontTools 口径不动 —— 逐字节不变。
+    if _NF['on'] and _probe:
+        PUNCT_INK, _pik_n, _pik_d = _calib_punct_ink(_probe, PUNCT_INK)
+        if _pik_n:
+            print('[标定B] PUNCT_INK 口径: NF -> 探针渲染实测墨心 %d 个标点(轮廓 vs 渲染 中位差 %.3fem)'
+                  % (_pik_n, _pik_d or 0.0))
 
 # (d) 组合出各参数(每一项都写清口径; 样本不足 -> None -> 兜底值)
 if _src_body and _probe:
