@@ -28,12 +28,15 @@ _FUNCS = ['nf_body_rows', 'nf_join_rows', 'nf_edges', 'nf_fill_bands', 'nf_fit',
           '_band_union',
           # taskP: 印刷线去除 / 框版心 / 横排页兜底 / 行槽配平位置先验 / 页内夹取
           '_nf_lines', '_nf_delines', '_nf_box', '_nf_hrow_page', '_align_rows_slots',
-          '_pv_clamp_on']
+          '_pv_clamp_on',
+          # taskP2: 短列证据补带 / 版心夹回纸幅 / 实测文本框夹取
+          'nf_short_cols', '_nf_clamp_box', '_txtbox_clamp_y']
 # 说明: BAND_*/LONG_H_*/FRAG_OVL/页幅/_NF/_nf_cache 都是**由函数算出来或需按用例改**的全局量,
 #   统一用 mocks 注入(它们不是 ast 的纯字面量赋值, 直接从源码 exec 会缺依赖函数)。
 _CONSTS = ['NF_MIN_COL', 'NF_COV', 'NF_FIT_K', 'NF_FIT_RES', 'PT_PER_PX',
            'NF_LINE_CV', 'NF_LINE_RV', 'NF_LINE_VLEN', 'NF_LINE_HLEN', 'n_cells', 'char_cells',
-           'NF_BOX_WMIN', 'NF_BOX_HMIN', 'NF_HROW_AR', 'NF_HROW_CHAR', 'NF_POS_PRIOR']
+           'NF_BOX_WMIN', 'NF_BOX_HMIN', 'NF_HROW_AR', 'NF_HROW_CHAR', 'NF_POS_PRIOR',
+           'NF_FILL_HMIN', 'NF_FILL_NRUN', 'NF_FILL_PAD', 'TXTBOX_C', 'TXTBOX_UP', 'TXTBOX_DN']
 
 
 class _Doc:
@@ -144,15 +147,43 @@ class TestEdges:
 
 class TestFillBands:
     def test_fill_short_column(self):
-        """短列(墨迹覆盖率低于 cov=0.12)漏检 -> 用残余墨迹补, 使列带数 >= 行数"""
+        """短列(墨迹覆盖率低于 cov=0.12)漏检 -> 用残余墨迹补, 使列带数 >= 行数。
+        taskP2: 候选要过「文字列证据」(run >= NF_FILL_NRUN) —— 故短列按**逐字 run** 造(4 字 = 4 条):
+        实心一整块是碎墨/装饰的形态, 新判据会(且应当)拒绝, 见 test_fill_rejects_solid_blob。"""
         np = pytest.importorskip('numpy')
         ns = _ns()
         ink = np.zeros((200, 400), dtype=bool)
-        ink[:, 40:60] = True          # 长列(满高)
-        ink[10:30, 120:140] = True    # 短列(只占 10% 高度) -> cov=0.12 会漏
-        bands = [(20.0, 30.0)]        # 只检到第一条(pt; 2x px -> 40-60px)
+        ink[:, 40:60] = True                      # 长列(满高)
+        for y in (10, 30, 50, 70):                # 短列 = 4 个字的 run(只占 ~10% 高度)
+            ink[y:y + 12, 120:140] = True
+        bands = [(20.0, 30.0)]                    # 只检到第一条(pt; 2x px -> 40-60px)
         out = ns['nf_fill_bands'](ink, bands, 0.0, 200.0, 0.0, 100.0, 2)
         assert len(out) == 2 and out[1][0] >= 55.0
+
+    def test_fill_rejects_solid_blob(self):
+        """taskP2: 残余墨迹里的「实心块」(无 run 结构 = 碎墨/装饰/扫描噪点) 不补成正文列"""
+        np = pytest.importorskip('numpy')
+        ns = _ns()
+        ink = np.zeros((200, 400), dtype=bool)
+        ink[:, 40:60] = True
+        ink[10:30, 120:140] = True                # 一整块 = 1 条长 run < NF_FILL_NRUN
+        out = ns['nf_fill_bands'](ink, [(20.0, 30.0)], 0.0, 200.0, 0.0, 100.0, 2)
+        assert len(out) == 1
+
+    def test_fill_merges_fragments(self):
+        """taskP2: 同列被切成的两段碎片(间隙 <= 4pt)先合并再判宽度 —— 原口径(gap 4px)会把
+        7pt+2pt 两段都当候选且都因宽度不足被拒, 真列补不出(实测 wz7 源页 291 的 `三十歲。`)"""
+        np = pytest.importorskip('numpy')
+        ns = _ns()
+        ink = np.zeros((200, 400), dtype=bool)
+        ink[:, 40:60] = True
+        for y in (10, 30, 50, 70):                # 碎片 A: x 120-127px
+            ink[y:y + 12, 120:127] = True
+            ink[y:y + 12, 131:138] = True         # 碎片 B: 间隙 4px(8px 合并窗内)
+        out = ns['nf_fill_bands'](ink, [(20.0, 30.0)], 0.0, 200.0, 0.0, 100.0, 2)
+        assert len(out) == 2
+        a, b = out[1]
+        assert a <= 60.5 and b >= 68.5            # 合并后覆盖两段(60-69pt)
 
     def test_no_fill_when_enough(self):
         np = pytest.importorskip('numpy')
@@ -325,3 +356,47 @@ class TestClampOn:
         assert ns['_pv_clamp_on']({'g': {'virtual': True}}) is True
         assert ns['_pv_clamp_on']({'g': {'in_l': 40.0}}) is False
         assert ns['_pv_clamp_on'](None) is False
+
+
+# ---------- F. taskP2: 版心夹回纸幅 / 短列计数 / 实测文本框夹取 ----------
+class TestTaskP2Box:
+    def test_clamp_box_inside(self):
+        """版心本就在纸内 -> 原样返回"""
+        ns = _ns()
+        assert ns['_nf_clamp_box'](50.0, 800.0, 100.0, 1200.0, 892.5, 1323.0) == \
+            (50.0, 800.0, 100.0, 1200.0)
+
+    def test_clamp_box_out_of_page(self):
+        """行盒整段越出纸(实测源页 182: y -138.8) -> 夹回纸内(否则槽统计全在纸外)"""
+        ns = _ns()
+        il, ir, it, ib = ns['_nf_clamp_box'](-20.0, 950.0, -138.8, 900.0, 892.5, 1323.0)
+        assert il == 0.0 and ir == 892.5
+        assert it == 0.0 and ib == 900.0          # 负的版心顶被夹到 0, 其余不动
+
+    def test_clamp_box_degenerate(self):
+        """夹后与纸几乎不相交(< 8pt) -> None(该页不建伪槽格, 交回流式)"""
+        ns = _ns()
+        assert ns['_nf_clamp_box'](-50.0, -45.0, 100.0, 400.0, 892.5, 1323.0) is None
+
+    def test_txtbox_clamp_keeps_box_inside(self):
+        """taskP2-①: 夹取用**实测文本框**比例 —— 盒顶可达 put + C + UP x F(远大于 em 盒的 0.94F),
+        夹后盒顶/盒底都必须落在页内(这正是 p104 ﹁ 越界 5.93pt 的根因)。"""
+        ns = _ns()
+        C, UP, DN = ns['TXTBOX_C'], ns['TXTBOX_UP'], ns['TXTBOX_DN']
+        page = 1323.0
+        for F in (9.3, 26.0, 40.0):
+            y = ns['_txtbox_clamp_y'](page + 50.0, F, page)          # 想放到页外
+            assert y + C + UP * F <= page + 1e-9
+            y2 = ns['_txtbox_clamp_y'](-50.0, F, page)
+            assert y2 + C - DN * F >= -1e-9
+
+    def test_short_cols_count(self):
+        """补带目标 = 长行数 + 版心内短列数(实测源页 291 的 `三十歲。` 4 字短列是真列)"""
+        ns = _ns()
+        long_row = (100.0, 700.0, 200.0, 2000.0, '正文长行')      # px(2x): 高 1800px
+        short_in = (560.0, 640.0, 220.0, 420.0, '三十歲。')        # 高 200px < LONG_H_FRAC x 页高
+        outside = (560.0, 640.0, 3960.0, 4040.0, '页码')           # 版心外(页外)
+        body = [long_row]
+        # 版心 pt: x 0-900, y 90-1000; rows 是 px(2x)
+        assert ns['nf_short_cols']([long_row, short_in, outside], body, 0.0, 900.0, 90.0, 1000.0,
+                                   2886.0) == 1
