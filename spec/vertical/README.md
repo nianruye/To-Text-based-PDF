@@ -158,3 +158,18 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 | `NF_ROW_FRAC` / `NF_POS_PRIOR` / `NF_HROW_*` / `FONT_*_FRAC` / `NF_BOX_*` | §1.975 常量块 |
 
 > 说明：本册锚点以**函数名**给出（行号随改动漂移，函数名稳定）；分部 spec 的旧行号锚点仍按 §4 规则同步。
+
+## taskQ（2026-10-16）新增锚点：标定的方向 / 对齐相位 / 落地口径
+
+| 分部 | 内容 | 锚点（`src/pipelines/build_vert.py`） |
+|---|---|---|
+| 09_calibration §12 | OCR→源图**逆映射**（方向契约） | `nf_ocr2src` `L1944` |
+| 09_calibration §12.2 | 对齐相位择优（映射后行心域 vs 列心域，残差只作同分次序） | `nf_fit_align` `L1906` |
+| 09_calibration §12.3 | 标定落地：窗外扩一个列距 + 列带与标定前同口径 | `_nf_after_fix` `L2027`（调用点 `_nf_frame` `L2056`） |
+| 09_calibration §12.4 | 命中率统计与逐页明细落盘 | `_nf_fix_stat` / `_nf_rej` `L1935-1942`、主循环后 §2.6 `L4021` |
+| 09_calibration §12.5 | 重试口径按渲染字数择优 | 建排主循环 `L3934-3960`、`page_puts_loose(quiet=)` `L2911` |
+| 09_calibration §12（开关） | `NF_FIX_INV` / `NF_FIT_ALIGN_POS` / `NF_FIT_LAND` / `NF_FIT_PAD` / `NF_RETRY_BEST`（四个 `*_INV/ALIGN_POS/LAND/RETRY_BEST` 全关 = taskQ 前行为，tex 逐字节相同） | §1.975 常量块 `L1780-1800` |
+
+> taskQ 只改 `nf_fit_align` 的**择优**与标定的**应用/落地**（不改拟合公式、不改任何输出判据），
+> 故 02 tate_layout / 03 marginalia / 04 frame_lines 三个分部的锚点无需改写；上表行号以函数名为准
+> （`build_vert.py` 的行号随改动漂移）。

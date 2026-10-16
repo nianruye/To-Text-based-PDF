@@ -24,19 +24,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _loader import load            # noqa: E402
 
 _FUNCS = ['nf_body_rows', 'nf_join_rows', 'nf_edges', 'nf_fill_bands', 'nf_fit', 'nf_fit_align',
+          '_ink_bands',
           '_nf_ink_gray', '_nf_page_px', '_nf_thr', '_calib_xscale_w', '_calib_med', '_runs',
           '_band_union',
           # taskP: 印刷线去除 / 框版心 / 横排页兜底 / 行槽配平位置先验 / 页内夹取
           '_nf_lines', '_nf_delines', '_nf_box', '_nf_hrow_page', '_align_rows_slots',
           '_pv_clamp_on',
           # taskP2: 短列证据补带 / 版心夹回纸幅 / 实测文本框夹取
-          'nf_short_cols', '_nf_clamp_box', '_txtbox_clamp_y']
+          'nf_short_cols', '_nf_clamp_box', '_txtbox_clamp_y',
+          # taskQ: 标定方向(逆映射) / 标定落地(窗外扩 + 列带重算)
+          'nf_ocr2src', '_nf_after_fix']
 # 说明: BAND_*/LONG_H_*/FRAG_OVL/页幅/_NF/_nf_cache 都是**由函数算出来或需按用例改**的全局量,
 #   统一用 mocks 注入(它们不是 ast 的纯字面量赋值, 直接从源码 exec 会缺依赖函数)。
 _CONSTS = ['NF_MIN_COL', 'NF_COV', 'NF_FIT_K', 'NF_FIT_RES', 'PT_PER_PX',
            'NF_LINE_CV', 'NF_LINE_RV', 'NF_LINE_VLEN', 'NF_LINE_HLEN', 'n_cells', 'char_cells',
            'NF_BOX_WMIN', 'NF_BOX_HMIN', 'NF_HROW_AR', 'NF_HROW_CHAR', 'NF_POS_PRIOR',
            'NF_FILL_HMIN', 'NF_FILL_NRUN', 'NF_FILL_PAD', 'TXTBOX_C', 'TXTBOX_UP', 'TXTBOX_DN']
+# taskQ 的 5 个开关(NF_FIX_INV / NF_FIT_ALIGN_POS / NF_FIT_LAND / NF_FIT_PAD / NF_RETRY_BEST)由 env 求值,
+#   必须走 mocks 注入(否则 load 会按测试机的 env 求值, 用例改不动) —— 见下方 WZ7。
 
 
 class _Doc:
@@ -60,6 +65,9 @@ WZ7 = dict(PW_PX=1843.6, PH_PX=2886.0, page_w=921.8, page_h=1443.0, PT_PER_PX=2.
            LONG_H_FRAC=300.0 / 2490.6, BAND_R_PX=1843.6 * (1100.0 / 1190.6),
            BAND_L_PX=1843.6 * (100.0 / 1190.6), LONG_H_PX=2886.0 * (300.0 / 2490.6),
            FRAG_OVL_PX=24.0, NF_MIN_COL=2, NF_COV=0.12, NF_FIT_K=(0.7, 1.6), NF_FIT_RES=0.5,
+           NF_FIX_INV=True, NF_FIT_ALIGN_POS=True, NF_FIT_LAND=True, NF_FIT_PAD=1.0,
+           NF_RETRY_BEST=True,
+           NF_SLOT_DBG=False,
            NF_LINE_CV=0.75, NF_LINE_RV=0.45, NF_LINE_VLEN=0.50, NF_LINE_HLEN=0.55,
            NF_BOX_WMIN=0.35, NF_BOX_HMIN=0.35, NF_HROW_AR=2.0, NF_HROW_CHAR=0.60,
            NF_POS_PRIOR=60.0, all_rows={}, _nf_box_cache={}, _nf_ink_cache={},
@@ -218,6 +226,92 @@ class TestFit:
         ns = _ns()
         assert ns['nf_fit_align']([100.0 * i for i in range(6)],
                                   [2.5 * 100.0 * i for i in range(6)]) is None
+
+    # ---- taskQ 遗留1: 映射方向 + 梳状简并下的对齐择优 ----
+    def test_ocr2src_is_inverse(self):
+        """OCR -> 源图 必须用逆映射 src = (ocr - b) / k(nf_fit 拟合的是 ocr = k x src + b)。
+        修前该处写成 k x ocr + b(同向再映射一次, 尺度被平方)-> 实测 248/250 页被
+        「映射后正文 x 不符」拒掉, 标定路径休眠。"""
+        ns = _ns()
+        k, b = 1.25, -300.0
+        assert abs(ns['nf_ocr2src'](k, b, 1.25 * 800 - 300) - 800.0) < 1e-9
+        # 正向(修前行为)只能靠开关取得, 且两者不等(除非 k=1, b=0)
+        ns0 = _ns(extra={'NF_FIX_INV': False})
+        assert abs(ns0['nf_ocr2src'](k, b, 1000.0) - (1.25 * 1000 - 300)) < 1e-9
+
+    def test_ocr2src_open_interval_guard(self):
+        """两端 k=1/b=0 时两向同值(解释「修前也有 2 页采纳」: 那是 OCR 帧近似恒等的页)。"""
+        ns = _ns()
+        assert abs(ns['nf_ocr2src'](1.0, 0.0, 123.4) - 123.4) < 1e-9
+
+    def test_align_pos_beats_residual_on_comb(self):
+        """梳状简并(实测 p30 的同型最小构造): 行距 ≈ k x 列距 时**整列错位**的解残差也很小
+        (实测 d-2 的中位残差 0.065px < 正解 d+0 的 0.311px), 只按残差择优会选中错位相位 ——
+        映射后正文行心域整体偏出墨迹列心域 200px(4 列), 窗跟着搬 -> 边界列被切 -> 整列丢字。
+        修后按「映射后行心域 == 列心域」择优 -> 选中 d+0(域失配 0.3px)。"""
+        ns = _ns()
+        cs = [100.0 + 50 * i for i in range(8)]
+        ro = [25.32, 87.09, 150.08, 212.91, 274.71, 337.09, 399.92, 462.24]
+        _k, b, _rms, _pr = ns['nf_fit_align'](cs, ro)
+        mis = abs((min(ro) - b) / _k - min(cs)) + abs((max(ro) - b) / _k - max(cs))
+        assert mis < 1.0, '位置判据应选中相位 0(域失配 %.1f)' % mis
+        # 关掉位置判据(修前口径): 同样的输入按残差选中 d-2(域失配 200px)
+        ns0 = _ns(extra={'NF_FIT_ALIGN_POS': False})
+        _k0, b0, _r0, _p0 = ns0['nf_fit_align'](cs, ro)
+        mis0 = abs((min(ro) - b0) / _k0 - min(cs)) + abs((max(ro) - b0) / _k0 - max(cs))
+        assert mis0 > 150.0, '修前口径本应选到错位相位(实测失配 %.1f)' % mis0
+
+class TestAfterFix:
+    """taskQ 遗留1 的落地环节: 标定后重算伪版心窗(外扩)+ 列带(检测 + 短列补齐)。"""
+
+    def _ink(self, np):
+        ink = np.zeros((600, 600), dtype=bool)
+        for x0 in (100, 200, 300, 400):
+            ink[50:550, x0:x0 + 20] = True            # 4 条真列(各 20px 宽, 距 100px = 50pt)
+        return ink
+
+    def _rows(self, cols=(200, 300, 400)):
+        return [(c - 4, c + 24, 60, 540, '甲乙丙丁戊') for c in cols]
+
+    def test_pad_keeps_boundary_column(self):
+        """窗 = 标定后行盒并集, 行盒比墨迹列窄 -> 边界列(100-120px = 50-60pt)会落在窗外;
+        外扩一个列距(NF_FIT_PAD=1)后仍在窗内 -> 4 列全检到(p254 左端列即此, 少 95 字)。"""
+        np = pytest.importorskip('numpy')
+        ns = _ns()
+        ink = self._ink(np)
+        rows, body, il, ir, it, ib, bands = ns['_nf_after_fix'](
+            29, self._rows(), None, 600.0, 600.0, ink, 50.0)
+        assert len(bands) == 4, '外扩后 4 条真列都应检出'
+        assert il <= 50.0 and len(body) == 3
+        ns0 = _ns(extra={'NF_FIT_LAND': False})
+        _r0, _b0, il0, _i0, _t0, _b0b, bands0 = ns0['_nf_after_fix'](
+            29, self._rows(), None, 600.0, 600.0, ink, 50.0)
+        assert len(bands0) == 3 and il0 >= 98.0, '修前口径(不外扩) -> 左端列被窗缘切掉'
+        ns1 = _ns(extra={'NF_FIT_PAD': 0.0})           # 只把外扩量调 0, 补齐仍在新口径下跑
+        _r1, _b1, il1, _i1, _t1, _b1b, bands1 = ns1['_nf_after_fix'](
+            29, self._rows(), None, 600.0, 600.0, ink, 50.0)
+        assert len(bands1) == 3 and il1 >= 98.0
+
+    def test_short_column_filled_after_fix(self):
+        """列带重算必须与标定前同口径: 覆盖率不足的短列(_ink_bands 检不出)由 nf_fill_bands 补回
+        (实测 p254 标定前 15+1=16, 只重算检测 -> 14)。"""
+        np = pytest.importorskip('numpy')
+        ns = _ns()
+        ink = self._ink(np)
+        for y in (60, 140, 220, 300):                 # 右上角的短列(4 个字 -> 4 条 run)
+            ink[y:y + 40, 500:520] = True
+        rows = self._rows() + [(496, 524, 60, 300, '短列甲乙')]
+        _r, _b, _il, _ir, _it, _ib, bands = ns['_nf_after_fix'](
+            28, rows, None, 600.0, 600.0, ink, 50.0)
+        assert any(a >= 248.0 for a, _b2 in bands), '短列应被补齐(未补 -> 整列丢)'
+
+    def test_none_when_body_too_short(self):
+        """标定后正文行不足(长列判据按源图尺度量) -> 返回 None(调用方据此弃用本页标定)"""
+        np = pytest.importorskip('numpy')
+        ns = _ns()
+        ink = self._ink(np)
+        short = [(c - 4, c + 24, 260, 300, '甲乙丙丁戊') for c in (200, 300, 400)]
+        assert ns['_nf_after_fix'](29, short, None, 600.0, 600.0, ink, 50.0) is None
 
 
 # ---------- E. 逐页阈值/纸型(§1.06) ----------

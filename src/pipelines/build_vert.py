@@ -1773,6 +1773,27 @@ FONT_MIN_FRAC = _envfrac('VERT_FONT_MIN_FRAC', 0.008)
 FONT_MAX_FRAC = float(os.environ.get('VERT_FONT_MAX_FRAC') or 0.12)
 NF_FIT_K = (0.7, 1.6)           # OCR/源图 尺度合理区间(实测 1.07-1.20; 超出判标定失败, 保持原坐标)
 NF_FIT_RES = 0.5                # 标定残差上限(列距倍数): 超限说明配对错位 -> 不采纳
+# taskQ 遗留1: 标定的**映射方向**开关。nf_fit 拟合的是 `OCR = k x 源图 + b`(见 _nf_fix_page 注释),
+#   把 OCR 行搬回源图坐标系必须用**逆映射** `源图 = (OCR - b) / k`; 修前该处直接写成 `k x OCR + b`
+#   (同向再映射一次 = 尺度被平方) -> 映射后的 x 域普遍越出纸幅, 被下游「映射后正文 x 不符」拒掉
+#   (实测 248/250 页) -> 该标定路径实际休眠。1(默认) = 逆映射(修后); 0 = 修前行为(仅 A/B 对照)。
+NF_FIX_INV = os.environ.get('VERT_NF_FIX_INV', '1') not in ('0', 'false', 'False')
+# taskQ 遗留1 补: 标定「行↔列」对齐的择优判据。1(默认) = 按**映射后的绝对位置**择优(正文行心域
+#   应与墨迹列心域相合, 残差仅同分次序); 0 = 只按残差中位(修前行为, 梳状简并时 190/245 页选错列
+#   相位, 见 nf_fit_align 注释) —— 仅供 A/B 对照。
+NF_FIT_ALIGN_POS = os.environ.get('VERT_NF_FIT_ALIGN_POS', '1') not in ('0', 'false', 'False')
+# taskQ 遗留1 补: **标定落地**口径(把标定结果落到本页的那一步, 见 _nf_after_fix)。
+#   1(默认) = 本轮口径: ①窗 = 标定后正文行盒并集**外扩 NF_FIT_PAD x 标定前列距**(行盒并集不是
+#   墨迹列并集, 边界列会探出窗缘 —— 实测 p254 左端列 43.0-59.0 在行盒窗外 14.6pt, 不外扩则整列
+#   检不出 -> 行多槽少 -> p254 少 95 字 / p130 少 84 字); ②列带 = 检测 + 短列补齐(与标定前同口径);
+#   ③标定后撑不起伪槽格时**弃用本页标定**(退回未标定坐标系, 见 _nf_frame)。
+#   0 = 修前口径(窗 = 行盒并集不外扩 / 只重算检测 / 撑不起就整页 return None) —— 仅 A/B 对照。
+NF_FIT_LAND = os.environ.get('VERT_NF_FIT_LAND', '1') not in ('0', 'false', 'False')
+NF_FIT_PAD = float(os.environ.get('VERT_NF_FIT_PAD') or 1.0)   # 外扩量(列距倍数, 只在 LAND=1 下生效)
+# taskQ 遗留2: 「重试口径」的选择开关。1(默认) = 按**渲染字数择优**(重试口径 vs 该页不采纳重试时
+#   实际会走的框内兜底口径, 各算一次取多者, 与 taskP §1 表第 4 行同一机制); 0 = 修前行为(重试口径
+#   一旦适配就无条件采纳, 仅 A/B 对照)。
+NF_RETRY_BEST = os.environ.get('VERT_NF_RETRY_BEST', '1') not in ('0', 'false', 'False')
 
 def nf_body_rows(rows, ph):
     """本页正文 OCR 行: 长行(本页页高 x LONG_H_FRAC) + 单行文本。
@@ -1887,10 +1908,18 @@ def nf_fit(pairs):
 
 def nf_fit_align(cs, ro, slack=3):
     """源图列心 cs / OCR 行心 ro(各自按 x 升序; 条数可不等 —— 端部多一条残片/漏检) -> (k,b,rms,pairs)。
-    做法: 枚举「相对错位 d」把两个序列错开对齐, 取残差中位最小者 —— 直接按下标配对在条数不等时
-    会整段错位(实测 p1207: 17 带 vs 16 行, 按标配对累计漂移 3 列 -> 拟合出尺度 2.4 的假值)。
-    尺度/残差合理性由调用方按 NF_FIT_K / NF_FIT_RES 判(这里只给候选)。配对序 = 由右向左? 不: 升序。"""
+    做法: 枚举「相对错位 d」把两个序列错开对齐 —— 直接按下标配对在条数不等时会整段错位
+    (实测 p1207: 17 带 vs 16 行, 按标配对累计漂移 3 列 -> 拟合出尺度 2.4 的假值)。
+    择优判据(taskQ 遗留1 补, 见 NF_FIT_ALIGN_POS): 先看**映射后的绝对位置** —— 正文行心域应与
+      墨迹列心域相合(两端失配之和最小者优), 残差中位只作同分次序。为什么残差单独不够: 竖排书的
+      「行距」与比它小一个尺度的「列距」在源图/OCR 帧两侧是**同一把梳子的等比放大**(实测 p30
+      行距 109px = 1.2224 x 列距 89.5px) -> 任何「整列错位」的解都能把残差压到 1-2px(梳状简并);
+      实测 245 页里只有 52 页「最优残差解 = 最优位置解」, 而残差最优解的失配中位 348px(≈4 列)。
+      错位的解不是纸面上的小误差: 伪版心的 x 窗直接由映射后的正文行给出, 窗整体搬走会把真列挡在
+      窗外(实测 p30 右移 2 列 -> 左边 2 列不在窗内 -> 3 行无处配位 -> 整页少 88 字)。
+    尺度/残差合理性由调用方按 NF_FIT_K / NF_FIT_RES 判(这里只给候选)。配对序 = 升序。"""
     best = None
+    best_key = None
     for d in range(-slack, slack + 1):
         pr = [(ro[i + d], cs[i]) for i in range(len(cs)) if 0 <= i + d < len(ro)]
         if len(pr) < 4: continue
@@ -1898,31 +1927,63 @@ def nf_fit_align(cs, ro, slack=3):
         if not f: continue
         k, b, rms = f
         if not (NF_FIT_K[0] <= k <= NF_FIT_K[1]): continue
-        if best is None or rms < best[2] - 1e-9 or (rms < best[2] + 1e-9 and len(pr) > len(best[3])):
-            best = (k, b, rms, pr)
+        if not NF_FIT_ALIGN_POS:
+            # 修前口径(逐位复现, 供 A/B 对照): 残差中位优先(1e-9 内同分) -> 再取配对数多者
+            if (best is None or rms < best[2] - 1e-9
+                    or (rms < best[2] + 1e-9 and len(pr) > len(best[3]))):
+                best = (k, b, rms, pr)
+            continue
+        # 位置失配(px): 映射后行心域 vs 列心域(两端之和)
+        mis = abs((min(ro) - b) / k - min(cs)) + abs((max(ro) - b) / k - max(cs))
+        key = (round(mis, 1), round(rms, 2), -len(pr))
+        if best_key is None or key < best_key:
+            best_key, best = key, (k, b, rms, pr)
     return best
 
 _nf_done = set()                # 已标定回源图坐标系的页(避免重复标定)
+_nf_fix_stat = {'try': 0, 'ok': 0, 'rej': {}, 'pages': {}}   # taskQ: 标定命中率统计(修前/修后对照)
+
+def _nf_rej(pi, tag, why):
+    """标定被拒: 记一笔分类计数(只统计/打印用, 不改任何判据)。"""
+    s = _nf_fix_stat
+    s['rej'][tag] = s['rej'].get(tag, 0) + 1
+    s['pages'][pi] = {'ok': False, 'tag': tag, 'why': why}
+    return None, why
+
+def nf_ocr2src(k, b, v):
+    """OCR 坐标 -> 源图坐标(2x px 口径, 与 all_rows 同单位)。
+    (k, b) 由 nf_fit 拟合得到, 其语义是 **OCR = k x 源图 + b**(尺度 = 相邻间距比中位, 截距 = 中位差);
+    故回源图必须**反解** v_src = (v_ocr - b) / k。
+    taskQ 遗留1: 修前此处写成 k x v + b —— 把「OCR->源图」的仿射又**同向**作用在 OCR 坐标上
+      (k 被平方, 截距随之翻倍), 映射后的 x 域因此普遍落在纸外 -> 被下面的「映射后正文 x 不符」
+      拦下(实测 248/250 页) -> 整条标定路径休眠(300 页样本里真正用上「按本书标定」的只有 2 页:
+      源页 182/214 —— 它们的错向映射恰好落回原范围, 属巧合而非该路径在正常工作)。
+    开关 VERT_NF_FIX_INV=0 回到修前行为(只作 A/B 对照用)。"""
+    if NF_FIX_INV: return (v - b) / k
+    return k * v + b
+
 def _nf_fix_page(pi, k, body, bands, ink, it, ib):
     """逐页 OCR 帧 -> 源图坐标系(仿射)。返回 (新 rows, 说明) 或 (None, 原因)。
     尺度/残差不过关 -> 不采纳(宁可留原坐标: 错标定会把整页列搬出页外)。"""
+    _nf_fix_stat['try'] += 1
     st = [_band_stats(ink, a, b, it, ib) for a, b in bands]
     ok = sorted([(a + b) / 2.0, s] for (a, b), s in zip(bands, st)
                 if s['top'] is not None and s['step'] > 0)            # 源图: 墨迹列(左->右)
-    if len(ok) < 4: return None, '列带统计不足 %d' % len(ok)
+    if len(ok) < 4: return _nf_rej(pi, '列带统计不足', '列带统计不足 %d' % len(ok))
     cs = [c for c, _s in ok]
     ro = sorted(body, key=lambda r: (r[0] + r[1]) / 2.0)              # OCR: 行心 左->右
     if abs(len(cs) - len(ro)) > max(1, 0.35 * max(len(cs), len(ro))):
-        return None, '列带/行 条数差太大 %d vs %d' % (len(cs), len(ro))
+        return _nf_rej(pi, '条数差太大', '列带/行 条数差太大 %d vs %d' % (len(cs), len(ro)))
     # 单位: 墨迹侧是 pt, OCR 侧是 2x px -> 统一到 px(与行坐标同单位, 反解后仍回到 px 口径)
     cs2 = [c * 2.0 for c in cs]
     pitch = statistics.median([y - x for x, y in zip(cs2, cs2[1:])]) if len(cs2) > 1 else 0.0
     fx = nf_fit_align(cs2, [(r[0] + r[1]) / 2.0 for r in ro])
-    if not fx: return None, 'x 样本不足/尺度不合理'
+    if not fx: return _nf_rej(pi, 'x 样本不足', 'x 样本不足/尺度不合理')
     kx, bx, rx, pr = fx
     if pitch <= 0 or rx > NF_FIT_RES * pitch:
-        return None, 'x 尺度%.3f 残差%.1fpx(>%.1f) 不可信' % (kx, rx, NF_FIT_RES * pitch)
+        return _nf_rej(pi, 'x 残差', 'x 尺度%.3f 残差%.1fpx(>%.1f) 不可信' % (kx, rx, NF_FIT_RES * pitch))
     # y: 尺度 = 字步进比的中位(行高/字数 ÷ 墨迹字步进); 截距 = 行心/列心差的中位
+    #   (配对两侧同为「2x px」口径: OCR 行心就是 2x px; 源侧用 (top+bot) = 2 x 列心(pt) 即 2x px)
     smap = dict((round(c, 3), s) for c, s in ok)
     rmap = dict((round((r[0] + r[1]) / 2.0, 3), r) for r in ro)
     bys, yy = [], []
@@ -1931,22 +1992,29 @@ def _nf_fix_page(pi, k, body, bands, ink, it, ib):
         stp = (r[3] - r[2]) / max(1, len(r[4]))
         if s['step'] > 0 and stp > 0: bys.append(stp / (s['step'] * 2.0))
         yy.append(((r[2] + r[3]) / 2.0, (s['top'] + s['bot'])))
-    if len(bys) < 4: return None, 'y 样本不足'
+    if len(bys) < 4: return _nf_rej(pi, 'y 样本不足', 'y 样本不足')
     ky = statistics.median(bys)
-    if not (NF_FIT_K[0] <= ky <= NF_FIT_K[1]): return None, 'y 尺度%.3f 不可信' % ky
+    if not (NF_FIT_K[0] <= ky <= NF_FIT_K[1]): return _nf_rej(pi, 'y 尺度', 'y 尺度%.3f 不可信' % ky)
     by = statistics.median([o - ky * s for o, s in yy])
     n = len(pr)
     # 采纳前再验一次「映射后正文落点」: 正文 x 带必须落在墨迹列带附近且在页幅内 ——
     #   残差小但整体错位的拟合(配对漂移 1-2 列)会把整页列搬到页外(实测 p1709 映射后 x -516px)。
     pw, ph = _nf_page_px(pi)
-    c0 = min(kx * r[0] + bx for r in body); c1 = max(kx * r[1] + bx for r in body)
+    c0 = min(nf_ocr2src(kx, bx, r[0]) for r in body)
+    c1 = max(nf_ocr2src(kx, bx, r[1]) for r in body)
     b0, b1 = bands[0][0] * 2.0, bands[-1][1] * 2.0
     if not (-0.02 * pw <= c0 and c1 <= 1.02 * pw
             and abs(c0 - b0) <= 0.25 * pw and abs(c1 - b1) <= 0.25 * pw):
-        return None, '映射后正文 x %.0f-%.0f 与墨迹列带 %.0f-%.0f 不符' % (c0, c1, b0, b1)
+        return _nf_rej(pi, '映射后 x 不符', '映射后正文 x %.0f-%.0f 与墨迹列带 %.0f-%.0f 不符'
+                       % (c0, c1, b0, b1))
     out = []
     for x0, x1, y0, y1, t in all_rows[k]:
-        out.append((kx * x0 + bx, kx * x1 + bx, ky * y0 + by, ky * y1 + by, t))
+        out.append((nf_ocr2src(kx, bx, x0), nf_ocr2src(kx, bx, x1),
+                    nf_ocr2src(ky, by, y0), nf_ocr2src(ky, by, y1), t))
+    _nf_fix_stat['ok'] += 1
+    _nf_fix_stat['pages'][pi] = {'ok': True, 'kx': round(kx, 4), 'bx': round(bx, 2),
+                                 'ky': round(ky, 4), 'by': round(by, 2),
+                                 'rms': round(rx, 2), 'pitch': round(pitch, 2), 'n': n}
     return out, 'kx%.3f bx%+.1f 残差%.1fpx ky%.3f by%+.1f (配 %d 列)' % (kx, bx, rx, ky, by, n)
 
 def _nf_clamp_box(il, ir, it, ib, pw, ph):
@@ -1964,6 +2032,36 @@ def nf_frame(pi, k):
     if pi in _nf_cache: return _nf_cache[pi]
     _nf_cache[pi] = _nf_frame(pi, k)
     return _nf_cache[pi]
+
+def _nf_after_fix(pi, fixed, box, pw, ph, ink, pitch0):
+    """标定落地(遗留1): 行换到源图坐标系 -> 重算伪版心窗 -> 重算列带。
+    ① 窗: 无印刷框时 = 标定后正文行盒的并集, 再**外扩一个列距**(NF_FIT_PAD × 标定前列距)后夹回纸幅
+       —— 行盒并集不是墨迹列并集, 边界列会探出窗缘(实测 p254 左端列 43.0-59.0 在窗外 14.6pt),
+       窗一窄该列整条检不出 -> 行多于槽 -> 整列不渲染(该页少 95 字 / p130 少 84 字)。
+    ② 列带: 与标定前**同口径**(检测 + 短列补齐) —— 只重算检测会白丢补齐出来的列(实测 p254:
+       标定前 原带 15 + 补 1 = 16, 只重算检测 -> 14)。
+    返回 (rows, body, il, ir, it, ib, bands); 标定后撑不起伪槽格(正文行/列带 < NF_MIN_COL) -> None。"""
+    rows = fixed
+    body = nf_body_rows(rows, ph)
+    if len(body) < NF_MIN_COL: return None
+    if box:
+        il, ir, it, ib = box
+    else:
+        il = min(r[0] for r in body) / 2.0; ir = max(r[1] for r in body) / 2.0
+        it = min(r[2] for r in body) / 2.0; ib = max(r[3] for r in body) / 2.0
+        pad = NF_FIT_PAD * pitch0 if NF_FIT_LAND else 0.0
+        cb = _nf_clamp_box(il - pad, ir + pad, it - pad, ib + pad, pw / 2.0, ph / 2.0)
+        if cb is None: return None
+        il, ir, it, ib = cb
+    bands = _ink_bands(ink, il, ir, it, ib, cov=NF_COV)
+    if NF_FIT_LAND:                       # 列带与标定前同口径(检测 + 短列补齐)
+        _nsc = nf_short_cols(rows, body, il, ir, it, ib, ph)
+        if NF_SLOT_DBG:
+            print('    [补带诊断] p%d 标定后 原带 %d + 长行 %d + 短列 %d -> need %d'
+                  % (pi + 1, len(bands), len(body), _nsc, len(body) + _nsc))
+        bands = nf_fill_bands(ink, bands, il, ir, it, ib, len(body) + _nsc)
+    if len(bands) < NF_MIN_COL: return None
+    return rows, body, il, ir, it, ib, bands
 
 def _nf_frame(pi, k):
     pw, ph = _nf_page_px(pi)
@@ -1997,20 +2095,26 @@ def _nf_frame(pi, k):
     fixed = None
     if pi not in _nf_done:                       # ① OCR 坐标 -> 源图坐标系(只做一次)
         _nf_done.add(pi)
+        _cs0 = [(a + b) / 2.0 for a, b in bands]         # 标定前列距(pt): 窗缘外扩量的基准
+        _pitch0 = statistics.median([y - x for x, y in zip(_cs0, _cs0[1:])]) if len(_cs0) > 1 else 0.0
         fixed, why = _nf_fix_page(pi, k, body, bands, ink, it, ib)
         if fixed:
-            all_rows[k] = fixed
-            rows = fixed
-            body = nf_body_rows(rows, ph)
-            if len(body) < NF_MIN_COL: return None
-            if not box:
-                il = min(r[0] for r in body) / 2.0; ir = max(r[1] for r in body) / 2.0
-                it = min(r[2] for r in body) / 2.0; ib = max(r[3] for r in body) / 2.0
-                _cb = _nf_clamp_box(il, ir, it, ib, pw / 2.0, ph / 2.0)
-                if _cb is None: return None
-                il, ir, it, ib = _cb
-            bands = _ink_bands(ink, il, ir, it, ib, cov=NF_COV)
-            if len(bands) < NF_MIN_COL: return None
+            _st = _nf_after_fix(pi, fixed, box, pw, ph, ink, _pitch0)
+            if _st is None and not NF_FIT_LAND:
+                return None                       # 修前口径: 标定落地失败 -> 本页不建伪槽格
+            if _st is None:
+                # 标定落地后本页撑不起伪槽格 -> **弃用本页标定**(与「尺度/残差不过关」同列, 保留原
+                #   坐标与标定前的窗/列带, 该页行为与修前一致): 实测源页 214(小开本残页)的列只占页高
+                #   8.9% < 长列门限 12%, 未标定时靠 OCR 帧的 1.27 倍拉伸才勉强算长列 —— 标定后它们
+                #   如实变短, 伪槽格路径本就不适用; 若不弃用则该页掉进 v2 流式(62 -> 22 字)。
+                _nf_fix_stat['ok'] -= 1
+                _r, _why2 = _nf_rej(pi, '标定后撑不起伪槽格',
+                                    '标定后正文行/列带不足(长列判据按源图尺度量)')
+                print('    [无框-坐标] p%d 标定弃用(%s) -> 用原坐标' % (pi + 1, _why2))
+                fixed, why = None, None
+            else:
+                rows, body, il, ir, it, ib, bands = _st
+                all_rows[k] = rows
         elif why:
             print('    [无框-坐标] p%d OCR 帧未标定(%s) -> 用原坐标' % (pi + 1, why))
         print('    [列带诊断] p%d 列带 %d: %s' % (
@@ -2818,7 +2922,7 @@ def _band_stats(ink, x0, x1, it, ib):
             'step': (ds[len(ds) // 2] if ds else 0.0),
             'top': (rs[0][0] if rs else None), 'bot': (rs[-1][1] if rs else None)}
 
-def page_puts_loose(k, pi, g):
+def page_puts_loose(k, pi, g, quiet=False):
     """框内兜底排版(任务D): 有版框但「无槽可配」的页(章题页/註釋页: p3/p156/p199/p210/p229)。
     现象: 这些页走 v2 流式回退(Tex 流动排版) —— 列位/字号取自 OCR 盒(坐标逐页伸缩 +10%),
       列从「版心右缘」起排且列高不受内框约束 -> 列底越过版框(~50-90pt), 首列字号大时还越右框
@@ -2829,7 +2933,9 @@ def page_puts_loose(k, pi, g):
       ② 列顶/列底 = 内框顶/底内缩 2pt(整列装进版框 —— 修越框); 步进 = 源头自然步进与「装得下内框」
          的步进取小; 字号 = min(源测字号, 由装得下内框反解的上限), 再交 col_puts 渲染
          (标点挤格 §1.0 / 字号保护 一并生效)。
-    返回 (tex 列表, 配对数)。"""
+    返回 (tex 列表, 配对数)。
+    quiet=True: 只算不打印(taskQ 遗留2 的「两口径择优」要先算一遍本路径的渲染字数, 若最终不采纳
+      该口径, 它的诊断行不该出现在日志里 —— 免得日志与「实际走了哪条路」对不上)。"""
     ink = _frame_ink(pi, g)
     il, ir, it, ib = g['in_l'], g['in_r'], g['in_t'], g['in_b']
     T, B = it + 2.0, ib - 2.0
@@ -2885,7 +2991,8 @@ def page_puts_loose(k, pi, g):
                 s2 = _band_stats(ink, a, b, it, ib)
                 if s2['hm'] > 0 and (Fmed <= 0 or s2['hm'] / INK_RATIO <= 1.35 * Fmed):
                     bx0, bx1, st = a, b, s2
-                    print('    [兜底-残余列] %-14s x%.1f-%.1f 字高%.1f' % (t[:14], a, b, s2['hm']))
+                    if not quiet:
+                        print('    [兜底-残余列] %-14s x%.1f-%.1f 字高%.1f' % (t[:14], a, b, s2['hm']))
             if bx0 is None and nfree < len(free_slots):      # 未用槽位(等比栅格)
                 bx0, bx1 = free_slots[nfree] - 8.0, free_slots[nfree] + 8.0
                 nfree += 1
@@ -2930,7 +3037,8 @@ def page_puts_loose(k, pi, g):
         if os.environ.get('VERT_LOOSE_DEBUG'):
             print('    [兜底行] %-14s nc=%2d 带x%.1f-%.1f hm%.1f -> F%.1f xc%.1f 列y%.1f-%.1f 步进%.2f %s' % (
                 t[:14], nc, bx0, bx1, st['hm'], F, xc, Tb, Bb, step, '' if si else '(残余列)'))
-    print('  [框内兜底] p%d %d 行 -> %d 列带配对 (内框高 %.1f)' % (pi + 1, len(rows), npair, avail))
+    if not quiet:
+        print('  [框内兜底] p%d %d 行 -> %d 列带配对 (内框高 %.1f)' % (pi + 1, len(rows), npair, avail))
     return puts, npair
 
 def note_puts_frame(k, pi, m, nrows, orows):
@@ -3837,10 +3945,31 @@ for i, pg in enumerate(sel):
             if pm2:
                 rows2_, nrows2_, orows2_ = page_rows(k, pm2, pg - 1)
                 puts2_, _pairs2, ok2_ = page_puts(k, pg - 1, pm2)
+                # taskQ 遗留2: 「重试口径」不再无条件采纳 —— 该页若不采纳重试, 实际会走 §1.99 框内兜底
+                #   (`page_puts_loose`, 同样是源图坐标系的绝对定位, 与本口径可比), 两口径各算一次
+                #   **取渲染字数多者**(与 taskP §1 表第 4 行「位置先验 vs 纯格数」同一机制)。
+                #   实测源页 24(2 列大幅题字页): 重试口径 82 字 vs 兜底口径 103 字 -> 采纳兜底。
+                #   字数口径 = len(puts): col_puts 与 _nf_rescue_rows 都是「一字符一 \put」。
+                #   只与兜底口径比(不与 v2 流式比): 流式是「放弃列位」的路径, 它的字数天然最高,
+                #   拿它当基准等于关掉整个重试机制(实测过: 会把 taskP 修好的序/扉页重新交回流式)。
+                _nA, _whyA = -1, ''
+                if ok2_ and NF_RETRY_BEST:
+                    _gl3 = frame_geom(pg - 1) or (nf_frame(pg - 1, k) if NF_MODE else None)
+                    if _gl3:
+                        _ng0 = len(_gap_log)          # 试算口径若最终不采纳, 它的空隙记录不入账
+                        _puts3, _np3 = page_puts_loose(k, pg - 1, _gl3, quiet=True)
+                        if len(_gap_log) > _ng0: del _gap_log[_ng0:]
+                        _nA, _whyA = len(_puts3), '兜底口径 %d 字(%d 列带)' % (len(_puts3), _np3)
+                    if _nA > len(puts2_):
+                        ok2_ = False
                 if ok2_:
-                    print('    [无框伪槽格·重试] p%d 行墨迹下限口径适配成功 (原口径 %d 对 -> 现 %d 对)'
-                          % (pg, len(_pairs), len(_pairs2)))
+                    print('    [无框伪槽格·重试] p%d 行墨迹下限口径适配成功 (原口径 %d 对 -> 现 %d 对, '
+                          '渲染 %d 字%s)' % (pg, len(_pairs), len(_pairs2), len(puts2_),
+                                           '' if _nA < 0 else ' >= 对照 %d 字' % _nA))
                     pm, rows_, nrows_, orows_, puts_, ok_ = pm2, rows2_, nrows2_, orows2_, puts2_, True
+                elif NF_RETRY_BEST and _nA >= 0:
+                    print('    [无框伪槽格·重试] p%d 重试口径适配但渲染 %d 字 < %s -> 不采纳, 走兜底'
+                          % (pg, len(puts2_), _whyA.strip()))
     if ok_:
         if puts_:
             parts.append('\\AddToShipoutPictureFG*{%\n  ' + '%\n  '.join(puts_) + '}')
@@ -3902,6 +4031,21 @@ else:
 tex_path = os.path.join(TMP, 'vert.tex')
 open(tex_path, 'w', encoding='utf8').write('\n'.join(parts))
 print('[tex] %s (页 %s)' % (tex_path, sel))
+
+# ---------- 2.6) 无版框标定命中率(taskQ 遗留1 的量化口径 + 逐页明细落盘) ----------
+# 只统计不判分: 「尝试」= _nf_fix_page 真正跑过的页(_nf_frame 到了标定那一步),
+# 「采纳」= 标定通过全部判据并改写了 all_rows。分子分母都写清楚(报告 §1 的修前/修后对比即取这里)。
+if _nf_fix_stat['try']:
+    _s = _nf_fix_stat
+    _rej = ' / '.join('%s %d' % (k, v) for k, v in sorted(_s['rej'].items(), key=lambda t: -t[1]))
+    print('[无框-坐标] 标定命中 %d/%d 页(采纳 %d / 拒 %d; 拒因: %s)%.0f%%' % (
+        _s['ok'], _s['try'], _s['ok'], _s['try'] - _s['ok'], _rej, 100.0 * _s['ok'] / _s['try']))
+    json.dump({'inv': bool(NF_FIX_INV), 'retry_best': bool(NF_RETRY_BEST),
+               'try': _s['try'], 'ok': _s['ok'], 'reject_by_tag': _s['rej'],
+               'pages': dict((str(k + 1), v) for k, v in sorted(_s['pages'].items()))},
+              open(os.path.join(TMP, 'nf_fix.json'), 'w', encoding='utf8'),
+              ensure_ascii=False, indent=1)
+    print('[无框-坐标] 逐页明细 -> %s' % os.path.join(TMP, 'nf_fix.json'))
 
 # ---------- 3) 编译 ----------
 r = subprocess.run(['uplatex', '-interaction=nonstopmode', 'vert.tex'], cwd=TMP, capture_output=True, text=True)
