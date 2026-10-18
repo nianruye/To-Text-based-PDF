@@ -2835,7 +2835,20 @@ def _split_slot_y(ink, sl, it, ib, step_ref, rows):
                 print('    [AB拆槽·并组] x%.0f-%.0f 退化子槽(run%d hm%.1f < %.1f) -> 并给最近邻组'
                       % (sl['x0'], sl['x1'], len(_runs), _hm, AB_YSPLIT_MIN_HM * step_ref))
     if len(_good) < 2:
-        return [sl]                        # 有效子槽不足 2 个 -> 不拆(保持原行为)
+        # 有效组不足 2 个 -> 把「退化」组也晋升为有效子槽。
+        #   书眉/页码/边注是 **10pt 级小字**(实测 p100 书眉墨高 9.0pt), 天然低于
+        #   AB_YSPLIT_MIN_HM x 字步进 这个按正文字号定的下限, 属正常元素而非碎墨。
+        #   若照旧整槽放弃, 全书 78 页会把书眉/页码并回正文槽 -> 位置口径配对判给正文行
+        #   -> 书眉被跳过 -> 丢 3 字/页。
+        #   渲染端已有 step<=0 -> cap 与 F=max(4.0,...) 兜底, 极端子槽也不会产出 0pt 字号。
+        for _g, _hm in _bad:
+            _good.append([list(_g), _hm])
+            if os.environ.get('VERT_AB_DBG'):
+                print('    [AB拆槽·晋升] x%.0f-%.0f 小字子槽(nr%d hm%.1f) -> 保留为独立槽'
+                      % (sl['x0'], sl['x1'], len(_g), _hm))
+        _bad = []
+        if len(_good) < 2:
+            return [sl]                    # 实在拆不出 2 个 -> 不拆(保持原行为)
     for _g, _hm in _bad:
         _ga = min(a for a, b in _g)
         _gb = max(b for a, b in _g)
