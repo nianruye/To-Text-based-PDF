@@ -1873,6 +1873,10 @@ AB_GEOM = os.environ.get('VERT_AB_GEOM', '1' if AB_FIX else '0') not in ('0', 'f
 AB_YSPLIT_K = float(os.environ.get('VERT_AB_YSPLIT_K') or 2.5)   # 拆槽空白下限(字步进倍数)
 AB_XK = float(os.environ.get('VERT_AB_XK') or 2.0)               # 配对 x 硬门限(列距倍数)
 AB_YK = float(os.environ.get('VERT_AB_YK') or 1.5)               # y 中心代价权重(字步进倍数)
+AB_YSPLIT_MIN_HM = float(os.environ.get('VERT_AB_YSPLIT_MIN_HM') or 0.45)
+    # 子槽墨高下限(字步进倍数): 低于此值的子槽视为退化 -> 该槽整体不拆。
+    #   背景: 退化子槽会让 col_puts 的 ysplit 分支算出 step=0, 进而字号保护算出 F=0pt
+    #   (实测全书 3 处 `! Improper 'at' size (0.0pt)`: 2 字短列 是：/又：/見：/唱：)。
 NF_MIN_COL = int(os.environ.get('VERT_NF_MIN_COL') or 2)   # 伪槽格最少列数(更少 -> 该页交回 v2 流式)
 #   taskP 由 3 降到 2: 实测本册「题辞」页(源页 22)只有 2 列大字, 降前被挡在 NF 外 -> 掉 v2 流式
 #   (几何取 OCR 盒全局拟合, 字号 47.9pt 对源书 ~95pt 明显偏小); 2 列时 nf_edges 用唯一一段
@@ -2761,6 +2765,20 @@ def _split_slot_y(ink, sl, it, ib, step_ref, rows):
                      for p, r in zip(rs, rs[1:]) if (r[0] - p[1]) > 0.3 * gap_th)))
     if len(groups) < 2:
         return [sl]
+    # 保护: 任一子槽的可用 run 为空 / 墨高 < AB_YSPLIT_MIN_HM x 字步进 -> **该槽整体不拆**。
+    #   退化子槽(只含一个标点的碎墨/半个字)会让渲染端 step=0 -> F=0pt -> LaTeX 报错;
+    #   而且部分拆开会让字符落到错误的子槽里, 宁可整槽不拆(回到原行为)。
+    for g in groups:
+        _hs0 = sorted(b - a for a, b in g)
+        _cap = max(40.0, 3.0 * _hs0[len(_hs0) // 2]) if _hs0 else 40.0
+        _runs = [r for r in g if 4.0 <= r[1] - r[0] <= _cap]
+        _hs = sorted(b - a for a, b in _runs)
+        _hm = _hs[len(_hs) // 2] if _hs else 0.0
+        if not _runs or _hm < AB_YSPLIT_MIN_HM * step_ref:
+            if os.environ.get('VERT_AB_DBG'):
+                print('    [AB拆槽·放弃] x%.0f-%.0f 某子槽退化(run%d hm%.1f < %.1f) -> 整槽不拆'
+                      % (sl['x0'], sl['x1'], len(_runs), _hm, AB_YSPLIT_MIN_HM * step_ref))
+            return [sl]
     out = []
     for g in groups:
         hs0 = sorted(b - a for a, b in g)
@@ -3064,6 +3082,10 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
         # ④ taskAB-A 拆分子槽(书眉/页码/共槽分段): 用**本子槽实测跨度**铺满 —— 该段自身的上下缘
         #    就是这串字的墨迹范围, 套全页常规步进会把「金瓶梅」压成 25.5pt 步进(源书实测 49.8)。
         step = max(0.0, (B - T - ink_h) / (nc - 1))
+        if step <= 0.0:
+            # 子槽跨度装不下一个字(退化子槽) -> 退回常规步进。留 step=0 会让下面的字号保护
+            #   按 0.95*0/INK_RATIO 算出 0pt(LaTeX `! Improper 'at' size`), 且所有字叠在一点。
+            step = cap
         top = T
     elif full:                                               # ① 满列: 顶贴槽实测顶, 底拉齐槽实测底
         step = min(1.30 * cap, max(0.75 * cap, (B - T - ink_h) / (nc - 1)))
@@ -3080,7 +3102,8 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     #   源书自身墨高/步进实测 0.93-0.95(处于上限内), 正常列不触发; 只兜住 OCR 字数异常(多字)的列。
     for _ in range(3):
         if nc <= 1 or ink_h <= 0.95 * step: break
-        F = round(0.95 * step / INK_RATIO, 1)
+        # F 下限 4pt: 任何路径都不许产出 0pt 字号(LaTeX 会报 `Improper 'at' size`, 全书构建判失败)
+        F = max(4.0, round(0.95 * step / INK_RATIO, 1))
         ink_h = INK_RATIO * F
         if full:
             step = min(1.30 * cap, max(0.75 * cap, (B - T - ink_h) / (nc - 1)))
