@@ -3633,6 +3633,13 @@ def page_puts(k, pi, m):
     #   归类成注格, 正文槽就少一条, 配对整体错位一格(实测 p54: 11~26 回 16 列只有 15 槽,
     #   缺的 555-594 是第十六回, 结果十六/十七/十八回各左移一列、十八回滚出配对)。
     #   判据纯几何: 与现有槽不重叠 + 落在槽的 x 跨度内 + 自身有墨, 且仅当「行数 > 槽数」时启用。
+    # taskCG5: 行数 <= 检测列数 -> 直接用全部列做槽(见上)
+    if (m['g'].get('virtual') and len(rows) > len(slots)
+            and len(m['slots']) >= len(rows) and len(m['slots']) > len(slots)):
+        _n0 = len(slots)
+        slots = sorted(m['slots'], key=lambda x: (-(x['x0'] + x['x1']), x.get('top') or 0.0))
+        print('    [全列做槽] p%d 行%d > 槽%d, 检测列%d >= 行数 -> 改用全部列'
+              % (pi + 1, len(rows), _n0, len(m['slots'])))
     if m['g'].get('virtual') and m['note'] and len(rows) > len(slots) and slots:
         _bs = sorted(slots, key=lambda x: -(x['x0'] + x['x1']))
         _cen = [(x['x0'] + x['x1']) / 2.0 for x in _bs]
