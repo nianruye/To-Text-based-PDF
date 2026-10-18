@@ -134,6 +134,8 @@ def main():
     ap.add_argument('src_pdf')
     ap.add_argument('-o', '--out')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--text-glyph', action='store_true',
+                    help='用文字字形画 ⊙（会嵌入字体, 文件约 +15MB）; 默认矢量绘制')
     ap.add_argument('--report')
     args = ap.parse_args()
 
@@ -157,23 +159,36 @@ def main():
 
     import fitz
     doc = fitz.open(args.pdf)
-    font = fitz.Font(fontfile=FONT_PATH + '') if os.path.exists(FONT_PATH) else None
+    font = fitz.Font(fontfile=FONT_PATH) if os.path.exists(FONT_PATH) else None
     n_put = 0
+    # 源书圈点的实测比例（p43/p44 六处, 归一化到字格）:
+    #   外圈直径 ≈ 0.85 格 -> 半径 0.425 格; 中心实点半径 ≈ 0.11 格;
+    #   环线粗细 ≈ 0.055 格（印刷细线, 与源图墨迹等效）
+    R_OUT, R_DOT, W_RING = 0.425, 0.110, 0.055
     for p, x0, x1, y0, ps, info in hits:
         pg = doc[p - 1]
         cell = ps
-        # ⊙ 画在这一格的中心：x 用该列中心，y 用格中心
         cx = (x0 + x1) / 2.0
         cy = y0 + cell / 2.0
-        size = cell * 0.92
         try:
-            if font is not None:
-                tw = font.text_length(chr(DING), fontsize=size)
-                pg.insert_text((cx - tw / 2.0, cy + size * 0.34), chr(DING),
-                               fontsize=size, fontfile=FONT_PATH, fontname='NotoSerif',
-                               render_mode=0)
+            if args.text_glyph:
+                size = cell * 0.92
+                if font is not None:
+                    tw = font.text_length(chr(DING), fontsize=size)
+                    pg.insert_text((cx - tw / 2.0, cy + size * 0.34), chr(DING),
+                                   fontsize=size, fontfile=FONT_PATH, fontname='NotoSerif',
+                                   render_mode=0)
+                else:
+                    pg.insert_text((cx - size * 0.3, cy + size * 0.34), chr(DING),
+                                   fontsize=size)
             else:
-                pg.insert_text((cx - size * 0.3, cy + size * 0.34), chr(DING), fontsize=size)
+                # 矢量: 外圈描边 + 中心实心点（不嵌字体, 体积零代价）
+                pg.draw_circle(fitz.Point(cx, cy), cell * R_OUT,
+                               color=(0, 0, 0), width=cell * W_RING,
+                               fill=None, overlay=True)
+                pg.draw_circle(fitz.Point(cx, cy), cell * R_DOT,
+                               color=(0, 0, 0), width=0,
+                               fill=(0, 0, 0), overlay=True)
             n_put += 1
         except Exception as e:
             print('  p%d 写入失败: %s' % (p, e))
