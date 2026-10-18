@@ -1935,6 +1935,26 @@ NF_FIT_PAD = float(os.environ.get('VERT_NF_FIT_PAD') or 1.0)   # 外扩量(列�
 #   一旦适配就无条件采纳, 仅 A/B 对照)。
 NF_RETRY_BEST = os.environ.get('VERT_NF_RETRY_BEST', '1') not in ('0', 'false', 'False')
 
+# --- taskCD) 特殊版式缺字(默认关 = 保持现行为, 便于 A/B 回退; 只作用于无版框 NF 路径) ---
+# ① 多块合并行的拼接口径(taskCD-a, 见 nf_join_rows):
+#    修前步进中位只取「无换行」行 -> 目录页/字表页整页都是 OCR 多块合并行(带 \n)时, 中位样本为空
+#    或被页上仅有的水印/横排短行(2-4pt/字)带偏 -> 真列(37-67pt/字)判成「不拼」-> 带 \n 的行在
+#    下游 page_rows 被当残片整行丢弃。实测 p563 整页 0 字 / p1171 只剩 7 字(仅目录标题)。
+NF_JOIN_MED = os.environ.get('VERT_NF_JOIN_MED', '0') not in ('0', 'false', 'False')
+# ② 正文/小字注分层参照(taskCD-b, 见 _metrics_finish):
+#    修前 hmax = max(槽字高): 页内少数大字号标题列把参照撑高 -> 0.75 x hmax 把占多数的正文列整批
+#    划出 body(实测 p659: 1 条 38pt 标题 + 14 条 23-26pt 正文 -> 阈值 28.5 -> 正文全被判成注,
+#    产物 220 字且字号错乱)。改为「最高四分位的中位」作参照: 离群大字号只有占 >= 25% 槽数时
+#    才会抬高参照; 单字号页取值与 max 相同(逐位不变)。
+NF_BODY_TIER = os.environ.get('VERT_NF_BODY_TIER', '0') not in ('0', 'false', 'False')
+# ③ 伪版心外的扫描水印/馆藏标签剔除(taskCD-c, 见 _nf_margin_artifact):
+#    实测 p1171(小开本目录页): 页顶手写编号 859.49/6996/879/v.3 与页底「国家图书馆 + 条码」
+#    是扫描件上的馆藏标记, 不是书内容, 却在页边带里被 special_rows 认成书眉/页码画出来
+#    (其中条码行还与目录列 x 带重叠, 被行合并并进邻列 -> 整列错字)。判据只认「整行在伪版心
+#    y 之外」且「横排(w/h >= NF_MARGIN_AR)或无汉字」—— 真书眉/页码是竖排汉字, 不受影响。
+NF_DROP_MARGIN = os.environ.get('VERT_NF_DROP_MARGIN', '0') not in ('0', 'false', 'False')
+NF_MARGIN_AR = float(os.environ.get('VERT_NF_MARGIN_AR') or 2.5)   # 水印行判据: 行盒 宽/高 下限
+
 def nf_body_rows(rows, ph):
     """本页正文 OCR 行: 长行(本页页高 x LONG_H_FRAC) + 单行文本。
     比 is_body_col 多两点(都是无版框书必需): ① 页幅用**本页**(混纸型); ② **不**按「左带小字」丢行
@@ -1946,8 +1966,23 @@ def nf_join_rows(rows):
     """无版框书: 把 OCR 在「小字標題/曲牌 + 正文」相接处插进去的换行拼回一行(实测 wz7 多页:
     「甜水令\\n「瓊樹生花，玉龍晚凍…」行盒仍是**一整列** —— y 跨度/字数 = 常列步进)。
     wz6 的换行行是「多块合并的残片」(图例 194 字), 故该规则**只在 NF 路径用**。
-    判据: 该行步进 ∈ [0.7, 1.4] × 本页常列步进中位 -> 拼回; 否则保持原样(下游按残片丢弃)。"""
-    st = sorted((r[3] - r[2]) / max(1, len(r[4])) for r in rows if len(r[4]) >= 2 and '\n' not in r[4])
+    判据: 该行步进 ∈ [0.7, 1.4] × 本页常列步进中位 -> 拼回; 否则保持原样(下游按残片丢弃)。
+    taskCD-a(NF_JOIN_MED=1): 中位样本改为「按拼接后字数 >= 8 的行」—— 修前只取**无换行**行:
+      目录页(实测 p563/p1171)整页都是多块合并行 -> 中位样本为空或被页上仅有的水印/横排短行
+      (2-4pt/字)带偏 -> 真列(37-67pt/字)判成不拼 -> 整页在下游被当残片丢弃。样本不足 3 条时
+      退回「>=2 字」的行。默认 0 保持修前口径(单元测试也按默认口径断言)。
+    注: 开关用 globals().get —— 单测加载器按 AST 只提取函数体, 不注入本模块新增的全局时仍可用。"""
+    if globals().get('NF_JOIN_MED', False):
+        def _js(r):
+            t2 = r[4].replace('\n', '')
+            return (r[3] - r[2]) / max(1, len(t2)) if len(t2) >= 2 else 0.0
+        st = sorted(s for s in (_js(r) for r in rows
+                                if len(r[4].replace('\n', '')) >= 8) if s > 0)
+        if len(st) < 3:                    # 长行样本过少(整页短行页) -> 退回全部行, 仍比「只看无换行行」稳
+            st = sorted(s for s in (_js(r) for r in rows
+                                    if len(r[4].replace('\n', '')) >= 2) if s > 0)
+    else:
+        st = sorted((r[3] - r[2]) / max(1, len(r[4])) for r in rows if len(r[4]) >= 2 and '\n' not in r[4])
     if not st: return rows
     med = st[len(st) // 2]
     out = []
@@ -2580,7 +2615,14 @@ def _metrics_finish(pi, g, slots, it, ib, w):
             if _s['x0'] < _b - 1.0 and _a < _s['x1'] - 1.0:
                 _s['hm'] = max(_s['hm'], _hb)
                 _sbset.add(id(_s))
-    hmax = max(s['hm'] for s in slots)
+    if NF_BODY_TIER and (g or {}).get('virtual') and slots:
+        # taskCD-b: 参照取「最高四分位的中位」—— 少数大字号标题列不再把正文门槛整体抬高
+        #   (实测 p659: 1 条 38pt 标题 / 14 条 23-26pt 正文, max 口径阈值 28.5 -> 正文全被判成注)。
+        #   单字号页 top 四分位的中位 == max -> 与修前逐位相同。
+        _hs = sorted(s['hm'] for s in slots if s['hm'] > 0)
+        hmax = statistics.median(_hs[int(0.75 * (len(_hs) - 1)):]) if _hs else 0.0
+    else:
+        hmax = max(s['hm'] for s in slots)
     body = [s for s in slots if s['nr'] >= 2 and s['hm'] >= 0.75 * hmax]
     note = [s for s in slots if s['nr'] >= 3 and s['hm'] < 0.75 * hmax]
     m = None
@@ -2914,6 +2956,24 @@ def _merge_col_rows(rows, step, prov=None):
         out.append(rr)
         if prov is not None: prov[id(rr)] = pieces
     return out
+
+def _nf_margin_artifact(r, m):
+    """taskCD-c: 伪版心 y 之外的「横排/非汉字」行 = 扫描水印/馆藏条码标签(只 NF 路径, 开关 NF_DROP_MARGIN)。
+    判据(两条同时成立):
+      ① 整行在伪版心上/下缘之外(r[3] <= in_t 或 r[2] >= in_b; px 与 ink 同单位, in_* 为 pt -> x2);
+      ② 行盒横排(w/h >= NF_MARGIN_AR) 或 无汉字 —— 真书眉/页码是竖排汉字且在页边带内, 不受影响。
+    背景(实测 p1171): 页顶手写编号 859.49/6996/879/v.3、页底「国家图书馆 + 004757702」是馆藏
+    标记; 前者被 special_rows 认成书眉/页码画出, 后者与目录列 x 带重叠被 _merge_col_rows 并进
+    邻列 -> 整列错字。判据只用行盒几何/文本, 不写死页号。"""
+    if not (NF_DROP_MARGIN and m and m.get('g') and m['g'].get('virtual')):
+        return False
+    it2, ib2 = m['g']['in_t'] * 2.0, m['g']['in_b'] * 2.0       # pt -> px(2x)
+    if not (r[3] <= it2 + 1.0 or r[2] >= ib2 - 1.0):
+        return False
+    w, h = r[1] - r[0], max(1.0, r[3] - r[2])
+    if w / h >= NF_MARGIN_AR:
+        return True
+    return not any(_is_cjk_ch(c) for c in r[4])
 
 def page_rows(k, m, pi, prov=None):
     """本页 OCR 行分组 -> (正文行, 注/边行, 页外行)。正文/注按「字步进」一维二分(源书正文与
@@ -5862,6 +5922,16 @@ for i, pg in enumerate(sel):
                 parts.append('\\newpage')
             continue
     pm = page_metrics(pg - 1) if (V_FRAME and V_FRAME_LAYOUT and src_doc is not None) else None
+    # taskCD-c: 伪版心外的扫描水印/馆藏标签**整行剔除**(只 NF 路径, 默认关) —— 必须在
+    #   _page_specials / page_rows / special_tex 之前: 否则它们会被认成书眉/页码画出来, 或与
+    #   目录列 x 带重叠被行合并并进邻列(实测 p1171)。本页伪版心由 page_metrics 给出。
+    if NF_MODE and pm is not None and NF_DROP_MARGIN:
+        _kept = [r for r in all_rows[k] if not _nf_margin_artifact(r, pm)]
+        if len(_kept) != len(all_rows[k]):
+            print('  [页边水印] p%d 剔除伪版心外横排/非汉字行 %d 条 -> %s' % (
+                pg, len(all_rows[k]) - len(_kept),
+                ', '.join('「%s」' % r[4][:12] for r in all_rows[k] if _nf_margin_artifact(r, pm))))
+            all_rows[k] = _kept
     # §1.995 特殊行(西文行/标题署名行, 只 NF 路径): 在本页任何渲染之前认领出去 —— 它们既不在
     #   正文列配对里(会被竖拆成逐字一格), 也被「本页正文字号」的兜底上限压住。认领方式:
     #   ① 行对象从 all_rows[k] 摘掉(下游 page_rows 自然看不到); ② x 带记进 _SPECIAL_BLOCK,
