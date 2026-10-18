@@ -3634,22 +3634,28 @@ def page_puts(k, pi, m):
     #   缺的 555-594 是第十六回, 结果十六/十七/十八回各左移一列、十八回滚出配对)。
     #   判据纯几何: 与现有槽不重叠 + 落在槽的 x 跨度内 + 自身有墨, 且仅当「行数 > 槽数」时启用。
     if m['g'].get('virtual') and m['note'] and len(rows) > len(slots) and slots:
-        _bxs = [(x['x0'], x['x1']) for x in slots]
-        _blo, _bhi = min(a for a, _b in _bxs), max(b for _a, b in _bxs)
+        _bs = sorted(slots, key=lambda x: -(x['x0'] + x['x1']))
+        _cen = [(x['x0'] + x['x1']) / 2.0 for x in _bs]
+        _gaps = [(_cen[_i] - _cen[_i + 1], _i) for _i in range(len(_bs) - 1)]
+        _pos = [g for g, _i in _gaps if g > 0.5]
+        _med = sorted(_pos)[len(_pos) // 2] if _pos else 0.0
         _addc = []
-        for _s2 in m['note']:
-            if _s2['x1'] <= _blo + 1.0 or _s2['x0'] >= _bhi - 1.0:
-                continue
-            if any(min(_s2['x1'], b) - max(_s2['x0'], a) > 0.5 * min(_s2['x1'] - _s2['x0'], b - a)
-                   for a, b in _bxs):
-                continue
-            if (_s2.get('nr') or 0) < 2:
-                continue
-            _addc.append(_s2)
+        if _med > 0:
+            for _g, _i in _gaps:
+                if _g < 1.55 * _med:            # 只有「约两倍列距」的空档才可能缺列
+                    continue
+                _lo2 = _cen[_i + 1] + 0.5 * (_bs[_i + 1]['x1'] - _bs[_i + 1]['x0']) * 0.5
+                _hi2 = _cen[_i] - 0.5 * (_bs[_i]['x1'] - _bs[_i]['x0']) * 0.5
+                for _s2 in m['note']:
+                    if _s2['x0'] < _lo2 - 1.0 or _s2['x1'] > _hi2 + 1.0:
+                        continue            # 必须整个落在空档内部
+                    if (_s2.get('nr') or 0) < 2:
+                        continue
+                    _addc.append(_s2)
         if _addc:
             slots = sorted(slots + _addc, key=lambda x: -(x['x0'] + x['x1']))
-            print('    [补列] p%d 行%d > 槽%d -> 并入 note 带 %d 条: %s'
-                  % (pi + 1, len(rows), len(_bxs), len(_addc),
+            print('    [补列] p%d 行%d > 槽%d 列距中位%.1f -> 空档内补 %d 条: %s'
+                  % (pi + 1, len(rows), len(_bs), _med, len(_addc),
                      ' '.join('%.0f-%.0f' % (x['x0'], x['x1']) for x in _addc)))
     _ab = (AB_FIX or _toc) and (not _dual) and m['g'].get('virtual') and (m['g'].get('fixed') or _toc)
     if _ab:
