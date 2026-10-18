@@ -22,6 +22,12 @@ BUILD_EXIT=$?
 echo "BUILD_EXIT=$BUILD_EXIT $(date '+%H:%M:%S')"
 [ $BUILD_EXIT -ne 0 ] && { echo "构建失败，尾部日志:"; tail -20 /tmp/build_v6.log; exit 1; }
 
+echo "=== 2.5) 修正文本层圆圈数字码位 $(date '+%H:%M:%S') ==="
+# Noto Serif CJK 把 U+2460(①) 与 U+2780(➀) 映到同一字形, dvipdfmx 的 ToUnicode 反查命中 ➀
+#   -> 复制/搜索/RAG 拿到错字。只改文本层码位, 不碰字形与坐标, 字符数不变(verify 口径不受影响)。
+/usr/bin/python3 src/tools/fix_tounicode_circled.py "$OUT" "$LINES" 2>&1 | tee /tmp/tounicode_fix.log | tail -4
+echo
+
 echo "=== 3) 生成 expect-low ==="
 /usr/bin/python3 - "$TMP/fax_pages.json" "$LINES" > /tmp/v6_expect_low.txt <<'PYEOF'
 import json, sys
