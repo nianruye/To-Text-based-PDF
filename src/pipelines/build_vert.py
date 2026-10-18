@@ -1998,6 +1998,11 @@ NF_MARGIN_AR = float(os.environ.get('VERT_NF_MARGIN_AR') or 2.5)   # 水印行�
 #    行分居 2C 个 x 心; 目录页的行心聚成约 C 组(组均 >= 1.4 行)。命中后不拆 x, 改走 y 拆子槽
 #    (_split_slot_y, 过滤点线小 run)+ 位置配对; 子槽 y 窗按本页行 y 范围外扩(回次/页码在伪版心外)。
 NF_TOC = os.environ.get('VERT_NF_TOC', '0') not in ('0', 'false', 'False')
+# taskCF: 列序单调性守卫 —— 竖排阅读序是**保序双射**(行按 x 递减、槽按 x 递减),
+#   位置口径配对(geom=True)允许两侧跳过但**不禁止交叉**, 实测 p54 把
+#   第十六/十七/十八回排成 3-循环置换(列内文字自洽、只有 x 位置互换)。
+#   开启后: 检出交叉 -> 退回「按序口径」(构造上单调)并打日志。
+MONO_FIX = os.environ.get('VERT_MONO', '1') not in ('0', 'false', 'False')
 NF_TOC_GROUP = float(os.environ.get('VERT_NF_TOC_GROUP') or 0.5)    # 同行心判据(列距倍数)
 NF_TOC_MINRUN = float(os.environ.get('VERT_NF_TOC_MINRUN') or 0.30) # y 拆槽时视为「点线」的 run 高上限(步进倍数)
 # ② 版心外大字号短行单独补槽(taskCE-c, 实测 p43 凡例标题 x749.9-804.4, 伪版心右缘 742.9):
@@ -3624,6 +3629,28 @@ def page_puts(k, pi, m):
     #   ③ 位置口径配对(B: x/y 硬约束 + 位置代价, 两侧可跳过)。
     # taskCE: TOC 页即使 OCR 帧未标定也走这里 —— 伪版心由本页正文行盒定, 行与列带同在 OCR 帧,
     #   位置仍可比(实测 p53/p55 行心与列带心差 <= 0.5pt); y 拆槽用 TOC 口径(rmin 滤点线)。
+    # taskCG2: 补齐被误划进 m['note'] 的整列 —— 目录页/小字页里某列的墨高偏小会被
+    #   归类成注格, 正文槽就少一条, 配对整体错位一格(实测 p54: 11~26 回 16 列只有 15 槽,
+    #   缺的 555-594 是第十六回, 结果十六/十七/十八回各左移一列、十八回滚出配对)。
+    #   判据纯几何: 与现有槽不重叠 + 落在槽的 x 跨度内 + 自身有墨, 且仅当「行数 > 槽数」时启用。
+    if m['g'].get('virtual') and m['note'] and len(rows) > len(slots) and slots:
+        _bxs = [(x['x0'], x['x1']) for x in slots]
+        _blo, _bhi = min(a for a, _b in _bxs), max(b for _a, b in _bxs)
+        _addc = []
+        for _s2 in m['note']:
+            if _s2['x1'] <= _blo + 1.0 or _s2['x0'] >= _bhi - 1.0:
+                continue
+            if any(min(_s2['x1'], b) - max(_s2['x0'], a) > 0.5 * min(_s2['x1'] - _s2['x0'], b - a)
+                   for a, b in _bxs):
+                continue
+            if (_s2.get('nr') or 0) < 2:
+                continue
+            _addc.append(_s2)
+        if _addc:
+            slots = sorted(slots + _addc, key=lambda x: -(x['x0'] + x['x1']))
+            print('    [补列] p%d 行%d > 槽%d -> 并入 note 带 %d 条: %s'
+                  % (pi + 1, len(rows), len(_bxs), len(_addc),
+                     ' '.join('%.0f-%.0f' % (x['x0'], x['x1']) for x in _addc)))
     _ab = (AB_FIX or _toc) and (not _dual) and m['g'].get('virtual') and (m['g'].get('fixed') or _toc)
     if _ab:
         # 行序改按「x 带分组(相邻列心距 < 0.4 列距算同带) + 带内 y 升序」: 同一条 x 带里的
@@ -3674,6 +3701,17 @@ def page_puts(k, pi, m):
             _pitch = (m['g']['in_r'] - m['g']['in_l']) / max(1, len(slots))
         pairs = _align_rows_slots(rows, slots, geom=(AB_GEOM or _toc), pitch=_pitch,
                                   step=(m.get('step_cap') or 0.0))
+        if MONO_FIX and len(pairs) >= 2:
+            _seq = [j for _ri, j in pairs]
+            _nx = sum(1 for a, b in zip(_seq, _seq[1:]) if b < a)
+            if _nx:
+                _alt = _align_rows_slots(rows, slots,
+                                         step=(m.get('step_cap') or 0.0))
+                _s2 = [j for _ri, j in _alt]
+                if _s2 and not any(b < a for a, b in zip(_s2, _s2[1:])):
+                    print('    [单调守卫] p%d 位置口径有 %d 处交叉配对 -> 改按序口径(对 %d)'
+                          % (pi + 1, _nx, len(_alt)))
+                    pairs = _alt
         if os.environ.get('VERT_AB_DBG'):
             print('    [AB配对] p%d 行%d 槽%d -> 对%d | 槽: %s' % (
                 pi + 1, R, len(slots), len(pairs),
@@ -3732,9 +3770,43 @@ def page_puts(k, pi, m):
         cand = sorted(m['note'], key=lambda s: -s['x1'])            # 阅读序(右->左), 与 rows 同序
         ink = _frame_ink(pi, m['g'])
         it, ib = m['g']['in_t'], m['g']['in_b']
+        # taskCG: 占用互斥 —— 已被正文行配对的列不得再接第二行(实测 p54 第十八回
+        #   被兜底塞进第十六回那列 x554.8-594.0, 整页列序变成 十五/十八/十六/十七)。
+        _used_x = [(slots[j]['x0'], slots[j]['x1']) for _ri, j in pairs]
+
+        def _ovl(a0, a1, b0, b1):
+            return min(a1, b1) - max(a0, b0) > 0.6 * min(a1 - a0, b1 - b0)
+
+        # taskCG: 空着的正文槽(自身位置优先的落点池)
+        _free_slots = [sl2 for j2, sl2 in enumerate(slots)
+                       if not any(j2 == j for _r, j in pairs)]
+        if os.environ.get('VERT_CG_DBG'):
+            print('    [CG-DBG] p%d 已占用列: %s' % (
+                pi + 1, ' '.join('%.0f-%.0f' % ab for ab in _used_x)))
+            print('    [CG-DBG] p%d 空闲槽: %s' % (
+                pi + 1, ' '.join('%.0f-%.0f' % (x['x0'], x['x1']) for x in _free_slots)))
+            print('    [CG-DBG] p%d 候选带: %s' % (
+                pi + 1, ' '.join('%.0f-%.0f' % (x['x0'], x['x1']) for x in cand)))
+            print('    [CG-DBG] p%d 未配对行: %s' % (
+                pi + 1, ' | '.join('x%.0f-%.0f %s' % (rows[i][0] / 2.0, rows[i][1] / 2.0,
+                                                      rows[i][4][:10]) for i in left_rows)))
         for ri, si in _align_rows_slots([rows[i] for i in left_rows], cand,
                                         prior=(NF_POS_PRIOR if NF_POS_PRIOR > 0 else 0.0)):
             sl = cand[si]
+            if any(_ovl(sl['x0'], sl['x1'], a, b) for a, b in _used_x):
+                _r0, _r1 = rows[left_rows[ri]][0] / 2.0, rows[left_rows[ri]][1] / 2.0
+                _hit = [sl2 for sl2 in _free_slots
+                        if _ovl(_r0, _r1, sl2['x0'], sl2['x1'])
+                        and not any(_ovl(sl2['x0'], sl2['x1'], a, b) for a, b in _used_x)]
+                if not _hit:
+                    print('    [兜底互斥] p%d %-12s 目标带 x%.0f-%.0f 已被正文列占用且无空槽'
+                          ' -> 不落位(避免串列)' % (pi + 1, rows[left_rows[ri]][4][:12],
+                                                    sl['x0'], sl['x1']))
+                    continue
+                sl = _hit[0]
+                _used_x.append((sl['x0'], sl['x1']))
+                print('    [兜底互斥] p%d %-12s 改落自身位置 x%.0f-%.0f'
+                      % (pi + 1, rows[left_rows[ri]][4][:12], sl['x0'], sl['x1']))
             st = _band_stats(ink, sl['x0'], sl['x1'], it, ib)
             if st['nr'] < 2: continue                              # 无墨/碎墨格: 不落位(不凭空补位)
             p, _b = col_puts(rows[left_rows[ri]][4], (sl['x0'] + sl['x1']) / 2.0, m, sl, None, pi)
