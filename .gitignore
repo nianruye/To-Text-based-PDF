@@ -25,3 +25,12 @@ tmp_vert/
 # OCR 数据与产物(不入库, AGENTS.md 策略; 1748 页数据 ~39MB 会拖垮审查面板)
 data/
 .mineru2/
+
+# 第三方源码 / 归档 / 试验目录（不入库；历史上曾误提交，已 filter-repo 移出）
+PaddleOCR-main/
+archive/
+tmp_frame/
+output_archive/
+source_pdf/
+0.35_p*.png
+0.45_p*.png
