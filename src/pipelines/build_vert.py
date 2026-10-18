@@ -1957,6 +1957,24 @@ NF_BODY_TIER = os.environ.get('VERT_NF_BODY_TIER', '0') not in ('0', 'false', 'F
 #    (其中条码行还与目录列 x 带重叠, 被行合并并进邻列 -> 整列错字)。判据只认「整行在伪版心
 #    y 之外」且「横排(w/h >= NF_MARGIN_AR)或无汉字」—— 真书眉/页码是竖排汉字, 不受影响。
 NF_DROP_MARGIN = os.environ.get('VERT_NF_DROP_MARGIN', '0') not in ('0', 'false', 'False')
+PARA_MARK = os.environ.get('VERT_PARA_MARK', '0') not in ('0', 'false', 'False')
+    # 段首圈点 ⊙(taskCC): 源书段落起首的圈点在 OCR 里被当噪点跳过, 但它占一整格 ->
+    #   该列 OCR 框高 = 字数+1 格。不处理的话文字整体上移一格、正好压在圈点上(实测 p43/p44)。
+    #   开时: 首格让给圈点(T += 一格), 文字按剩余跨度铺, 圈点用 _put_tex 画出来。
+    #   判据见 _slot_lead_mark(VERT_PARA_MARK_LO/HI / _CENTER_MIN / _RING3_MAX / _OUTER_MIN)。
+PARA_MARK_LO = float(os.environ.get('VERT_PARA_MARK_LO') or 0.6)
+PARA_MARK_HI = float(os.environ.get('VERT_PARA_MARK_HI') or 1.6)
+PARA_MARK_MIN_CHARS = int(os.environ.get('VERT_PARA_MARK_MIN_CHARS') or 8)
+PARA_MARK_CENTER_MIN = float(os.environ.get('VERT_PARA_MARK_CENTER_MIN') or 90.0)
+PARA_MARK_RING3_MAX = float(os.environ.get('VERT_PARA_MARK_RING3_MAX') or 20.0)
+PARA_MARK_OUTER_MIN = float(os.environ.get('VERT_PARA_MARK_OUTER_MIN') or 55.0)
+PARA_MARK_SIZE = float(os.environ.get('VERT_PARA_MARK_SIZE') or 1.357)
+    # ⊙ 的墨高在 F=31.2 时只有 22.1pt, 而源书圈点墨高 30pt(实测 p43) -> 放大 1.357 倍。
+PARA_MARK_DY = float(os.environ.get('VERT_PARA_MARK_DY') or 0.855)
+    # ⊙(U+2299) 是数学符号, 字形墨心相对 \put 锚点比汉字高得多 —— 实测 p43 直接画时
+    #   墨迹 370-388, 而应落在首字格中心 407.6, 偏高 28.6pt = 0.92em(F=31.2)。
+    #   本值 = 向下补偿的字号倍数; 换字体/换字号需重标(做法同 PUNCT_INK: 探针渲染实测墨心)。
+
 NF_FRAME_ALLX = os.environ.get('VERT_NF_FRAME_ALLX', '0') not in ('0', 'false', 'False')
     # 伪版心 x 域并上「y 落在正文带内」的所有行(含被判为特殊行的大字号标题/目录标题)。
     #   背景: p43 凡例标题 x750-804 因「大字号特殊行」被从 body 摘出 -> 伪版心 x1 只到 742.9
@@ -3218,6 +3236,60 @@ def _pv_clamp_on(m):
     有版框页(含 wz6)不走这里: 其列位受版框约束, 无此现象, 逐位不变。"""
     return bool(m and m['g'].get('virtual'))
 
+def _slot_lead_mark(pi, sl, n_chars, cap):
+    """槽首是否压着一个 OCR 漏识的「段首圈点」-> dict 或 None。
+
+    判据(实测标定, 全部相对量):
+      几何: (bot-top)/cap - n_chars ∈ [PARA_MARK_LO, PARA_MARK_HI]
+            —— 槽内墨迹占了「字数+1」格, 多出的一格就是圈点
+      形状: 首格墨迹的径向剖面 中心填充 >= CENTER_MIN 且 第3环(0.4-0.6半径) <= RING3_MAX
+            (中空环) 且 最外环 >= OUTER_MIN
+            实测真圈点 p43×3 + p44×3: 中心 100%, 第3环 1-14%, 最外环 70-100%
+            误报 p77 汉字(中心 73%) / p1699「酒」(中心 32%) 被中心填充排除
+    说明: 单靠几何会误判笔画密的汉字(p77/p1699), 单靠形状会漏(普通列首字也密), 两者必须叠加。
+    """
+    if not PARA_MARK or n_chars < PARA_MARK_MIN_CHARS or cap <= 0:
+        return None
+    t0, b0 = sl.get('top'), sl.get('bot')
+    if t0 is None or b0 is None:
+        return None
+    extra = (b0 - t0) / cap - n_chars
+    if not (PARA_MARK_LO <= extra <= PARA_MARK_HI):
+        return None
+    try:
+        import numpy as _np
+        ink = _nf_ink(pi)
+        if ink is None:
+            return None
+        x0, x1 = int(round(sl['x0'] * 2)), int(round(sl['x1'] * 2))
+        y0, y1 = int(round(t0 * 2)), int(round((t0 + cap) * 2))
+        sub = ink[max(0, y0):max(1, y1), max(0, x0):max(1, x1)]
+        ys, xs = _np.where(sub)
+        if len(ys) < 8:
+            return None
+        cell = sub[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+        H, W = cell.shape
+        if H < 8 or W < 8:
+            return None
+        cy, cx = H / 2.0, W / 2.0
+        yy, xx = _np.mgrid[0:H, 0:W]
+        r = _np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
+        rmax = min(H, W) / 2.0
+        band = []
+        for k in range(5):
+            mk = (r >= rmax * k / 5.0) & (r < rmax * (k + 1) / 5.0)
+            band.append(100.0 * cell[mk].sum() / max(1, mk.sum()))
+        cmk = r < rmax * 0.22
+        center = 100.0 * cell[cmk].sum() / max(1, cmk.sum())
+    except Exception:
+        return None
+    if not (center >= PARA_MARK_CENTER_MIN and band[2] <= PARA_MARK_RING3_MAX
+            and band[4] >= PARA_MARK_OUTER_MIN):
+        return None
+    return {'cell': cap, 'top0': t0, 'extra': round(extra, 2),
+            'center': round(center), 'band': [round(v) for v in band]}
+
+
 def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     """一列正文 -> (逐字 \\put 列表, 本列墨迹底 pt)。列位 = 槽中心(字盒居中于界行线栅格格内)。
     列顶/列底改用**本槽实测**(§1.98 槽实测; 全 222 页 2601 个正文槽统计), 三类:
@@ -3248,6 +3320,19 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     band_b = m['band_b']
     full = (band_b - B) <= 3.0 * cap                         # 满列判据: 源槽墨底贴墨带底
     nc = n_cells(t)                                          # 排版格数(标点不占格)
+    # 段首圈点(taskCC): 首格让给圈点, 文字整体下移一格(否则压在圈点上)。
+    #   必须在下面算 step/top **之前**改 T —— 让 step 按「少一格」的跨度重新铺。
+    _pm = None
+    _T0 = T
+    if PARA_MARK and sl is not None and m['g'].get('virtual'):
+        _pm = _slot_lead_mark(pi, sl, len(t), cap)
+        if _pm is not None:
+            T = T + _pm['cell']
+            if os.environ.get('VERT_PARA_MARK_DBG'):
+                print('    [段首圈点] p%s x%.1f-%.1f 多%.2f格 中心%d%% 径向%s -> 首格让给圈点'
+                      % (pi + 1 if pi is not None else '?', sl['x0'], sl['x1'],
+                         _pm['extra'], _pm['center'],
+                         '/'.join(str(v) for v in _pm['band'])))
     # 列内空隙(taskJ-B): 本槽 run 序列 + 文本 -> 额外空格格数(该格不落墨, 只推进)
     _ip1 = (lambda y: any(a - 0.5 <= y <= b + 0.5 for a, b in sl['runs'])) if (GAP_INK and sl.get('runs')) else None
     gaps = (fit_gaps(sl['runs'], t, (sl.get('step') or cap), T, B, h_ink=ink_h, ink_probe=_ip1)
@@ -3315,6 +3400,15 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
         y_put = page_h - (y0 + k * step)
         out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m)))
         k += 1
+    if _pm is not None:
+        # 圈点画在让出来的首格(原 T0 起的一格), 字号同正文 —— 源书圈点也是整格大小。
+        # y 加 PARA_MARK_DY 补偿: ⊙ 的墨心比汉字锚点高 0.92em(实测), 不补会画高一格。
+        # 方向: TeX 的 y **向上增大**(字往下走 y_put = page_h - y_pt 递减),
+        #   所以「再往下移动」要**减** DY —— 加号会把圈的墨心又推高一格(实测踩过)。
+        _Fm = F * PARA_MARK_SIZE
+        out.append(_put_tex('⊙', xc - XSCALE * _Fm / 2.0,
+                            page_h - _T0 - PARA_MARK_DY * _Fm, _Fm,
+                            clamp=_pv_clamp_on(m)))
     return out, top + ink_h + (max(k, 1) - 1) * step
 
 def _nf_hrow_page(k, pi):
