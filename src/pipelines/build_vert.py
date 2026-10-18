@@ -1941,6 +1941,10 @@ NF_RETRY_BEST = os.environ.get('VERT_NF_RETRY_BEST', '1') not in ('0', 'false', 
 #    或被页上仅有的水印/横排短行(2-4pt/字)带偏 -> 真列(37-67pt/字)判成「不拼」-> 带 \n 的行在
 #    下游 page_rows 被当残片整行丢弃。实测 p563 整页 0 字 / p1171 只剩 7 字(仅目录标题)。
 NF_JOIN_MED = os.environ.get('VERT_NF_JOIN_MED', '0') not in ('0', 'false', 'False')
+NF_JOIN_HI = float(os.environ.get('VERT_NF_JOIN_HI') or 1.5)   # 拼接步进上界(倍数; 修前 1.4)
+#   1.5 的依据: 全书 1748 页模拟(JOIN_MED 口径) —— 窗口从 1.4 放宽到 1.5 只多拼 3 行, 全是真列:
+#   p400「當局者迷，傍觀者清。」(1.413) / p1511 目录回目(1.488) / p1742 字表「鬢髮…」(1.451);
+#   再宽会开始收进 OCR 多块残片, 故不继续放宽。
 # ② 正文/小字注分层参照(taskCD-b, 见 _metrics_finish):
 #    修前 hmax = max(槽字高): 页内少数大字号标题列把参照撑高 -> 0.75 x hmax 把占多数的正文列整批
 #    划出 body(实测 p659: 1 条 38pt 标题 + 14 条 23-26pt 正文 -> 阈值 28.5 -> 正文全被判成注,
@@ -1967,11 +1971,13 @@ def nf_join_rows(rows):
     「甜水令\\n「瓊樹生花，玉龍晚凍…」行盒仍是**一整列** —— y 跨度/字数 = 常列步进)。
     wz6 的换行行是「多块合并的残片」(图例 194 字), 故该规则**只在 NF 路径用**。
     判据: 该行步进 ∈ [0.7, 1.4] × 本页常列步进中位 -> 拼回; 否则保持原样(下游按残片丢弃)。
+    taskCD-a 模式(下方注释)下上界默认放宽到 1.5(NF_JOIN_HI): 全书模拟只多拼 3 行, 均为真列。
     taskCD-a(NF_JOIN_MED=1): 中位样本改为「按拼接后字数 >= 8 的行」—— 修前只取**无换行**行:
       目录页(实测 p563/p1171)整页都是多块合并行 -> 中位样本为空或被页上仅有的水印/横排短行
       (2-4pt/字)带偏 -> 真列(37-67pt/字)判成不拼 -> 整页在下游被当残片丢弃。样本不足 3 条时
       退回「>=2 字」的行。默认 0 保持修前口径(单元测试也按默认口径断言)。
     注: 开关用 globals().get —— 单测加载器按 AST 只提取函数体, 不注入本模块新增的全局时仍可用。"""
+    _hi = 1.4
     if globals().get('NF_JOIN_MED', False):
         def _js(r):
             t2 = r[4].replace('\n', '')
@@ -1981,6 +1987,7 @@ def nf_join_rows(rows):
         if len(st) < 3:                    # 长行样本过少(整页短行页) -> 退回全部行, 仍比「只看无换行行」稳
             st = sorted(s for s in (_js(r) for r in rows
                                     if len(r[4].replace('\n', '')) >= 2) if s > 0)
+        _hi = globals().get('NF_JOIN_HI', 1.4)   # taskCD-a: 修前 1.4; CD 模式默认 1.5(依据见常量注释)
     else:
         st = sorted((r[3] - r[2]) / max(1, len(r[4])) for r in rows if len(r[4]) >= 2 and '\n' not in r[4])
     if not st: return rows
@@ -1991,7 +1998,7 @@ def nf_join_rows(rows):
             out.append((x0, x1, y0, y1, t)); continue
         t2 = t.replace('\n', '')
         s2 = (y1 - y0) / max(1, len(t2))
-        out.append((x0, x1, y0, y1, t2) if 0.7 * med <= s2 <= 1.4 * med else (x0, x1, y0, y1, t))
+        out.append((x0, x1, y0, y1, t2) if 0.7 * med <= s2 <= _hi * med else (x0, x1, y0, y1, t))
     return out
 
 def nf_short_cols(rows, body, il, ir, it, ib, ph):
