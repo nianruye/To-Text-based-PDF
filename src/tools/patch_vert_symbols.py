@@ -21,15 +21,34 @@
 """
 import difflib
 import json
+import os
 import sys
 
-SYMB = set('『』「」（）〔〕【】〈〉《》“”‘’﹁﹂﹃﹄')     # 要补的「符号集」
-BODY_MIN_H = 300          # 正文行的 y 跨度下限(px@2x; 与 build_vert.is_body_col 同口径)
+SYMB_BASE = '『』「」（）〔〕【】〈〉《》“”‘’﹁﹂﹃﹄'   # 引号/括号(必补)
+# 句读标点(。，、；：？！)：**行/列边界的句读最容易被 spotting 丢掉**(跨列的「、」「。」归不到任何一行)，
+# 2026-10-17 用户实测两处证据: 「謝希大、祝日念」(跨行顿号) / 「不欺。老媽」(行末句号) —— spotting 都没有,
+# 而 layout 都有。用 VERT_PATCH_JS=0 可退回只补引号括号(旧口径)。
+_JS = '。，、；：？！'
+if os.environ.get('VERT_PATCH_JS', '1') not in ('0', 'false', 'False', ''):
+    SYMB_BASE += _JS
+SYMB = set(SYMB_BASE)                                # 要补的「符号集」
+# 阈值一律用「页面比例」（换纸型/换书自动适配）。wz6 等价校验：页宽 1190px、页高 2490px 时
+# 0.92→1095(~1100)、0.12→299(~300)、0.084→100、0.022→55
+BODY_MIN_H_FRAC = 0.12    # 正文行 y 跨度下限 = 12% 页高
+HEADER_X_FRAC = 0.92      # 书眉/页码: x0 > 92% 页宽
+HEADER_H_FRAC = 0.12      #            且 y 跨度 < 12% 页高
+NOTE_X_FRAC = 0.084       # 左边注: x0 < 8.4% 页宽
+NOTE_LH_FRAC = 0.022      #         且 每字高 < 2.2% 页高
 MAX_INS_PG = 40           # 单页补全上限(防对齐异常时灌入垃圾)
 
 
 def body_rows(lines, coords, key):
     """本页正文行 [(idx, x0, y0, text)]: 剔除书眉/页码(gap 短行)/边注(x0<100 小字); 返回阅读序(右->左)"""
+    # 本页尺寸(2x px)：由该页所有 poly 极值推 → 换纸型/换书自动适配
+    _ax = [q[0] for p in (coords.get(key) or []) if p for q in p]
+    _ay = [q[1] for p in (coords.get(key) or []) if p for q in p]
+    pw = max(_ax) if _ax else 1190.0
+    ph = max(_ay) if _ay else 2490.0
     out = []
     for i, (t, p) in enumerate(zip(lines.get(key, []), coords.get(key, []))):
         if not p: continue
@@ -37,9 +56,9 @@ def body_rows(lines, coords, key):
         if not t or '\n' in t: continue
         xs = [q[0] for q in p]; ys = [q[1] for q in p]
         x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
-        if y1 - y0 < BODY_MIN_H or len(t) < 2: continue
-        if x0 > 1100 and y1 - y0 < 300: continue          # 书眉/页码(最右列短行)
-        if x0 < 100 and (y1 - y0) / len(t) < 55: continue  # 左侧小字边注
+        if y1 - y0 < BODY_MIN_H_FRAC * ph or len(t) < 2: continue
+        if x0 > HEADER_X_FRAC * pw and y1 - y0 < HEADER_H_FRAC * ph: continue          # 书眉/页码(最右列短行)
+        if x0 < NOTE_X_FRAC * pw and (y1 - y0) / len(t) < NOTE_LH_FRAC * ph: continue  # 左侧小字边注
         out.append((i, x0, y0, t))
     out.sort(key=lambda r: -r[1])                          # 阅读序: 右 -> 左
     return out

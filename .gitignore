@@ -21,3 +21,7 @@ font_classifier/
 page_numbers*.json
 tmp_vert/
 *.bak_*
+
+# OCR 数据与产物(不入库, AGENTS.md 策略; 1748 页数据 ~39MB 会拖垮审查面板)
+data/
+.mineru2/

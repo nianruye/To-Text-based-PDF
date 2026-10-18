@@ -315,8 +315,18 @@ P_TOT = 1.00         # DP 代价: 末字格号与槽实测墨迹跨度的差(每
 GAP_MAX = 4          # 单列最多插几格(防异常放大)
 _gap_log = []        # 空隙检出记录(全书跑完落盘, VERT_GAP_REPORT)
 
+# —— 插格(空格)必须有源图墨迹依据(taskV) ——
+# 旧行为: 'g' 转移代价恒为 p_g, 只按「槽跨度格数 vs 文本格数」的总量约束 -> 只要总格数对得上,
+#   空格插在哪都行, DP 会挑代价最小处 -> 实测 wz7 大量 2-3 倍步进的伪空格(p73 x118 CV0.326
+#   异常步进 67pt=2.01 倍; p76 x126 99pt=3.0 倍)。
+# 新判据: 插格位置的**预测 y** 若落在源图该槽某条墨迹 run 内 -> 那里有墨, 不该插 -> 重罚。
+#   VERT_GAP_INK=1 启用(默认 0 = 与旧行为逐位相同, 供 A/B)。
+GAP_INK = os.environ.get('VERT_GAP_INK', '0') not in ('0', 'false', 'False', '')
+P_GAP_INK = float(os.environ.get('VERT_GAP_INK_PEN') or 50.0)   # 惩罚量级(远大于 p_g≈1)
+
+
 def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=None, p_merge=P_MERGE, p_punct=P_PUNCT,
-             p_skipn=P_SKIPN, p_r=P_SKIPR, p_g=P_GAP, p_t=P_TOT, _align=None):
+             p_skipn=P_SKIPN, p_r=P_SKIPR, p_g=P_GAP, p_t=P_TOT, _align=None, ink_probe=None):
     """槽内墨迹 run + 文本 -> [(字符下标, 插入格数)]（taskJ-B 纯函数, DP）。
     _align(taskU-A 只读旁路): 传 dict 时填**逐字 -> run 下标**的对齐结果('m' 转移), 不传则
       与旧实现逐位相同(只是把「bg==0 早退」挪到回溯之后 —— 该分支本就无副作用)。
@@ -381,8 +391,17 @@ def fit_gaps(runs, t, m, T0, B, h_ink=None, hratio=None, p_merge=P_MERGE, p_punc
                     dp[i + 1][j][g] = cur + p_skipn; bt[i + 1][j][g] = (i, j, g, 'n')
                 if j < n and cur + p_r < dp[i][j + 1][g]:
                     dp[i][j + 1][g] = cur + p_r; bt[i][j + 1][g] = (i, j, g, 'r')
-                if i < L and g < GAP_MAX and cur + p_g < dp[i][j][g + 1]:
-                    dp[i][j][g + 1] = cur + p_g; bt[i][j][g + 1] = (i, j, g, 'g')
+                if i < L and g < GAP_MAX:
+                    _gc = p_g
+                    if ink_probe is not None:
+                        # 该插格位置的预测墨顶处若源图有墨 -> 不许在此插空格
+                        try:
+                            if ink_probe(pred(i, g + 1)):
+                                _gc += P_GAP_INK
+                        except Exception:
+                            pass
+                    if cur + _gc < dp[i][j][g + 1]:
+                        dp[i][j][g + 1] = cur + _gc; bt[i][j][g + 1] = (i, j, g, 'g')
     # 槽实测墨迹跨度对应的**格数**: 末字墨底 = 首字墨顶 + (N-1) x m + 墨高 -> N = (B-T0-墨高)/m + 1
     #   (漏减墨高会系统性多算 ~0.95 格 -> 每列都误判有一处空隙; 实测 p14: exp 22.89 vs 真值 22)
     if h_ink is None:
@@ -1140,9 +1159,29 @@ def pn_sequence_fix():
             v = pn_parse(t)
             if v is not None: recs.append((i + 1, t, v))
     if not recs: return {}, [], (0, 1.0, 0.0)
+
+    # —— 页码一致性过滤(防正文数字被当页码污染拟合) ——
+    # 真页码满足 p - v ≈ 常数(本书正文从 PDF 第 45 页起编页 -> 44); 假页码(正文里的数字行)
+    # 散布。取 (p-v) 的最密集簇: 占比 >= 25% 且 >= 3 个样本才采信, 否则全部保留(保守)。
+    # 实测 wz7: p263「二一九」=219 (p-v=44) / p276「二三一」=231 (45) 是真页码;
+    #          p265「三一」=31 (234) / p282「三八」=38 (244) 是正文数字。
+    _clusters = {}
+    for _p, _t, _v in recs:
+        _d = _p - _v
+        _hit = next((_k for _k in _clusters if abs(_k - _d) <= 3), _d)
+        _clusters.setdefault(_hit, []).append((_p, _t, _v))
+    _n_all = len(recs)
+    _best = max(_clusters.values(), key=len)
+    if len(_best) >= 3 and len(_best) >= _n_all * 0.25:
+        recs = _best
+        print('[页码序列] 一致性过滤: 保留 %d/%d 条(淘汰正文数字/误读)' % (len(recs), _n_all))
+    else:
+        print('[页码序列] 一致性过滤: 无主簇(最大 %d/%d), 全部保留' % (len(_best), _n_all))
+
     # 全局斜率(相邻有效页码页的斜率中位; 页码应随页序单调递增)
+    # p2 - p1 必须 > 0：同一页可能识别出多个页码行(书眉数字/影印页等) -> 否则除零
     gslopes = [(v2 - v1) / float(p2 - p1)
-               for (p1, _, v1), (p2, _, v2) in zip(recs, recs[1:]) if p2 - p1 <= PN_GAP]
+               for (p1, _, v1), (p2, _, v2) in zip(recs, recs[1:]) if 0 < p2 - p1 <= PN_GAP]
     a_glob = statistics.median(gslopes) if gslopes else 1.0
     c_glob = statistics.median(v - a_glob * p for p, _, v in recs)
     fix = {}; log = []
@@ -1153,8 +1192,9 @@ def pn_sequence_fix():
         segs[-1].append(r)
     for seg in segs:
         if len(seg) >= 4:
-            a = statistics.median([(v2 - v1) / float(p2 - p1)
-                                   for (p1, _, v1), (p2, _, v2) in zip(seg, seg[1:])])
+            _sl = [(v2 - v1) / float(p2 - p1)
+                   for (p1, _, v1), (p2, _, v2) in zip(seg, seg[1:]) if p2 > p1]
+            a = statistics.median(_sl) if _sl else a_glob
             c = statistics.median(v - a * p for p, _, v in seg)
         else:
             a, c = a_glob, statistics.median(v - a_glob * p for p, _, v in seg)
@@ -1166,7 +1206,7 @@ def pn_sequence_fix():
             k_ = min([q for q in range(i + 1, len(seg)) if good[q]], default=None)
             if j is not None and k_ is not None:
                 pj, vj = seg[j][0], seg[j][2]; pk, vk = seg[k_][0], seg[k_][2]
-                nv = int(round(vj + (vk - vj) * (p - pj) / float(pk - pj)))   # 邻页线性插值
+                nv = int(round(vj + (vk - vj) * (p - pj) / float(pk - pj))) if pk != pj else vj   # 邻页线性插值(防同页)
             elif j is not None: nv = int(round(seg[j][2] + a * (p - seg[j][0])))   # 单侧外推
             elif k_ is not None: nv = int(round(seg[k_][2] - a * (seg[k_][0] - p)))
             else: nv = int(round(a * p + c))                                   # 段内无参照: 用拟合
@@ -2889,7 +2929,8 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     full = (band_b - B) <= 3.0 * cap                         # 满列判据: 源槽墨底贴墨带底
     nc = n_cells(t)                                          # 排版格数(标点不占格)
     # 列内空隙(taskJ-B): 本槽 run 序列 + 文本 -> 额外空格格数(该格不落墨, 只推进)
-    gaps = (fit_gaps(sl['runs'], t, (sl.get('step') or cap), T, B, h_ink=ink_h)
+    _ip1 = (lambda y: any(a - 0.5 <= y <= b + 0.5 for a, b in sl['runs'])) if (GAP_INK and sl.get('runs')) else None
+    gaps = (fit_gaps(sl['runs'], t, (sl.get('step') or cap), T, B, h_ink=ink_h, ink_probe=_ip1)
             if (sl and sl.get('runs')) else [])
     gap_at, extra = {}, 0
     for ci, e in gaps:
@@ -4388,7 +4429,8 @@ def nf_fix_quotes(k, pi, m):
         step = sl.get('step') or cap
         if step <= 1.0: continue
         al = {}
-        _gaps = fit_gaps(runs, text, step, T, B, h_ink=h_ink, _align=al)
+        _ip2 = (lambda y: any(a - 0.5 <= y <= b + 0.5 for a, b in runs)) if (GAP_INK and runs) else None
+        _gaps = fit_gaps(runs, text, step, T, B, h_ink=h_ink, _align=al, ink_probe=_ip2)
         if not al: continue
         # 逐字「渲染格号」(与 col_puts 同口径): 渲染端把 char i 摆在 cell (i + 之前插入的空格格数)
         _gb = [0] * (len(text) + 1)
@@ -5248,6 +5290,7 @@ _brdef = []
 _ffile = _calib_font_path(FONT_MC)
 _FONT_PATH = _ffile          # §1.995: 西文行的字体几何(fontTools)与渲染用的是同一字体文件
 _gchars = sorted(set(VERT_FORMS.values())) + sorted(PUNCT_INK)
+_fg = None          # 字体几何缓存; 找不到字体文件时保持 None(下游 (c) 括号族对账要用)
 _book_chars = sorted(set(ch for kk in keys for r in all_rows[kk] for ch in r[4]
                          if 0x3400 <= ord(ch) <= 0x9FFF))
 if _ffile:

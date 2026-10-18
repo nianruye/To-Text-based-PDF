@@ -26,6 +26,24 @@ PAYLOAD = {
         "useLayoutDetection": _USE_LAYOUT,
         "promptLabel": "spotting",   # 仅 useLayoutDetection=False 时生效 → 行级
         "temperature": 0,
+        # —— 以下为网页端(aistudio)同款参数, 2026-10-18 实测补全 ——
+        # 缺 maxPixels 时, 1843x2886(531万px) 的输入被过度压缩 -> 字糊 -> 漏字+幻觉
+        # (wz7 p73 最后一列源文 36 字, 旧参数只认出 18 字并编出「一真一實。」)
+        "minPixels": 147384,
+        "maxPixels": 2822400,
+        "repetitionPenalty": 1,      # 抑制编造/重复
+        "topP": 1,
+        "layoutShapeMode": "auto",
+        "useDocUnwarping": False,
+        "useDocOrientationClassify": False,
+        "useChartRecognition": True,
+        "useSealRecognition": True,
+        "useOcrForImageBlock": True,
+        "mergeTables": True,
+        "relevelTitles": True,
+        "layoutNms": True,
+        "restructurePages": True,
+        "markdownIgnoreLabels": ["header", "header_image", "footer", "footer_image", "footnote"],
     }),
 }
 print(f"[OCR模式] useLayoutDetection={_USE_LAYOUT} ({'layout版面(合并块+分类)' if _USE_LAYOUT else 'spotting行级'})")
