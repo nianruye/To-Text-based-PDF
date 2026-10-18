@@ -4175,6 +4175,20 @@ def _fax_inkpx(i):
 
 FAX_REF_MIN_CH = int(os.environ.get('VERT_FAX_REF_MIN_CH') or 100)   # 「正文页」样本下限(OCR 字数)
 FAX_REF_MIN_N = int(os.environ.get('VERT_FAX_REF_MIN_N') or 3)        # 参考样本不足此数 -> 不判贴图页
+# --- 第三判据(taskV): OCR 重复行幻觉页 ---
+# 现象: OCR 模型对表格/图版/复杂版式会陷入**模板循环**, 整页输出同一行几十~几百遍
+#   (实测 wz7 p467/p511/p1039 = '1986年1月1日' x 227 行全同; p398/p523 = '1990年…' x 292 行)。
+#   这类页**没有真实文字**, 重建只会把假字画出来 —— 且半角数字经 tate 全角化后字宽 0.745em,
+#   本页字步进容不下 -> 直接超页幅(实测 p467 span 右缘 944.2pt vs 页宽 921.7 -> 越界 22.5pt)。
+# 处置: 与影印页同办 —— 整页贴源图(读者看到的是原书那一页, 不是空白或垃圾字)。
+# 判据(只用本书自身分布, 不写死页码/字数):
+#   行数 >= FAX_DUP_MIN_ROWS **且** 唯一行占比 <= FAX_DUP_RATIO。
+# 敏感性实测(行数门 10/20/30 x 占比 0.2/0.3/0.5 共 9 组): 恒命中 8 页、新增贴图 5 页 —— 判据稳健;
+#   且命中的 3 页 p397(李家孫)/p1069(1986年1月1日)/p1127(e) **本就在原影印页列表**, 两者互相印证。
+#   开关 VERT_FAX_DUP=0 可退回纯影印页口径。
+FAX_DUP_ON = os.environ.get('VERT_FAX_DUP', '1') not in ('0', 'false', 'False')
+FAX_DUP_MIN_ROWS = int(os.environ.get('VERT_FAX_DUP_MIN_ROWS') or 20)   # 幻觉页行数下限
+FAX_DUP_RATIO = float(os.environ.get('VERT_FAX_DUP_RATIO') or 0.5)      # 唯一行占比上限
 
 def fax_decide(nch, ipc):
     """纯判据: 每页 (OCR 非空白字数, 每字墨迹面积) -> {0based页: (nch, ipc, 倍数)}。
@@ -4214,6 +4228,26 @@ def fax_pages(verbose=True):
         inkpx, pw, ph = _fax_inkpx(i)
         ipc[i] = inkpx / (nch.get(i, 0) + 1.0)
     _FAX_PAGES = fax_decide(nch, ipc)
+    # 第三判据(taskV): OCR 重复行幻觉页 -> 同影印页一样贴源图(见 FAX_DUP_* 注释)
+    if FAX_DUP_ON:
+        _dup = {}
+        for _k in keys:
+            _rs = [str(t).replace('\n', '').strip() for t in sl.get(_k, [])]
+            _rs = [t for t in _rs if t]
+            _n = len(_rs)
+            if _n < FAX_DUP_MIN_ROWS:
+                continue
+            _u = len(set(_rs))
+            if _u / float(_n) <= FAX_DUP_RATIO:
+                _i = int(_k)
+                _dup[_i] = (nch.get(_i, 0), round(ipc.get(_i, 0.0), 1), round(_u / float(_n), 3))
+        if _dup:
+            _FAX_PAGES = dict(_FAX_PAGES)
+            _FAX_PAGES.update(_dup)
+            if verbose:
+                print('[影印页] 重复行幻觉页(第三判据) %d 页: %s' % (
+                    len(_dup), ', '.join('p%d(%d行/唯一占比%.3f)' % (i + 1, v[0], v[2])
+                                         for i, v in sorted(_dup.items()))))
     tx = sorted(v for v in nch.values() if v >= FAX_REF_MIN_CH)
     ref = sorted(v for v in (ipc[i] for i in range(len(keys)) if nch.get(i, 0) >= FAX_REF_MIN_CH))
     ref = ref[len(ref) // 2] if ref else 0.0
