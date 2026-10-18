@@ -1971,6 +1971,24 @@ NF_FRAME_ALLX = os.environ.get('VERT_NF_FRAME_ALLX', '0') not in ('0', 'false', 
     #   **单独补一个槽**(复用 special_rows / 列框兜底那条路径), 只增一槽不改窗口。
     #   本开关保留作为该机制的正向测试载体(见 test_title_row_widens_frame_x)与负面记录。
 NF_MARGIN_AR = float(os.environ.get('VERT_NF_MARGIN_AR') or 2.5)   # 水印行判据: 行盒 宽/高 下限
+# --- taskCE) 目录页「同 x 多行 y 分段」+ 版心外大字号标题补槽(默认关, 便于 A/B 与回退) ---
+# ① 目录页列结构(实测 p53/p55/p561/p1172): 每「回」占一列, 列内自上而下 = 回次 + 回目(1-2 行)
+#    + 点线 + 页码, **同 x 不同 y**。page_rows 合并后每列仍是 1-2 行(回次与回目合成一行, 页码因
+#    间隔 > 2.5 步进而独立), 于是 R ≈ 1.3-2.3 x C —— 与「双行小字页」(每槽左右两子列, R = 2C)
+#    在条数上不可分。现有 _dual 按 x 拆左右子列, 对这些页会把上下分段的行按序塞进左右子列 ->
+#    文本交错(实测 p55 产物「第三二十九七九回…」)。判据用**行心 x 聚类**: 真双行小字页的 2C 条
+#    行分居 2C 个 x 心; 目录页的行心聚成约 C 组(组均 >= 1.4 行)。命中后不拆 x, 改走 y 拆子槽
+#    (_split_slot_y, 过滤点线小 run)+ 位置配对; 子槽 y 窗按本页行 y 范围外扩(回次/页码在伪版心外)。
+NF_TOC = os.environ.get('VERT_NF_TOC', '0') not in ('0', 'false', 'False')
+NF_TOC_GROUP = float(os.environ.get('VERT_NF_TOC_GROUP') or 0.5)    # 同行心判据(列距倍数)
+NF_TOC_MINRUN = float(os.environ.get('VERT_NF_TOC_MINRUN') or 0.30) # y 拆槽时视为「点线」的 run 高上限(步进倍数)
+# ② 版心外大字号短行单独补槽(taskCE-c, 实测 p43 凡例标题 x749.9-804.4, 伪版心右缘 742.9):
+#    版心**不动**, 只把 _page_specials 的候选行心窗口从版心缘外扩 NF_TITLE_OUT_PAD 个列距, 且仅限
+#    短行(len <= NF_TITLE_OUT_MAXLEN)、后面仍要过「大字号 + 稀少性」两道既有判据。只多认领这一行
+#    (走标题署名路径渲染, x 带进 _SPECIAL_BLOCK), 不放宽 _ink_bands 的扫描窗口。
+NF_TITLE_OUT = os.environ.get('VERT_NF_TITLE_OUT', '0') not in ('0', 'false', 'False')
+NF_TITLE_OUT_PAD = float(os.environ.get('VERT_NF_TITLE_OUT_PAD') or 1.5)   # 外扩量(列距倍数)
+NF_TITLE_OUT_MAXLEN = int(os.environ.get('VERT_NF_TITLE_OUT_MAXLEN') or 8)  # 只收短行(字数上限)
 
 def nf_body_rows(rows, ph):
     """本页正文 OCR 行: 长行(本页页高 x LONG_H_FRAC) + 单行文本。
@@ -2823,23 +2841,46 @@ def _row_spans_gap(rows, sl, g0, g1):
             return True
     return False
 
-def _split_slot_y(ink, sl, it, ib, step_ref, rows):
+def _split_slot_y(ink, sl, it, ib, step_ref, rows, rmin=2.0):
     """taskAB-A: 槽内墨迹 y 投影的大空隙 -> 子槽列表(不拆时返回 [sl])。
     判据: 相邻墨迹 run 的空白 > AB_YSPLIT_K x 字步进, 且没有 OCR 行跨越该空白(见 _row_spans_gap)。
     背景(实测 wz7 p86): 书眉「金瓶梅」y320-442 与页码「四二」y1188-1229 的 x 带完全相同,
     纯 x 槽把两段并成一槽(run 3+2=5) -> 槽顶/底跨 909pt, 行↔槽 1:1 破坏。拆开后两段各自成槽,
     步进/上下缘都按本段实测。
     子槽字段与 _slots_of_edges 同口径(nr/hm/step/runs/keep/top/bot), 另加 ysplit=True
-    (col_puts 据此按**本子槽实测跨度**铺满, 不套全页常规步进)。"""
+    (col_puts 据此按**本子槽实测跨度**铺满, 不套全页常规步进)。
+    rmin(taskCE, 默认 2.0 = 原口径): 「像字」run 的高下限(pt)。目录页的回次/回目/页码之间有
+    **竖排点线**(点径 4-5pt、间隔 5-10pt)贯穿, 按 2pt 收 run 时点线把整列连成一条, 任何空隙
+    都测不出 -> 拆不开。TOC 口径传 0.30 x 字步进(~7.5pt), 点线被当空白、真字 run(20-27pt)保留。"""
     if not sl or sl.get('x0') is None or sl.get('x1') is None:
         return [sl]
     step_ref = step_ref if step_ref and step_ref > 0 else (sl.get('step') or 0.0)
     if step_ref <= 0:
         return [sl]
     rs = _slot_runs(ink, sl['x0'], sl['x1'], it, ib, min_h=0.0)
-    # 拆槽只看「像字」的 run(高 >= 2pt): 扫描噪点(实测 p513 标题两行之间一处 1pt 斑点)
+    # 拆槽只看「像字」的 run(高 >= rmin, 默认 2pt): 扫描噪点(实测 p513 标题两行之间一处 1pt 斑点)
     #   会把 82pt 的空隙截成 34+46 两段, 两段都低于阈值 -> 该拆的槽拆不开。
-    rs = [r for r in rs if r[1] - r[0] >= 2.0]
+    if rmin > 2.0:
+        # TOC 口径(taskCE): 点线是「小而方」的墨点(高 4-5pt / x 跨度 ~2-3pt)。页码里的
+        #   一/二/三 是单条横画, 高也只有 1-3pt —— 只按高度会把整段页码当点线丢掉
+        #   (实测 p53 第八回「一三三」3 字漏渲染)。补一条 x 跨度判据: 横画 x 跨度接近字宽
+        #   (>= 0.5 x 步进), 点线远小于它。
+        import numpy as np
+        xa = int((sl['x0'] + 3.5) * 2); xb = int((sl['x1'] - 3.5) * 2)
+        _keep = []
+        for r in rs:
+            if r[1] - r[0] >= rmin:
+                _keep.append(r); continue
+            ya, yb = int(round(r[0] * 2)), int(round(r[1] * 2))
+            seg = ink[ya:yb, xa:xb] if (yb > ya and xb > xa) else None
+            if seg is None or not seg.size or not seg.any():
+                continue
+            xs = np.where(seg.any(axis=0))[0]
+            if xs.size and (xs[-1] - xs[0] + 1) / 2.0 >= 0.5 * step_ref:
+                _keep.append(r)
+        rs = _keep
+    else:
+        rs = [r for r in rs if r[1] - r[0] >= rmin]
     if len(rs) < 2:
         return [sl]
     gap_th = AB_YSPLIT_K * step_ref
@@ -3447,8 +3488,25 @@ def page_puts(k, pi, m):
     if _SPECIAL_BLOCK.get(k):                    # §1.995: 已被特殊行占用的 x 带不再参与配对
         slots = [s for s in slots if not _band_blocked(s['x0'], s['x1'], _SPECIAL_BLOCK[k])]
     R, C = len(rows), len(slots)
+    # taskCE(默认关, VERT_NF_TOC=1 开): 目录页判据 —— 行心 x 聚成约 C 组、组均 >= 1.4 行,
+    #   且行数达到 1.3 x C。真双行小字页的 2C 条行分居 2C 个 x 心, 组均 ~1.0, 不会命中;
+    #   目录页每列的回次/回目/页码同 x 不同 y, 组均 ~2。命中后不走 _dual(按 x 拆子列会让
+    #   上下分段的行互相串位), 改在 AB 块里按 y 拆子槽(点线不参与空隙判定)+ 位置配对。
+    _toc = False
+    if NF_TOC and m['g'].get('virtual') and R and C >= 4 and R >= 1.3 * C:
+        _p0 = m['g'].get('pitch') or ((m['g']['in_r'] - m['g']['in_l']) / max(1, C))
+        _xt = max(6.0, NF_TOC_GROUP * _p0 * 2.0)         # 同行心容差(px; 行心 = (x0+x1)/2 px)
+        _sc = sorted((r[0] + r[1]) / 2.0 for r in rows)
+        _ng = 1
+        for _a, _b in zip(_sc, _sc[1:]):
+            if _b - _a > _xt:
+                _ng += 1
+        _toc = (_ng <= C + 2 and R >= 1.4 * _ng)
+        if os.environ.get('VERT_NF_TOC_DBG'):
+            print('    [TOC判据] p%d 行%d 槽%d x组%d 组均%.2f 容差%.1f -> %s' % (
+                pi + 1, R, C, _ng, R / float(_ng), _xt, 'TOC' if _toc else '否'))
     _dual = False
-    if C and 1.7 * C <= R <= 2.3 * C:                    # 双行小字页: 槽内再分左右子列
+    if (not _toc) and C and 1.7 * C <= R <= 2.3 * C:     # 双行小字页: 槽内再分左右子列
         ink = _frame_ink(pi, m['g'])
         it, ib = m['g']['in_t'], m['g']['in_b']
         sub = []
@@ -3470,7 +3528,9 @@ def page_puts(k, pi, m):
     #   ① 槽按 y 拆子槽(A); ② 用**全部**伪槽格参与配对(不只 m['body']: 大字号标题页的
     #   m['font'] 被标题带偏, 正文列会被划进 note -> m['body'] 只剩标题槽, 实测 p513 只剩 2 槽);
     #   ③ 位置口径配对(B: x/y 硬约束 + 位置代价, 两侧可跳过)。
-    _ab = AB_FIX and (not _dual) and m['g'].get('virtual') and m['g'].get('fixed')
+    # taskCE: TOC 页即使 OCR 帧未标定也走这里 —— 伪版心由本页正文行盒定, 行与列带同在 OCR 帧,
+    #   位置仍可比(实测 p53/p55 行心与列带心差 <= 0.5pt); y 拆槽用 TOC 口径(rmin 滤点线)。
+    _ab = (AB_FIX or _toc) and (not _dual) and m['g'].get('virtual') and (m['g'].get('fixed') or _toc)
     if _ab:
         # 行序改按「x 带分组(相邻列心距 < 0.4 列距算同带) + 带内 y 升序」: 同一条 x 带里的
         #   书眉/页码/标题行行心可能差几 pt(实测 p87 差 6pt, p509 差 6pt), 直接按 x0 降序会把
@@ -3488,14 +3548,22 @@ def page_puts(k, pi, m):
                 _j += 1
             rows.extend(sorted(_sr[_i:_j], key=lambda r: r[2]))
             _i = _j
-        if AB_ALLSLOTS:
+        if AB_ALLSLOTS or _toc:
             # 位置口径下**不剔除** §1.995 特殊行占用的槽: 特殊行已从 all_rows 摘掉, 对应子槽没有
             #   行可配(会被跳过); 反而要保留被占用的槽去接同列**剩余**的行 —— 实测 p375 标题列
             #   三行里两行被特殊路径认领、剩下的「第二十二回」正需要落回该列(旧过滤把整槽删掉,
             #   该行既无槽可配、又因字高 1.46x 正文被残余列补救的 0.5-1.35x 判据拒绝 -> 整行丢失)。
+            #   taskCE/TOC: 目录页的導讀/目錄标题槽常因 hm 偏小被判进 note, 也必须参与(否则
+            #   对应行只能走残余列补救)。
             slots = sorted(m['slots'], key=lambda s: (-(s['x0'] + s['x1']), s.get('top') or 0.0))
         _it, _ib = m['g']['in_t'], m['g']['in_b']
-        if AB_YSPLIT:
+        if _toc:
+            # TOC: 槽的 y 窗扩到本页 OCR 行的 y 范围(回次在伪版心之上、页码在其下 —— 伪版心由
+            #   长行(回目)定, 直接沿用会把这两段切掉, 槽 run 测不到它们 -> 拆不出子槽)。
+            _ph = m['g']['page_px'][1] / 2.0
+            _it = min(_it, max(0.0, min(r[2] for r in rows) / 2.0 - 2.0))
+            _ib = max(_ib, min(_ph - 2.0, max(r[3] for r in rows) / 2.0 + 2.0))
+        if AB_YSPLIT or _toc:
             _ink = _frame_ink(pi, m['g'])
             # 字步进参照取 min(槽步进上限, OCR 行 y 跨度/字数的中位): 槽步进在大字号标题页会被
             #   标题槽带偏(实测 p513 m['step_cap']=31.1, 而正文 OCR 步进中位 25.2) ——
@@ -3504,11 +3572,13 @@ def page_puts(k, pi, m):
             _ocr_step = _st[len(_st) // 2] if _st else 0.0
             _caps = [x for x in (m.get('step_cap'), _ocr_step) if x and x > 0]
             _step_ref = min(_caps) if _caps else ((m.get('font') or 0.0) * 0.9)
-            slots = [ss for s in slots for ss in _split_slot_y(_ink, s, _it, _ib, _step_ref, rows)]
+            _rmin = NF_TOC_MINRUN * _step_ref if _toc else 2.0
+            slots = [ss for s in slots for ss in _split_slot_y(
+                _ink, s, _it, _ib, _step_ref, rows, rmin=_rmin)]
         _pitch = m['g'].get('pitch') or 0.0
         if _pitch <= 0 and slots:
             _pitch = (m['g']['in_r'] - m['g']['in_l']) / max(1, len(slots))
-        pairs = _align_rows_slots(rows, slots, geom=AB_GEOM, pitch=_pitch,
+        pairs = _align_rows_slots(rows, slots, geom=(AB_GEOM or _toc), pitch=_pitch,
                                   step=(m.get('step_cap') or 0.0))
         if os.environ.get('VERT_AB_DBG'):
             print('    [AB配对] p%d 行%d 槽%d -> 对%d | 槽: %s' % (
@@ -4407,9 +4477,17 @@ def _page_specials(k, pi, g, ink, rows, verbose=True):
     il, ir = g['in_l'] * 2.0, g['in_r'] * 2.0
     it, ib = g['in_t'] * 2.0, g['in_b'] * 2.0
     pitch = g.get('pitch') or (g['in_r'] - g['in_l']) / max(1, N_COL_FRAME)
-    # 候选行: 行心在版心 x 带内(页外行/书眉走各自路径), 单块(非合并残片)
+    # 候选行: 行心在版心 x 带内(页外行/书眉走各自路径), 单块(非合并残片)。
+    #   taskCE-c(默认关, VERT_NF_TITLE_OUT=1 开): 版心**不动**, 只把候选窗口向左右外扩
+    #   NF_TITLE_OUT_PAD 个列距, 且仅限短行 —— 版心外的大字号短行(实测 p43 凡例 x749.9-804.4,
+    #   版心右缘 742.9)由此进入下面「大字号 + 稀少性」两道既有判据; 命中后走标题署名路径
+    #   (逐字 \\put 按源图墨迹定位, x 带进 _SPECIAL_BLOCK), 不新建槽、不改 _ink_bands 窗口。
+    _outpad = (NF_TITLE_OUT_PAD * pitch * 2.0) if NF_TITLE_OUT else 0.0
     cand = [r for r in rows
-            if len(r[4]) >= 1 and '\n' not in r[4] and il - 6 <= (r[0] + r[1]) / 2.0 <= ir + 6]
+            if len(r[4]) >= 1 and '\n' not in r[4]
+            and (il - 6 <= (r[0] + r[1]) / 2.0 <= ir + 6
+                 or (_outpad > 0 and len(r[4]) <= NF_TITLE_OUT_MAXLEN
+                     and il - 6 - _outpad <= (r[0] + r[1]) / 2.0 <= ir + 6 + _outpad))]
     if not cand:
         return [], [], set()
     # ---- 逐行量墨迹带(只定邻域用 OCR x; 带宽/带顶/带底/字高全取源图实测) ----
