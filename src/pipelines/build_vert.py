@@ -3306,10 +3306,28 @@ def page_puts(k, pi, m):
     #   ③ 位置口径配对(B: x/y 硬约束 + 位置代价, 两侧可跳过)。
     _ab = AB_FIX and (not _dual) and m['g'].get('virtual') and m['g'].get('fixed')
     if _ab:
+        # 行序改按「x 带分组(相邻列心距 < 0.4 列距算同带) + 带内 y 升序」: 同一条 x 带里的
+        #   书眉/页码/标题行行心可能差几 pt(实测 p87 差 6pt, p509 差 6pt), 直接按 x0 降序会把
+        #   页码排到书眉前面 -> 拆槽后页码顶到书眉子槽上(实测 p87/p509 少了 19 字书眉、多画了页码)。
+        #   不做 round 分桶: 桶边界上的 6pt 差会落到相邻两桶(实测 p509)。
+        _px_pitch = (m['g'].get('pitch') or 0.0) * 2.0
+        _tol = max(8.0, 0.4 * _px_pitch) if _px_pitch > 0 else 24.0
+        _sr = sorted(rows, key=lambda r: -(r[0] + r[1]))
+        rows = []
+        _i = 0
+        while _i < len(_sr):
+            _c0 = (_sr[_i][0] + _sr[_i][1]) / 2.0
+            _j = _i + 1
+            while _j < len(_sr) and _c0 - (_sr[_j][0] + _sr[_j][1]) / 2.0 <= _tol:
+                _j += 1
+            rows.extend(sorted(_sr[_i:_j], key=lambda r: r[2]))
+            _i = _j
         if AB_ALLSLOTS:
+            # 位置口径下**不剔除** §1.995 特殊行占用的槽: 特殊行已从 all_rows 摘掉, 对应子槽没有
+            #   行可配(会被跳过); 反而要保留被占用的槽去接同列**剩余**的行 —— 实测 p375 标题列
+            #   三行里两行被特殊路径认领、剩下的「第二十二回」正需要落回该列(旧过滤把整槽删掉,
+            #   该行既无槽可配、又因字高 1.46x 正文被残余列补救的 0.5-1.35x 判据拒绝 -> 整行丢失)。
             slots = sorted(m['slots'], key=lambda s: (-(s['x0'] + s['x1']), s.get('top') or 0.0))
-            if _SPECIAL_BLOCK.get(k):
-                slots = [s for s in slots if not _band_blocked(s['x0'], s['x1'], _SPECIAL_BLOCK[k])]
         _it, _ib = m['g']['in_t'], m['g']['in_b']
         if AB_YSPLIT:
             _ink = _frame_ink(pi, m['g'])
