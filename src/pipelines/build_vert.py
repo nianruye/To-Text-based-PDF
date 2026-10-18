@@ -1957,6 +1957,11 @@ NF_BODY_TIER = os.environ.get('VERT_NF_BODY_TIER', '0') not in ('0', 'false', 'F
 #    (其中条码行还与目录列 x 带重叠, 被行合并并进邻列 -> 整列错字)。判据只认「整行在伪版心
 #    y 之外」且「横排(w/h >= NF_MARGIN_AR)或无汉字」—— 真书眉/页码是竖排汉字, 不受影响。
 NF_DROP_MARGIN = os.environ.get('VERT_NF_DROP_MARGIN', '0') not in ('0', 'false', 'False')
+NF_FRAME_ALLX = os.environ.get('VERT_NF_FRAME_ALLX', '0') not in ('0', 'false', 'False')
+    # 伪版心 x 域并上「y 落在正文带内」的所有行(含被判为特殊行的大字号标题/目录标题)。
+    #   背景: p43 凡例标题 x750-804 因「大字号特殊行」被从 body 摘出 -> 伪版心 x1 只到 742.9
+    #   -> 标题反过来因「在版心之外」被判页边丢弃(循环矛盾), 实测该页少 2 字。
+    #   y 域仍由 body 定, 故书眉/页码(在 y 带之外)不受影响。
 NF_MARGIN_AR = float(os.environ.get('VERT_NF_MARGIN_AR') or 2.5)   # 水印行判据: 行盒 宽/高 下限
 
 def nf_body_rows(rows, ph):
@@ -2364,6 +2369,15 @@ def _nf_after_fix(pi, fixed, box, pw, ph, ink, pitch0):
     else:
         il = min(r[0] for r in body) / 2.0; ir = max(r[1] for r in body) / 2.0
         it = min(r[2] for r in body) / 2.0; ib = max(r[3] for r in body) / 2.0
+        # 与 _nf_frame 同口径: x 域并上「y 落在正文带内」的所有行(含大字号标题)。
+        #   漏了这一处, 标定后重算版心会按 body±pad 覆盖回去 —— 实测 p43 凡例标题
+        #   x749.9-804.4 被 body±pad 的 742.9 右缘挡住, 标题整行不渲染(该页少 2 字)。
+        if NF_FRAME_ALLX:
+            _inner = [r for r in rows
+                      if r[2] / 2.0 >= it - 1.0 and r[3] / 2.0 <= ib + 1.0]
+            if _inner:
+                il = min(il, min(r[0] for r in _inner) / 2.0)
+                ir = max(ir, max(r[1] for r in _inner) / 2.0)
         pad = NF_FIT_PAD * pitch0 if NF_FIT_LAND else 0.0
         cb = _nf_clamp_box(il - pad, ir + pad, it - pad, ib + pad, pw / 2.0, ph / 2.0)
         if cb is None: return None
@@ -2383,6 +2397,13 @@ def _nf_frame(pi, k):
     ink = _nf_ink(pi)                       # 自适应阈值(与标定/渲染同口径)
     rows = all_rows.get(k)
     if not rows: return None
+    if os.environ.get('VERT_NF_ROWS_DBG') == str(pi + 1):
+        print('    [行清单] p%d nf_join_rows 后 %d 行:' % (pi + 1, len(rows)))
+        for _i, _r in enumerate(rows):
+            print('       [%2d] x%6.1f-%6.1f y%6.1f-%6.1f len%d  %s'
+                  % (_i, _r[0] / 2.0, _r[1] / 2.0, _r[2] / 2.0, _r[3] / 2.0,
+                     len(str(_r[4])) if len(_r) > 4 else -1,
+                     str(_r[4]).replace(chr(10), '|')[:30] if len(_r) > 4 else ''))
     rows = nf_join_rows(rows)               # OCR 插的换行拼回(只 NF: 见 nf_join_rows)
     all_rows[k] = rows
     body = nf_body_rows(rows, ph)
@@ -2395,6 +2416,20 @@ def _nf_frame(pi, k):
     else:
         il = min(r[0] for r in body) / 2.0; ir = max(r[1] for r in body) / 2.0
         it = min(r[2] for r in body) / 2.0; ib = max(r[3] for r in body) / 2.0
+        # taskCC: 版心 x 域并上「y 落在正文带内」的所有行 —— 大字号标题(凡例/章回名/目录标题)
+        #   被 nf_body_rows 判成特殊行后从 body 摘出, 若只按 body 求 x 域, 标题会落在版心之外,
+        #   反过来又被「页边带」判据丢弃(实测 p43 凡例标题 x750-804 输给版心右缘 742.9, 少 2 字)。
+        #   y 域不动: 书眉/页码在 y 带之外, 不会被这条并进来。
+        if NF_FRAME_ALLX:
+            _inner = [r for r in rows
+                      if r[2] / 2.0 >= it - 1.0 and r[3] / 2.0 <= ib + 1.0]
+            if _inner:
+                _l = min(r[0] for r in _inner) / 2.0
+                _r2 = max(r[1] for r in _inner) / 2.0
+                if _l < il - 0.5 or _r2 > ir + 0.5:
+                    print('    [伪版心扩x] p%d x %.1f-%.1f -> %.1f-%.1f (并入 y 带内行 %d 条)'
+                          % (pi + 1, il, ir, min(il, _l), max(ir, _r2), len(_inner)))
+                il, ir = min(il, _l), max(ir, _r2)
         # taskP2 护栏: 伪版心**夹回纸幅**(见 _nf_clamp_box 注释)
         _cb = _nf_clamp_box(il, ir, it, ib, pw / 2.0, ph / 2.0)
         if _cb is None: return None

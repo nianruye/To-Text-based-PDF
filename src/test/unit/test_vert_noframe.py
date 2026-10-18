@@ -67,7 +67,7 @@ WZ7 = dict(PW_PX=1843.6, PH_PX=2886.0, page_w=921.8, page_h=1443.0, PT_PER_PX=2.
            FRAG_OVL_PX=24.0, NF_MIN_COL=2, NF_COV=0.12, NF_FIT_K=(0.7, 1.6), NF_FIT_RES=0.5,
            NF_FIX_INV=True, NF_FIT_ALIGN_POS=True, NF_FIT_LAND=True, NF_FIT_PAD=1.0,
            NF_RETRY_BEST=True,
-           NF_SLOT_DBG=False,
+           NF_SLOT_DBG=False, NF_FRAME_ALLX=False,
            NF_LINE_CV=0.75, NF_LINE_RV=0.45, NF_LINE_VLEN=0.50, NF_LINE_HLEN=0.55,
            NF_BOX_WMIN=0.35, NF_BOX_HMIN=0.35, NF_HROW_AR=2.0, NF_HROW_CHAR=0.60,
            NF_POS_PRIOR=60.0, all_rows={}, _nf_box_cache={}, _nf_ink_cache={},
@@ -304,6 +304,32 @@ class TestAfterFix:
         _r, _b, _il, _ir, _it, _ib, bands = ns['_nf_after_fix'](
             28, rows, None, 600.0, 600.0, ink, 50.0)
         assert any(a >= 248.0 for a, _b2 in bands), '短列应被补齐(未补 -> 整列丢)'
+
+    def test_title_row_widens_frame_x(self):
+        """标题行(凡例/章回名)被 nf_body_rows 判成短行摘出 body 后, 若伪版心只按 body 求 x 域,
+        标题就落在版心之外 -> 没有槽 -> 整行不渲染。实测 p43 凡例标题 x749.9-804.4 输给
+        body±pad 的版心右缘 742.9, 该页少 2 字。
+        NF_FRAME_ALLX 把 x 域并到「y 落在正文带内的所有行」——**两处都要扩**:
+        _nf_frame(标定前) 与 _nf_after_fix(标定后重算, 实测占 96% 的页, 只扩前者等于没修)。"""
+        np = pytest.importorskip('numpy')
+        ink = self._ink(np)
+        # 标题行必须是「短行」才进不了 body: nf_body_rows 判据是 (y1-y0) >= LONG_H_FRAC*ph,
+        #   本用例 ph=600 -> 阈值 72.3px, 故标题行高取 60px(正文行高 480px)。
+        ink[100:160, 480:540] = True              # 标题那条墨迹列
+        # x 取 480-540px = 240-270pt (页内; 超过 pw/2=300pt 会被 _nf_clamp_box 夹掉)
+        rows = self._rows() + [(480, 540, 100, 160, '凡例')]   # px: x240-270pt, y50-80pt
+        # 默认(不扩): 右缘 = body 的 x 上界(212pt), 标题在版心外 -> 无槽 -> 整行丢
+        ns0 = _ns(extra={'NF_FIT_PAD': 0.0})
+        _r0, b0, _il0, ir0, _it0, _ib0, _bd0 = ns0['_nf_after_fix'](
+            42, rows, None, 600.0, 600.0, ink, 50.0)
+        assert len(b0) == 3, '标题行不该算正文(短行), 实测 body %d 行' % len(b0)
+        # 扩 x: 右缘吃到标题(310pt)
+        ns1 = _ns(extra={'NF_FIT_PAD': 0.0, 'NF_FRAME_ALLX': True})
+        _r1, b1, _il1, ir1, _it1, _ib1, _bd1 = ns1['_nf_after_fix'](
+            42, rows, None, 600.0, 600.0, ink, 50.0)
+        assert ir0 <= 214.0, '不扩时右缘应止于正文列(212pt), 实测 %.1f' % ir0
+        assert ir1 >= 268.0, '扩 x 后右缘应把标题(270pt)包容进来, 实测 %.1f' % ir1
+        assert ir1 > ir0 + 20.0
 
     def test_none_when_body_too_short(self):
         """标定后正文行不足(长列判据按源图尺度量) -> 返回 None(调用方据此弃用本页标定)"""
