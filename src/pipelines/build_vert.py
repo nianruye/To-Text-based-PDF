@@ -1853,6 +1853,26 @@ NF_POS_PRIOR = float(os.environ.get('VERT_NF_POS_PRIOR') or 60.0)   # 行/槽配
 #    故 DP 宁可原地跳过剩行, 见 _align_rows_slots 注释)
 NF_ROW_FRAC = float(os.environ.get('VERT_NF_ROW_FRAC') or 0.05)   # 槽内「行墨迹下限」= 槽宽 x 该值
 #   (只无版框路径用; 目的 = 滤掉槽窗口里混进的印刷细线, 见 _slot_runs 的 row_floor 注释)
+# --- taskAB) 行↔槽配对错位修复(书眉/页码共槽 + 列序跳到页首) ---
+# 根因(实测 wz7 p86/p513):
+#   ① 伪槽格是**纯 x 带**(墨迹列带), 同一条 x 带里 y 方向相距很远的两段(书眉 320-442 /
+#      页码 1188-1229, 空白 746pt)仍算一个槽 -> 槽 run 数把两段相加(3+2=5), 行↔槽 1:1 被破坏
+#      (19 行 18 槽): 页码那行被 DP 跳过不渲染, 书眉行按整槽跨度算步进(「梅」偏 127pt)。
+#   ② _align_rows_slots 只按「格数/run 数」配平, 不知道行/槽的实际位置: p513 两列正文
+#      (x 192.6/147.6)被配到 x 766/576 的标题/詩列槽(偏 +574/+429pt)。
+# 修法(全部默认关, 保持现行为; VERT_AB_FIX=1 开启 —— 见 docs/vert_taskAB_report.md):
+#   A) 槽按 y 拆子槽: 槽内墨迹 y 投影出现 > K x 字步进的空白 -> 拆(有 OCR 行跨越该空白则**不拆**,
+#      目录页/双段列的内空隙仍交 fit_gaps 还原);
+#   B) 配对增加位置约束: x 中心距 > XK x 列距 或 y 范围不重叠 -> 禁止配对; 代价加 x/y 中心距离项。
+#      只对「无版框书 + OCR 坐标已标定到源图坐标系」(gv['fixed'])的页生效 —— 未标定页 OCR x 有
+#      1.07-1.20 的系统缩放, 位置不可信, 仍走原「格数」口径。有版框书(wz6)一字不改。
+AB_FIX = os.environ.get('VERT_AB_FIX', '0') not in ('0', 'false', 'False')
+AB_YSPLIT = os.environ.get('VERT_AB_YSPLIT', '1' if AB_FIX else '0') not in ('0', 'false', 'False')
+AB_ALLSLOTS = os.environ.get('VERT_AB_ALLSLOTS', '1' if AB_FIX else '0') not in ('0', 'false', 'False')
+AB_GEOM = os.environ.get('VERT_AB_GEOM', '1' if AB_FIX else '0') not in ('0', 'false', 'False')
+AB_YSPLIT_K = float(os.environ.get('VERT_AB_YSPLIT_K') or 2.5)   # 拆槽空白下限(字步进倍数)
+AB_XK = float(os.environ.get('VERT_AB_XK') or 2.0)               # 配对 x 硬门限(列距倍数)
+AB_YK = float(os.environ.get('VERT_AB_YK') or 1.5)               # y 中心代价权重(字步进倍数)
 NF_MIN_COL = int(os.environ.get('VERT_NF_MIN_COL') or 2)   # 伪槽格最少列数(更少 -> 该页交回 v2 流式)
 #   taskP 由 3 降到 2: 实测本册「题辞」页(源页 22)只有 2 列大字, 降前被挡在 NF 外 -> 掉 v2 流式
 #   (几何取 OCR 盒全局拟合, 字号 47.9pt 对源书 ~95pt 明显偏小); 2 列时 nf_edges 用唯一一段
@@ -2693,7 +2713,71 @@ def page_metrics(pi):
     _metrics_cache[pi] = m
     return m
 
-def _align_rows_slots(rows, slots, skip=8.0, prior=0.0):
+def _row_spans_gap(rows, sl, g0, g1):
+    """是否有 OCR 行「x 落在本槽内、y 跨过空隙 (g0,g1)」(pt)。用于拆槽保护:
+    目录页/双段列的内空隙由 col_puts 的 fit_gaps 还原(该列在 OCR 里仍是**一行**),
+    拆成子槽会把它压进其中一段 —— 有行跨越就不拆。"""
+    for r in rows:
+        if '\n' in r[4]:
+            continue
+        xc = (r[0] + r[1]) / 4.0
+        if xc < sl['x0'] - 2.0 or xc > sl['x1'] + 2.0:
+            continue
+        if r[2] / 2.0 <= g0 + 1.0 and r[3] / 2.0 >= g1 - 1.0:
+            return True
+    return False
+
+def _split_slot_y(ink, sl, it, ib, step_ref, rows):
+    """taskAB-A: 槽内墨迹 y 投影的大空隙 -> 子槽列表(不拆时返回 [sl])。
+    判据: 相邻墨迹 run 的空白 > AB_YSPLIT_K x 字步进, 且没有 OCR 行跨越该空白(见 _row_spans_gap)。
+    背景(实测 wz7 p86): 书眉「金瓶梅」y320-442 与页码「四二」y1188-1229 的 x 带完全相同,
+    纯 x 槽把两段并成一槽(run 3+2=5) -> 槽顶/底跨 909pt, 行↔槽 1:1 破坏。拆开后两段各自成槽,
+    步进/上下缘都按本段实测。
+    子槽字段与 _slots_of_edges 同口径(nr/hm/step/runs/keep/top/bot), 另加 ysplit=True
+    (col_puts 据此按**本子槽实测跨度**铺满, 不套全页常规步进)。"""
+    if not sl or sl.get('x0') is None or sl.get('x1') is None:
+        return [sl]
+    step_ref = step_ref if step_ref and step_ref > 0 else (sl.get('step') or 0.0)
+    if step_ref <= 0:
+        return [sl]
+    rs = _slot_runs(ink, sl['x0'], sl['x1'], it, ib, min_h=0.0)
+    # 拆槽只看「像字」的 run(高 >= 2pt): 扫描噪点(实测 p513 标题两行之间一处 1pt 斑点)
+    #   会把 82pt 的空隙截成 34+46 两段, 两段都低于阈值 -> 该拆的槽拆不开。
+    rs = [r for r in rs if r[1] - r[0] >= 2.0]
+    if len(rs) < 2:
+        return [sl]
+    gap_th = AB_YSPLIT_K * step_ref
+    groups = [[rs[0]]]
+    for r in rs[1:]:
+        g0 = groups[-1][-1][1]
+        if (r[0] - g0) > gap_th and not _row_spans_gap(rows, sl, g0, r[0]):
+            groups.append([r])
+        else:
+            groups[-1].append(r)
+    if os.environ.get('VERT_AB_DBG'):
+        print('    [AB拆槽] x%.0f-%.0f 步进%.1f 阈%.1f run%d 组%d 空隙:%s' % (
+            sl['x0'], sl['x1'], step_ref, gap_th, len(rs), len(groups),
+            ','.join('%.0f%s' % (r[0] - p[1], '*' if (r[0] - p[1]) > gap_th else '')
+                     for p, r in zip(rs, rs[1:]) if (r[0] - p[1]) > 0.3 * gap_th)))
+    if len(groups) < 2:
+        return [sl]
+    out = []
+    for g in groups:
+        hs0 = sorted(b - a for a, b in g)
+        cap = max(40.0, 3.0 * hs0[len(hs0) // 2]) if hs0 else 40.0
+        runs = [r for r in g if 4.0 <= r[1] - r[0] <= cap]
+        hs = sorted(b - a for a, b in runs)
+        cs = sorted((a + b) / 2.0 for a, b in runs)
+        ds = sorted(d for d in (cs[j + 1] - cs[j] for j in range(len(cs) - 1)) if d < 80)
+        out.append({'x0': sl['x0'], 'x1': sl['x1'], 'nr': len(runs),
+                    'hm': (hs[len(hs) // 2] if hs else 0.0),
+                    'step': (ds[len(ds) // 2] if ds else 0.0),
+                    'runs': runs,
+                    'keep': [list(r) for r in g],
+                    'top': g[0][0], 'bot': g[-1][1], 'ysplit': True})
+    return out
+
+def _align_rows_slots(rows, slots, skip=8.0, prior=0.0, geom=False, pitch=0.0, step=0.0):
     """OCR 行(阅读序, 右->左) x 槽(阅读序) 单调对齐 -> [(行下标, 槽下标)]。
     行数 == 槽数(全书 195/231 页): 按序 1:1 直配 —— 源书阅读序 = 槽序, 任何代价法只会引入噪声
       (实测 p9 12:12 时代价法反而丢 1 行 1 槽, 把 21 字那列认成残片)。
@@ -2701,10 +2785,15 @@ def _align_rows_slots(rows, slots, skip=8.0, prior=0.0):
       匹配代价 = |OCR 字数 - 槽 run 数 - infl|, infl = 该页两者中位差(墨迹 run 会把相邻相碰的字
       并掉, 实测 p50 OCR 26 字 vs run 23); 罚 skip 取 8 字 —— 只放明显不符的行/槽走, 实测
       p11 两条 OCR 残片(2 字/3 字)对任何槽的代价都 >8 -> 正确落空, 12 条长行全部归位。
-    不按 x 位置匹配: OCR x 逐页有 ~10% 伸缩(p100 末列偏 43pt, 首列偏 +30pt), 位置法会认错槽。"""
+    不按 x 位置匹配: OCR x 逐页有 ~10% 伸缩(p100 末列偏 43pt, 首列偏 +30pt), 位置法会认错槽。
+    geom(taskAB-B, 只无版框且 OCR 坐标已标定的页): 位置可信 -> 加位置约束与代价:
+      · 硬约束: x 中心距 > AB_XK x 列距 或 y 范围不重叠(容差半步进) -> 禁止配对;
+      · 代价: + 行/槽 x 中心距/列距 + 行/槽 y 中心距/字步进;
+      · 两侧都可跳过(有位置约束后, 配不上的槽宁可空着也不硬配 —— 实测 p513 的 2 个正文槽
+        在页首而 16 条行多在页尾, 原口径强制用满槽 -> 两条行被搬到页首 +574/+429pt)。"""
     R, C = len(rows), len(slots)
     if not R or not C: return []
-    if R == C: return [(i, i) for i in range(R)]
+    if R == C and not geom: return [(i, i) for i in range(R)]
     # 位置先验(taskP, prior>0 时启用): cost += prior x |行序 - 槽序|(各自按阅读序归一化到 [0,1])。
     #   为什么需要: 只按「格数/run 数」配平时, 行数 > 槽数会整段**平移** —— 实测源页 1206(18 行 16 槽)
     #   把两组詩行的 4 个短列错配到左侧 3 个长列的位置上, 而真正的两列(遞畢酒 44 字/小優彈唱 34 字)
@@ -2712,10 +2801,37 @@ def _align_rows_slots(rows, slots, skip=8.0, prior=0.0):
     #   (8/15 x prior) 高于跳 2 行的代价(2 x skip), DP 改为「原地跳过剩行」-> 4 个詩列回到原位。
     # 代价口径用「排版格数」n_cells(标点不占格): 源槽 run 数 = 源书格数, 与 OCR 字数直接比会
     #   被标点数带偏(§1.0; 全书平均每列 0.51 个挤格标点)
-    infl = (statistics.median(n_cells(r[4]) for r in rows)
-            - statistics.median(s['nr'] for s in slots))
+    # geom 口径下 infl 取 0: 位置配对不再要求「两侧全部用满」, 全局中位差会被标题/书眉这类
+    #   窄槽(条数 ≠ 字数)带偏 —— 实测 p513 的 infl=10 把正确配对的代价整体抬到 skip 罚以上
+    #   (标题行 5 字 vs 槽 15 run -> 代价 20 > 2x8), 正确配对反而被跳过。
+    infl = 0.0 if geom else (statistics.median(n_cells(r[4]) for r in rows)
+                             - statistics.median(s['nr'] for s in slots))
+
+    def _geom_ok(i, j):
+        """taskAB-B 位置硬约束: x 中心距 <= AB_XK x 列距 且 y 范围相交(±半字步进)。"""
+        r, s = rows[i], slots[j]
+        if pitch > 0:
+            if abs((r[0] + r[1]) / 4.0 - (s['x0'] + s['x1']) / 2.0) > AB_XK * pitch:
+                return False
+        if s.get('top') is not None and s.get('bot') is not None:
+            tol = 0.5 * (step or 12.0)
+            if r[3] / 2.0 < s['top'] - tol or r[2] / 2.0 > s['bot'] + tol:
+                return False
+        return True
+
+    def _geom_cost(i, j):
+        r, s = rows[i], slots[j]
+        c = 0.0
+        if pitch > 0:
+            c += abs((r[0] + r[1]) / 4.0 - (s['x0'] + s['x1']) / 2.0) / pitch
+        if step > 0 and s.get('top') is not None and s.get('bot') is not None:
+            c += AB_YK * abs((r[2] + r[3]) / 4.0 - (s['top'] + s['bot']) / 2.0) / step
+        return c
+
     row_can = R > C                       # 只允许多的一方跳过
     col_can = C > R
+    if geom:                              # 位置口径: 两侧都可跳过(空槽/空行都是合法结局)
+        row_can = col_can = True
     INF = 1e9
     dp = [[INF] * (C + 1) for _ in range(R + 1)]
     bt = [[None] * (C + 1) for _ in range(R + 1)]
@@ -2723,10 +2839,12 @@ def _align_rows_slots(rows, slots, skip=8.0, prior=0.0):
     for i in range(R + 1):
         for j in range(C + 1):
             if dp[i][j] >= INF: continue
-            if i < R and j < C:
+            if i < R and j < C and (not geom or _geom_ok(i, j)):
                 c = abs(n_cells(rows[i][4]) - slots[j]['nr'] - infl) + dp[i][j]
                 if prior > 0:
                     c += prior * abs(i / float(max(1, R - 1)) - j / float(max(1, C - 1)))
+                if geom:
+                    c += _geom_cost(i, j)
                 if c < dp[i + 1][j + 1]: dp[i + 1][j + 1] = c; bt[i + 1][j + 1] = (i, j, 1)
             if row_can and i < R and dp[i][j] + skip < dp[i + 1][j]:
                 dp[i + 1][j] = dp[i][j] + skip; bt[i + 1][j] = (i, j, 0)
@@ -2942,6 +3060,11 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
                          'at': [[ci, e] for ci, e in gaps]})
     if nc == 1:
         step, top = 0.0, (B - ink_h if full else T)
+    elif sl and sl.get('ysplit'):
+        # ④ taskAB-A 拆分子槽(书眉/页码/共槽分段): 用**本子槽实测跨度**铺满 —— 该段自身的上下缘
+        #    就是这串字的墨迹范围, 套全页常规步进会把「金瓶梅」压成 25.5pt 步进(源书实测 49.8)。
+        step = max(0.0, (B - T - ink_h) / (nc - 1))
+        top = T
     elif full:                                               # ① 满列: 顶贴槽实测顶, 底拉齐槽实测底
         step = min(1.30 * cap, max(0.75 * cap, (B - T - ink_h) / (nc - 1)))
         top = T
@@ -3158,6 +3281,7 @@ def page_puts(k, pi, m):
     if _SPECIAL_BLOCK.get(k):                    # §1.995: 已被特殊行占用的 x 带不再参与配对
         slots = [s for s in slots if not _band_blocked(s['x0'], s['x1'], _SPECIAL_BLOCK[k])]
     R, C = len(rows), len(slots)
+    _dual = False
     if C and 1.7 * C <= R <= 2.3 * C:                    # 双行小字页: 槽内再分左右子列
         ink = _frame_ink(pi, m['g'])
         it, ib = m['g']['in_t'], m['g']['in_b']
@@ -3175,8 +3299,45 @@ def page_puts(k, pi, m):
                             'top': (rs[0][0] if rs else None), 'bot': (rs[-1][1] if rs else None)})
         print('  [双行小字] p%d 槽 %d -> 子列 %d (行 %d)' % (pi + 1, C, len(sub), R))
         slots = sub
-    pairs = _align_rows_slots(rows, slots, prior=(NF_POS_PRIOR if m['g'].get('virtual') else 0.0))
-    if m['g'].get('virtual') and NF_POS_PRIOR > 0 and R != C:
+        _dual = True
+    # taskAB(默认关, VERT_AB_FIX=1 开): 无版框书且本页 OCR 坐标已标定到源图坐标系的页, 位置可信 ->
+    #   ① 槽按 y 拆子槽(A); ② 用**全部**伪槽格参与配对(不只 m['body']: 大字号标题页的
+    #   m['font'] 被标题带偏, 正文列会被划进 note -> m['body'] 只剩标题槽, 实测 p513 只剩 2 槽);
+    #   ③ 位置口径配对(B: x/y 硬约束 + 位置代价, 两侧可跳过)。
+    _ab = AB_FIX and (not _dual) and m['g'].get('virtual') and m['g'].get('fixed')
+    if _ab:
+        if AB_ALLSLOTS:
+            slots = sorted(m['slots'], key=lambda s: (-(s['x0'] + s['x1']), s.get('top') or 0.0))
+            if _SPECIAL_BLOCK.get(k):
+                slots = [s for s in slots if not _band_blocked(s['x0'], s['x1'], _SPECIAL_BLOCK[k])]
+        _it, _ib = m['g']['in_t'], m['g']['in_b']
+        if AB_YSPLIT:
+            _ink = _frame_ink(pi, m['g'])
+            # 字步进参照取 min(槽步进上限, OCR 行 y 跨度/字数的中位): 槽步进在大字号标题页会被
+            #   标题槽带偏(实测 p513 m['step_cap']=31.1, 而正文 OCR 步进中位 25.2) ——
+            #   用 31.1 时标题三行之间 72.7pt 的空隙(阈 77.8)拆不开。
+            _st = sorted((r[3] - r[2]) / 2.0 / len(r[4]) for r in rows if r[4] and '\n' not in r[4])
+            _ocr_step = _st[len(_st) // 2] if _st else 0.0
+            _caps = [x for x in (m.get('step_cap'), _ocr_step) if x and x > 0]
+            _step_ref = min(_caps) if _caps else ((m.get('font') or 0.0) * 0.9)
+            slots = [ss for s in slots for ss in _split_slot_y(_ink, s, _it, _ib, _step_ref, rows)]
+        _pitch = m['g'].get('pitch') or 0.0
+        if _pitch <= 0 and slots:
+            _pitch = (m['g']['in_r'] - m['g']['in_l']) / max(1, len(slots))
+        pairs = _align_rows_slots(rows, slots, geom=AB_GEOM, pitch=_pitch,
+                                  step=(m.get('step_cap') or 0.0))
+        if os.environ.get('VERT_AB_DBG'):
+            print('    [AB配对] p%d 行%d 槽%d -> 对%d | 槽: %s' % (
+                pi + 1, R, len(slots), len(pairs),
+                ' '.join('x%.0f-%.0f nr%d t%s b%s%s' % (
+                    s['x0'], s['x1'], s['nr'],
+                    ('%.0f' % s['top']) if s.get('top') is not None else '-',
+                    ('%.0f' % s['bot']) if s.get('bot') is not None else '-',
+                    'Y' if s.get('ysplit') else '') for s in slots)))
+            print('    [AB配对] p%d 对: %s' % (pi + 1, pairs))
+    else:
+        pairs = _align_rows_slots(rows, slots, prior=(NF_POS_PRIOR if m['g'].get('virtual') else 0.0))
+    if (not _ab) and m['g'].get('virtual') and NF_POS_PRIOR > 0 and R != C:
         # 位置先验只在「像本页这样行/槽数不等」时才可能有影响: 两种口径各算一次, **取渲染字数多的那个**
         #   (目标就是少丢字; 纯位置先验会在个别页(实测源页 399/444)把本来配得上的行挤掉, 纯格数口径
         #   又会在源页 1206 那种「版心内有两列无列带(墨迹太少)」的页上整段平移 -> 各有胜负)。
@@ -3215,7 +3376,10 @@ def page_puts(k, pi, m):
     #   只在「本页按正文口径已适配(配对 >= 0.8x行数)」时才做 —— 不适配的页会整页交回 v2 流式,
     #   这些 puts 会被丢掉(实测源页 29 大字节版页: 15 行对 5 槽, 兜底把 10 行塞进注格 = 白做且刷屏)。
     _placed_rows = set()
-    if m['g'].get('virtual') and m['note'] and len(pairs) < R and len(pairs) >= 0.8 * R:
+    # taskAB: 位置口径下**不走这条兜底** —— 它的 DP 不带位置约束(只按 run 数配), 会把未配对行
+    #   塞进任意注格(实测 p513 把「第三十二回」放到 x480 的正文列上、与正文叠字)。位置口径下
+    #   未配对行交 _nf_rescue_rows 按本行 OCR x 窗找源图残余列位。
+    if (not _ab) and m['g'].get('virtual') and m['note'] and len(pairs) < R and len(pairs) >= 0.8 * R:
         left_rows = [ri for ri in range(R) if not any(i == ri for i, _j in pairs)]
         cand = sorted(m['note'], key=lambda s: -s['x1'])            # 阅读序(右->左), 与 rows 同序
         ink = _frame_ink(pi, m['g'])
