@@ -2814,20 +2814,40 @@ def _split_slot_y(ink, sl, it, ib, step_ref, rows):
                      for p, r in zip(rs, rs[1:]) if (r[0] - p[1]) > 0.3 * gap_th)))
     if len(groups) < 2:
         return [sl]
-    # 保护: 任一子槽的可用 run 为空 / 墨高 < AB_YSPLIT_MIN_HM x 字步进 -> **该槽整体不拆**。
-    #   退化子槽(只含一个标点的碎墨/半个字)会让渲染端 step=0 -> F=0pt -> LaTeX 报错;
-    #   而且部分拆开会让字符落到错误的子槽里, 宁可整槽不拆(回到原行为)。
+    # 退化子槽(只含一条碎墨/半个字) -> **并给最近的邻组**, 不整槽放弃。
+    #   教训: 早先写成「整槽不拆」, 实测 p86 书眉「金瓶梅」(3字) + 页码「四二」(2字) 共槽时,
+    #   页码那条 5pt 碎墨(hm 5.0 < 0.45x25.5=11.5) 让整槽放弃 -> 书眉/页码都没有独立子槽
+    #   -> AB 位置口径配对把它们跳过 -> 两行全丢(671->668); 同一机制全书 88 页丢字(-368),
+    #   含 p375 回目「第二十二回」。并组后书眉/页码各自成槽, 字全部保住。
+    #   渲染端已有 step<=0 -> cap 与 F=max(4.0,...) 两道兜底, 不会再现 0pt 字号。
+    _good, _bad = [], []
     for g in groups:
         _hs0 = sorted(b - a for a, b in g)
         _cap = max(40.0, 3.0 * _hs0[len(_hs0) // 2]) if _hs0 else 40.0
         _runs = [r for r in g if 4.0 <= r[1] - r[0] <= _cap]
         _hs = sorted(b - a for a, b in _runs)
         _hm = _hs[len(_hs) // 2] if _hs else 0.0
-        if not _runs or _hm < AB_YSPLIT_MIN_HM * step_ref:
+        if _runs and _hm >= AB_YSPLIT_MIN_HM * step_ref:
+            _good.append([list(g), _hm])
+        else:
+            _bad.append((list(g), _hm))
             if os.environ.get('VERT_AB_DBG'):
-                print('    [AB拆槽·放弃] x%.0f-%.0f 某子槽退化(run%d hm%.1f < %.1f) -> 整槽不拆'
+                print('    [AB拆槽·并组] x%.0f-%.0f 退化子槽(run%d hm%.1f < %.1f) -> 并给最近邻组'
                       % (sl['x0'], sl['x1'], len(_runs), _hm, AB_YSPLIT_MIN_HM * step_ref))
-            return [sl]
+    if len(_good) < 2:
+        return [sl]                        # 有效子槽不足 2 个 -> 不拆(保持原行为)
+    for _g, _hm in _bad:
+        _ga = min(a for a, b in _g)
+        _gb = max(b for a, b in _g)
+        _bi = min(range(len(_good)),
+                  key=lambda i: min(abs(_ga - max(b for a, b in _good[i][0])),
+                                    abs(_gb - min(a for a, b in _good[i][0]))))
+        _good[_bi][0].extend(_g)
+        _good[_bi][0].sort()
+    groups = [g for g, _hm in _good]
+    if os.environ.get('VERT_AB_DBG') and _bad:
+        print('    [AB拆槽] x%.0f-%.0f -> 并组后 %d 个子槽'
+              % (sl['x0'], sl['x1'], len(groups)))
     out = []
     for g in groups:
         hs0 = sorted(b - a for a, b in g)
