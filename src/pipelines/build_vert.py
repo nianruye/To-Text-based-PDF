@@ -3663,32 +3663,69 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
       ② **必须真有墨**: 该带内墨迹 run >= 2 条且字高中位 >= 0.5 x 本页字号(碎墨/扫描噪点达不到);
          字高 > 1.35 x 本页字号 的也不收(粘连长 run, 会把字高测成整列高);
       ③ 列顶/底取带内实测(夹在版心内), 字号 = 带内字高中位/INK_RATIO, 走 col_puts 渲染(标点/压缩同源)。
-    返回 tex 列表(未配对行多于残余列时多出的行仍不渲染 —— 有墨才画, 不凭空补位)。"""
+    返回 tex 列表(未配对行多于残余列时多出的行仍不渲染 —— 有墨才画, 不凭空补位)。
+
+    taskCJ4(R4) 三条口径修正(修前 8 页共丢 23 字, 逐页追踪见 docs/vert_taskCJ4_report.md):
+      a) **已占用带带 y 段**: 配对行只占用它自己的 OCR y 带。页码/书眉与正文列同 x 带、不同 y 段
+         是竖排常见版式(实测 p1023 四六三 / p1609 四三九 / p1067 五〇七 ...), 旧口径「x 重叠即
+         已用」把整行拒掉 -> 丢字。现在 x 重叠但 y 不重叠 -> 允许; 渲染窗取**本行 y 带**
+         (不占别的行的 y 段, 与 _split_slot_y 的 y 拆槽同源)。
+      b) **y 窗择优**: 旧口径统计窗 = 伪版心 ∪ 本行 y 带(taskU-C) —— 与已用列共 x 时会把别人的
+         墨一起统计(列顶/列底/字号全错: v6 的页码被摊满整列, 实测 p1023「四」y267→「三」y1068),
+         短列时覆盖率又被整页高稀释(实测 p702「唱：」在整页高上覆盖率 2.2% < 4% -> 带都检不出)。
+         现在同时试「本行 y 窗」与「宽窗」, 取 **run 数与排版格数最接近**者(平手取宽窗 = 旧口径)。
+      c) **大字号行 / 单字行**: 旧 `_ok_stat` 把 > 1.35x 页字号一律拒(本为挡粘连长 run), 但 run
+         数与字数相称的标题/回目行(实测 p1609「第九十六回」5 run / 5 字, 字号 1.40x)是真列;
+         单字页码(实测 p1503「三」)又因 nr >= 2 拒。现在前者的判据改为「run 数与格数相称」,
+         后者改按「单字墨迹跨度/带宽」定字高。"""
     g = m['g']
     ink = _frame_ink(pi, g)
     il, ir, it, ib = g['in_l'], g['in_r'], g['in_t'], g['in_b']
-    # 「已占用」的列带 = 已配对槽内**实测墨迹带**(槽格是半列距宽、几乎铺满版心, 拿槽格当占用会把
-    #   所有列判成已用 -> 落在「残余墨迹」上的补救一个也找不出, 实测源页 1206 残余列 = 0)
+    # 「已占用」的列带 = 已配对槽内**实测墨迹带** × **该配对行自身的 OCR y 带**(taskCJ4):
+    #   槽格是半列距宽、几乎铺满版心, 拿槽格当占用会把所有列判成已用 -> 落在「残余墨迹」上的
+    #   补救一个也找不出(实测源页 1206 残余列 = 0); 但只用 x 带又会把「同列不同 y 段」的页码/
+    #   书眉误判成已占用。y 带必须取**配对行**而不是槽的 top/bot: 槽 top/bot 是该列全部墨迹
+    #   (含未配对行), 会把同列剩余 y 段也标成已用。
     used = []
     for _i, _j in pairs:
         sl = slots[_j]
+        _ry0, _ry1 = rows[_i][2] / 2.0, rows[_i][3] / 2.0
         for x0, x1 in _ink_bands(ink, sl['x0'] - 2, sl['x1'] + 2, it, ib, cov=0.05):
-            used.append((x0, x1))
+            used.append((x0, x1, _ry0, _ry1))
     unmatched = [ri for ri in range(len(rows))
                  if ri not in skip and not any(i == ri for i, _j in pairs)]
     ya, yb = int((it + 2) * 2), int((ib - 2) * 2)
     if NF_SLOT_DBG:
         print('    [补救诊断] p%d 未配对行 %d 已用列带 %d: %s' % (
-            pi + 1, len(unmatched), len(used), ['%.0f-%.0f' % b for b in used]))
+            pi + 1, len(unmatched), len(used),
+            ['%.0f-%.0f/%.0f-%.0f' % b for b in used]))
     hms = sorted(s['hm'] for s in slots if s['hm'] > 0)
     Fmed = (hms[len(hms) // 2] / INK_RATIO) if hms else 0.0
     pitch = g.get('pitch') or (ir - il) / max(1, len(slots))
 
-    def _ok_stat(st):
-        """带内墨迹是否「像正文列」: run >= 2 且字高在本页字号 0.5-1.35 倍内(挡碎墨/粘连长 run)。"""
-        if st['nr'] < 2 or st['hm'] <= 0: return False
-        F0 = st['hm'] / INK_RATIO
-        return not (Fmed > 0 and (F0 > 1.35 * Fmed or F0 < 0.5 * Fmed))
+    def _font_est(st, nc, span):
+        """本列字号估计(taskCJ4): run 高中位口径对**多笔画数字**失效 —— 「二/三」的 run 是
+        横画(高 3-4pt), hm/INK_RATIO 只有 3.5pt, 而整列跨度/字数 ≈ 17pt。故:
+          · run 口径可信(F_run >= 0.7 x 页字号) -> 用 F_run(普通正文列, 与修前同值);
+          · 否则 nc >= 2 -> 墨迹段跨度/字数/0.9(竖排 n 字跨度 ≈ n x 字号);
+          · 单字 -> 0.9 x 页字号(单字墨迹(一/三)的 run 高与跨度都不反映字号)。"""
+        F_run = st['hm'] / INK_RATIO
+        if Fmed > 0 and F_run >= 0.7 * Fmed: return F_run
+        if nc >= 2 and span > 0: return span / float(nc) / 0.9
+        return 0.9 * Fmed
+
+    def _ok_stat(st, nc, bw, fe):
+        """带内墨迹是否「像正文列」(taskCJ4 扩展):
+        · 字号必须在页字号 0.5-1.35 倍内; 大字号行(F0 > 1.35x)若 run 数与格数相称
+          (每条 run 一个字)则是真标题/回目列, 收(原口径只挡粘连长 run);
+        · nc >= 2 要求 run >= 2(挡碎墨); 单字行按带宽像一个字判断(细线/碎片 < 0.4 x 字号)。"""
+        if st['nr'] < 1 or st['hm'] <= 0: return False
+        if nc == 1:
+            return 0.4 * fe <= bw <= 1.6 * fe
+        if st['nr'] < 2: return False
+        if Fmed <= 0: return True
+        if 0.5 * Fmed <= fe <= 1.35 * Fmed: return True
+        return fe > 1.35 * Fmed and 0.6 * nc <= st['nr'] <= 1.2 * nc + 1.0
 
     ph_pt = g['page_px'][1] / 2.0
     def _ynwin(r):
@@ -3699,24 +3736,29 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
         y0 = max(0.0, min(r[2] / 2.0 - 2.0, ph_pt)); y1 = max(0.0, min(r[3] / 2.0 + 2.0, ph_pt))
         return min(it + 2.0, y0), max(ib - 2.0, y1)
 
-    def _ocr_band(r):
+    def _ocr_band(r, ywin):
         """**OCR 列框兜底**: 行自带 x 带 ± 一列距 -> 窗内最靠窗心的**未被占用**墨迹列带
         (宽 >= 8pt, 覆盖率 >= 0.04)。OCR x 有系统缩放(本书 1.07-1.20)与相位漂移, 故只用它**定邻域**,
-        列位仍取窗内实测墨迹带心(自纠偏); 已被别的行占用的列带不再落位(不叠字)。
+        列位仍取窗内实测墨迹带心(自纠偏)。
+        ywin(taskCJ4): 本窗的 y 范围(pt) —— 调用方传「本行 y 窗」或「宽窗」两种口径各试一次。
+        「已占用」判据(taskCJ4) = x 重叠 **且** y 重叠: 页码/书眉与正文列同 x 带时, 只要 y 段
+        不重叠就是该列剩余空间, 允许落位(与 _split_slot_y 的 y 拆槽同源); y 重叠 -> 不叠字。
         返回 (a, b) 或 None。"""
         import numpy as np
         cx = (r[0] + r[1]) / 4.0                     # OCR 行 x 中心(px/2 = pt)
         wa = max(il, cx - pitch); wb = min(ir, cx + pitch)
         if wb - wa < 8: return None
-        _y0, _y1 = _ynwin(r)
+        _y0, _y1 = ywin
         sub = ink[int(_y0 * 2):int(_y1 * 2), int(wa * 2):int(wb * 2)]   # 全墨迹(伪槽格页版心内没有「残余」可言)
         if sub.size == 0: return None
         colc = sub.mean(axis=0)
+        _ry0, _ry1 = r[2] / 2.0, r[3] / 2.0
         best = None
         for i0, i1 in _runs(colc > 0.04, 4):
             if i1 - i0 < 16: continue
             a2, b2 = wa + i0 / 2.0, wa + i1 / 2.0
-            if any(a2 < b3 - 1 and a3 < b2 - 1 for a3, b3 in used):
+            if any(a2 < b3 - 1 and a3 < b2 - 1 and _ry0 < b4 + 2.0 and a4 < _ry1 + 2.0
+                   for a3, b3, a4, b4 in used):
                 continue
             c = (i0 + i1) / 2.0
             if best is None or abs(c - (cx - wa) * 2) < abs(best[2] - (cx - wa) * 2):
@@ -3724,27 +3766,84 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
         if best is None: return None
         return (wa + best[0] / 2.0, wa + best[1] / 2.0)
 
+    def _band_y_runs(a, b):
+        """带内 x 投影 -> 全页 y 墨迹 run [(y0,y1)] pt(笔画级; 不做 x 内缩)。
+        用途: 从「整列墨迹」里切出**本行自己的 y 段**(页码/书眉与正文列同 x 时必需)。"""
+        xa, xb = int(a * 2), int(b * 2)
+        if xb <= xa: return []
+        m = ink[:, xa:xb].any(axis=1)
+        return [((y0) / 2.0, (y1 + 1) / 2.0) for y0, y1 in _runs(m, 1)]
+
+    def _segment(rs, r):
+        """从带内 run 表里取「本行」的墨迹段(taskCJ4): 以**与本行 OCR y 带相交**的 run 为种子,
+        向两侧扩到 run 间距 <= 0.5 x 页字号; 无相交 run 时取离行心最近的一条为种子。
+        只在种子范围**外**扩, 不在种子内部切 —— 普通正文列(OCR 行盒覆盖整列)种子即全部 run ->
+        段 = 整列, 与修前口径逐位相同; 页码/回目首行(行盒只覆盖一段)才被切到本行。"""
+        if not rs: return None
+        ry0, ry1 = r[2] / 2.0, r[3] / 2.0
+        seeds = [i for i, q in enumerate(rs) if q[0] <= ry1 + 2.0 and ry0 - 2.0 <= q[1]]
+        if seeds:
+            i0, i1 = seeds[0], seeds[-1]
+        else:
+            c = (ry0 + ry1) / 2.0
+            j = min(range(len(rs)), key=lambda k: abs((rs[k][0] + rs[k][1]) / 2.0 - c))
+            i0 = i1 = j
+        gap = max(4.0, 0.5 * Fmed)
+        while i0 > 0 and rs[i0][0] - rs[i0 - 1][1] <= gap: i0 -= 1
+        while i1 < len(rs) - 1 and rs[i1 + 1][0] - rs[i1][1] <= gap: i1 += 1
+        return rs[i0:i1 + 1]
+
     puts, nok = [], 0
     for idx, ri in enumerate(unmatched):
-        a = b = None; st = None
-        if a is None:                                # OCR 列框兜底(该行自带 x 带; 伪槽格页唯一可用的定位源)
-            got = _ocr_band(rows[ri])
-            if got:
-                a2, b2 = got
-                _yy0, _yy1 = _ynwin(rows[ri])             # taskU-C: 用「行自带 y 带 ∪ 伪版心」统计
-                st2 = _band_stats(ink, a2, b2, _yy0, _yy1)
-                if _ok_stat(st2): a, b, st = a2, b2, st2
+        a = b = None; st = None; ywin_sel = None; fe = 0.0
+        nc = n_cells(rows[ri][4])
+        # taskCJ4: 两种 y 窗各试一次找 x 带 ——
+        #   ① 本行 y 窗: 只投影本行自己的墨迹(短列/与已用列共 x 的页码书眉; 覆盖率不被整页高稀释);
+        #   ② 宽窗: 伪版心 ∪ 本行 y 带(taskU-C 旧口径; OCR 行盒比墨迹紧时靠它补全列顶/列底)。
+        # 找到 x 带后不再直接用窗统计, 而是从**带内整列墨迹**里切出与本行 OCR y 带相交的段
+        # (_segment) —— 这样 OCR 行盒偏紧(p1067 第三字 y1133 被行盒切掉)也能补全。
+        # 选择 = 段内 run 数与排版格数最接近者(平手取宽窗, 保证普通短列与修前逐位相同)。
+        _r_win = (max(0.0, rows[ri][2] / 2.0 - 2.0), min(ph_pt, rows[ri][3] / 2.0 + 2.0))
+        _w_win = _ynwin(rows[ri])
+        _cands = []
+        for _yi, _yw in ((1, _r_win), (0, _w_win)):
+            got = _ocr_band(rows[ri], _yw)
+            if not got:
+                if os.environ.get('VERT_RESCUE_DBG'):
+                    print('      [补救候选] p%d 行[%d] %s窗 x带落空' % (
+                        pi + 1, ri, '本行' if _yi else '宽'))
+                continue
+            a2, b2 = got
+            _seg = _segment(_band_y_runs(a2, b2), rows[ri])
+            if not _seg: continue
+            _sy0, _sy1 = _seg[0][0], _seg[-1][1]
+            st2 = _band_stats(ink, a2, b2, _sy0, _sy1, pad=0.0)
+            fe2 = _font_est(st2, nc, _sy1 - _sy0)
+            _ok = _ok_stat(st2, nc, b2 - a2, fe2)
+            if os.environ.get('VERT_RESCUE_DBG'):
+                print('      [补救候选] p%d 行[%d] %s窗 带x%.1f-%.1f 段y%.1f-%.1f nr%d hm%.1f '
+                      'bw%.1f fe%.1f ok=%s' % (
+                          pi + 1, ri, '本行' if _yi else '宽', a2, b2, _sy0, _sy1,
+                          st2['nr'], st2['hm'], b2 - a2, fe2, _ok))
+            if not _ok: continue
+            _cands.append((abs(len(_seg) - nc), _yi, a2, b2, st2, (_sy0, _sy1), fe2))
+        if _cands:
+            _cands.sort(key=lambda t: (t[0], t[1]))       # run 数差最小; 平手取宽窗(_yi=0)
+            _s0 = _cands[0]
+            a, b, st, ywin_sel, fe = _s0[2], _s0[3], _s0[4], _s0[5], _s0[6]
         if NF_SLOT_DBG:
             print('    [补救诊断] p%d 行[%d] %-12s -> %s' % (
                 pi + 1, ri, rows[ri][4][:12],
-                ('x%.1f-%.1f nr%d hm%.1f' % (a, b, st['nr'], st['hm'])) if a is not None
+                ('x%.1f-%.1f nr%d hm%.1f F%.1f y%.1f-%.1f %s' % (
+                    a, b, st['nr'], st['hm'], fe, ywin_sel[0], ywin_sel[1],
+                    '本行窗' if ywin_sel == _r_win else '宽窗'))
+                if a is not None
                 else ('落空(OCR x %.1f-%.1f)' % (rows[ri][0] / 2, rows[ri][1] / 2))))
         if a is None: continue                       # 两条路都没有可信墨迹 -> 不渲染(不凭空补位)
-        F = round(max(9.0, st['hm'] / INK_RATIO), 1)
-        _yy0, _yy1 = _ynwin(rows[ri])
+        F = round(max(9.0, fe), 1)
+        _yy0, _yy1 = ywin_sel
         Tb = max(st['top'] if st['top'] is not None else _yy0, 2.0)
         Bb = min(st['bot'] if st['bot'] is not None else _yy1, ph_pt - 2.0)
-        nc = n_cells(rows[ri][4])
         ink_h0 = INK_RATIO * F
         step = (max(1.0, min((Bb - Tb - ink_h0) / (nc - 1), (ib - it - 4.0 - ink_h0) / (nc - 1)))
                 if nc > 1 else 0.0)
@@ -3752,9 +3851,11 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
               'w': ir - il, 'note': [], 'body': [], 'g': g, 'slots': []}
         # taskU-C: 带上**本列墨迹 run 表** -> col_puts 里的 fit_gaps 才能检出列内空隙(源书目录页
         #   「第N回 | 回目上半 | 回目下半」三段之间的空档就靠这条还原); 不带则整列按等格铺满。
+        # taskCJ4: run 表按**选中的 y 窗**取 —— 共 x 的页码/书眉不能用整列(含别的行)的 run,
+        #   否则 fit_gaps 会把别人的行间空档当成本行的字间空隙。
         sl = {'x0': a, 'x1': max(b, a + 1.0), 'nr': st['nr'], 'hm': st['hm'],
               'step': st['step'], 'top': Tb, 'bot': Bb,
-              'runs': _slot_runs(ink, a, b, it, ib)}
+              'runs': _slot_runs(ink, a, b, _yy0, _yy1)}
         p, _ = col_puts(rows[ri][4], (a + b) / 2.0, m2, sl, None, pi)
         puts += p
         nok += 1
@@ -4161,12 +4262,14 @@ def page_puts(k, pi, m):
         '' if ok else '<<不适配, 回退流式'))
     return puts, pairs, ok
 
-def _band_stats(ink, x0, x1, it, ib):
+def _band_stats(ink, x0, x1, it, ib, pad=2.0):
     """区带 x0-x1(pt) 内的墨迹 run 统计 -> {nr, hm, step, top, bot}(pt)。
     先剔「竖线列」(该列墨占比 > 0.6: 版框线/界行线 —— 否则长 run 贯穿内框, 字高会被测成框高),
-    再按 page_metrics 同口径统计(run 高限 4pt..3×中位)。"""
+    再按 page_metrics 同口径统计(run 高限 4pt..3×中位)。
+    pad: y 窗两端内缩量(pt, 默认 2 = 原口径)。taskCJ4: 残余列补救传 pad=0 —— 它的 y 窗是
+      **本行 OCR y 带**(短列/页码), 再内缩 2pt 会把首/末字的墨切掉(实测 p702「唱：」行高 57pt)。"""
     xa, xb = int(x0 * 2), int(x1 * 2)
-    ya, yb = int((it + 2) * 2), int((ib - 2) * 2)
+    ya, yb = int((it + pad) * 2), int((ib - pad) * 2)
     z = {'nr': 0, 'hm': 0.0, 'step': 0.0, 'top': None, 'bot': None}
     if xb - xa < 2 or yb - ya < 4: return z
     sub = ink[ya:yb, xa:xb]
