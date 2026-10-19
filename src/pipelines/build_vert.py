@@ -1860,13 +1860,14 @@ NF_ROW_FRAC = float(os.environ.get('VERT_NF_ROW_FRAC') or 0.05)   # 槽内「行
 #      (19 行 18 槽): 页码那行被 DP 跳过不渲染, 书眉行按整槽跨度算步进(「梅」偏 127pt)。
 #   ② _align_rows_slots 只按「格数/run 数」配平, 不知道行/槽的实际位置: p513 两列正文
 #      (x 192.6/147.6)被配到 x 766/576 的标题/詩列槽(偏 +574/+429pt)。
-# 修法(全部默认关, 保持现行为; VERT_AB_FIX=1 开启 —— 见 docs/vert_taskAB_report.md):
+# 修法(**默认已开** —— 全书验证完成后翻转, 见 docs/vert_taskAB_report.md;
+#   要复现旧行为(无框书 v8 口径)用 VERT_AB_FIX=0):
 #   A) 槽按 y 拆子槽: 槽内墨迹 y 投影出现 > K x 字步进的空白 -> 拆(有 OCR 行跨越该空白则**不拆**,
 #      目录页/双段列的内空隙仍交 fit_gaps 还原);
 #   B) 配对增加位置约束: x 中心距 > XK x 列距 或 y 范围不重叠 -> 禁止配对; 代价加 x/y 中心距离项。
 #      只对「无版框书 + OCR 坐标已标定到源图坐标系」(gv['fixed'])的页生效 —— 未标定页 OCR x 有
 #      1.07-1.20 的系统缩放, 位置不可信, 仍走原「格数」口径。有版框书(wz6)一字不改。
-AB_FIX = os.environ.get('VERT_AB_FIX', '0') not in ('0', 'false', 'False')
+AB_FIX = os.environ.get('VERT_AB_FIX', '1') not in ('0', 'false', 'False')
 AB_YSPLIT = os.environ.get('VERT_AB_YSPLIT', '1' if AB_FIX else '0') not in ('0', 'false', 'False')
 AB_ALLSLOTS = os.environ.get('VERT_AB_ALLSLOTS', '1' if AB_FIX else '0') not in ('0', 'false', 'False')
 AB_GEOM = os.environ.get('VERT_AB_GEOM', '1' if AB_FIX else '0') not in ('0', 'false', 'False')
@@ -1940,7 +1941,7 @@ NF_RETRY_BEST = os.environ.get('VERT_NF_RETRY_BEST', '1') not in ('0', 'false', 
 #    修前步进中位只取「无换行」行 -> 目录页/字表页整页都是 OCR 多块合并行(带 \n)时, 中位样本为空
 #    或被页上仅有的水印/横排短行(2-4pt/字)带偏 -> 真列(37-67pt/字)判成「不拼」-> 带 \n 的行在
 #    下游 page_rows 被当残片整行丢弃。实测 p563 整页 0 字 / p1171 只剩 7 字(仅目录标题)。
-NF_JOIN_MED = os.environ.get('VERT_NF_JOIN_MED', '0') not in ('0', 'false', 'False')
+NF_JOIN_MED = os.environ.get('VERT_NF_JOIN_MED', '1') not in ('0', 'false', 'False')
 NF_JOIN_HI = float(os.environ.get('VERT_NF_JOIN_HI') or 1.5)   # 拼接步进上界(倍数; 修前 1.4)
 #   1.5 的依据: 全书 1748 页模拟(JOIN_MED 口径) —— 窗口从 1.4 放宽到 1.5 只多拼 3 行, 全是真列:
 #   p400「當局者迷，傍觀者清。」(1.413) / p1511 目录回目(1.488) / p1742 字表「鬢髮…」(1.451);
@@ -1950,14 +1951,14 @@ NF_JOIN_HI = float(os.environ.get('VERT_NF_JOIN_HI') or 1.5)   # 拼接步进上
 #    划出 body(实测 p659: 1 条 38pt 标题 + 14 条 23-26pt 正文 -> 阈值 28.5 -> 正文全被判成注,
 #    产物 220 字且字号错乱)。改为「最高四分位的中位」作参照: 离群大字号只有占 >= 25% 槽数时
 #    才会抬高参照; 单字号页取值与 max 相同(逐位不变)。
-NF_BODY_TIER = os.environ.get('VERT_NF_BODY_TIER', '0') not in ('0', 'false', 'False')
+NF_BODY_TIER = os.environ.get('VERT_NF_BODY_TIER', '1') not in ('0', 'false', 'False')
 # ③ 伪版心外的扫描水印/馆藏标签剔除(taskCD-c, 见 _nf_margin_artifact):
 #    实测 p1171(小开本目录页): 页顶手写编号 859.49/6996/879/v.3 与页底「国家图书馆 + 条码」
 #    是扫描件上的馆藏标记, 不是书内容, 却在页边带里被 special_rows 认成书眉/页码画出来
 #    (其中条码行还与目录列 x 带重叠, 被行合并并进邻列 -> 整列错字)。判据只认「整行在伪版心
 #    y 之外」且「横排(w/h >= NF_MARGIN_AR)或无汉字」—— 真书眉/页码是竖排汉字, 不受影响。
-NF_DROP_MARGIN = os.environ.get('VERT_NF_DROP_MARGIN', '0') not in ('0', 'false', 'False')
-PARA_MARK = os.environ.get('VERT_PARA_MARK', '0') not in ('0', 'false', 'False')
+NF_DROP_MARGIN = os.environ.get('VERT_NF_DROP_MARGIN', '1') not in ('0', 'false', 'False')
+PARA_MARK = os.environ.get('VERT_PARA_MARK', '1') not in ('0', 'false', 'False')
     # 段首圈点 ⊙(taskCC): 源书段落起首的圈点在 OCR 里被当噪点跳过, 但它占一整格 ->
     #   该列 OCR 框高 = 字数+1 格。不处理的话文字整体上移一格、正好压在圈点上(实测 p43/p44)。
     #   开时: 首格让给圈点(T += 一格), 文字按剩余跨度铺, 圈点用 _put_tex 画出来。
@@ -1997,7 +1998,7 @@ NF_MARGIN_AR = float(os.environ.get('VERT_NF_MARGIN_AR') or 2.5)   # 水印行�
 #    文本交错(实测 p55 产物「第三二十九七九回…」)。判据用**行心 x 聚类**: 真双行小字页的 2C 条
 #    行分居 2C 个 x 心; 目录页的行心聚成约 C 组(组均 >= 1.4 行)。命中后不拆 x, 改走 y 拆子槽
 #    (_split_slot_y, 过滤点线小 run)+ 位置配对; 子槽 y 窗按本页行 y 范围外扩(回次/页码在伪版心外)。
-NF_TOC = os.environ.get('VERT_NF_TOC', '0') not in ('0', 'false', 'False')
+NF_TOC = os.environ.get('VERT_NF_TOC', '1') not in ('0', 'false', 'False')
 # taskCF: 列序单调性守卫 —— 竖排阅读序是**保序双射**(行按 x 递减、槽按 x 递减),
 #   位置口径配对(geom=True)允许两侧跳过但**不禁止交叉**, 实测 p54 把
 #   第十六/十七/十八回排成 3-循环置换(列内文字自洽、只有 x 位置互换)。
@@ -2009,7 +2010,7 @@ NF_TOC_MINRUN = float(os.environ.get('VERT_NF_TOC_MINRUN') or 0.30) # y 拆槽�
 #    版心**不动**, 只把 _page_specials 的候选行心窗口从版心缘外扩 NF_TITLE_OUT_PAD 个列距, 且仅限
 #    短行(len <= NF_TITLE_OUT_MAXLEN)、后面仍要过「大字号 + 稀少性」两道既有判据。只多认领这一行
 #    (走标题署名路径渲染, x 带进 _SPECIAL_BLOCK), 不放宽 _ink_bands 的扫描窗口。
-NF_TITLE_OUT = os.environ.get('VERT_NF_TITLE_OUT', '0') not in ('0', 'false', 'False')
+NF_TITLE_OUT = os.environ.get('VERT_NF_TITLE_OUT', '1') not in ('0', 'false', 'False')
 NF_TITLE_OUT_PAD = float(os.environ.get('VERT_NF_TITLE_OUT_PAD') or 1.5)   # 外扩量(列距倍数)
 NF_TITLE_OUT_MAXLEN = int(os.environ.get('VERT_NF_TITLE_OUT_MAXLEN') or 8)  # 只收短行(字数上限)
 
