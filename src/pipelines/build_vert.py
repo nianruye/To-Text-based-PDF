@@ -1844,6 +1844,13 @@ if NF_MODE and src_doc is not None and RIGHT_p > PW_PX / 2.0 - 0.5:
     RIGHT_p = round(PW_PX / 2.0 - 1.0, 1)
     OM_pt = round(RIGHT_p - TH_pt - 70, 1)
 NF_SLOT_DBG = os.environ.get('VERT_NF_SLOT_DBG') == '1'   # 伪槽格逐槽统计诊断打印
+# taskCJ: 无框伪槽格「槽窗口锚定」(默认开, =0 回到旧口径做 A/B 对照)。
+#   根因(诊断 docs/vert_taskCJ_diagnosis.md): nf_edges 的槽边界 = 相邻墨迹带心中点 ->
+#   槽心相对本列带心偏 (G_R-G_L)/4; 本列一侧是空白(章末/诗行/页边书眉列)时 G 达数倍列距,
+#   整列被平移约 2 个列距(实测 p159 -88.6pt / p937 -88pt / p721 -85pt / p149 +83pt)。
+#   修法: 只对「被拉宽且中点显著偏离本列带心」的槽, 把窗口收到本列带心 ± 半列距
+#   (两端仍不小于本列墨迹带 + 4pt, 保证不切墨); 普通槽判据不成立 -> x0/x1 逐位不变。
+NF_SLOT_ANCHOR = os.environ.get('VERT_NF_SLOT_ANCHOR', '1') not in ('0', 'false', 'False')
 NF_HROW_AR = float(os.environ.get('VERT_NF_HROW_AR') or 2.0)   # 横排行判据: 行盒 宽/高 下限
 NF_HROW_CHAR = float(os.environ.get('VERT_NF_HROW_CHAR') or 0.60)   # 横排行字数占本页比下限
 # taskU-C: 见 page_puts 里 ok 的注释 —— 目录页走「残余列补救」而非 v2 流式的开关(默认关, 实测净损失字)
@@ -2343,12 +2350,24 @@ def _sb_pitch(bands, il, ir):
 
 def nf_edges(bands):
     """墨迹列带 -> (伪槽格边界 edges, 列距中位 pitch)。边界 = 相邻带心中点, 首末外扩 pitch/2;
-    格宽因此 = 该处列距(与 §1.98「槽 = 内框等分」同语义: 标点摆位的分母是格距)。"""
+    格宽因此 = 该处列距(与 §1.98「槽 = 内框等分」同语义: 标点摆位的分母是格距)。
+    taskCJ: pitch 取**最小的 60% 差值的中位**(稳健列距)。为什么不能用全体中位: 稀疏页只有
+      两三列时, 一条「页边书眉列 <-> 正文列」的大空隙(实测 p149 709.2pt vs 真列距 44.6)
+      会把中位整体抬高到 376.9 -> 首末槽外扩 pitch/2 = 188pt, 槽心偏 +83pt。取小差值中位后
+      p149 = 44.6(真值)。
+      只在稳健值**显著小于**全体中位(< 0.85 x)时替换: 正常页的列距抖动 ±5% 会让小差值中位
+      比全体中位小 1-2%, 若无条件替换, 首末槽外缘(pitch/2)跟着漂 0.3-0.5pt -> 普通列的
+      \\put x 不再逐位不变(验收硬指标)。0.85 只在「中位被 >= 1.5x 列距的空白污染」时才落上。
+    VERT_NF_SLOT_ANCHOR=0 时完全回到旧口径(全体中位), 供 A/B 对照。"""
     cs = sorted((a + b) / 2.0 for a, b in bands)
     if len(cs) < NF_MIN_COL: return None, 0.0
-    ds = [y - x for x, y in zip(cs, cs[1:]) if y - x > 4.0]
+    ds = sorted(y - x for x, y in zip(cs, cs[1:]) if y - x > 4.0)
     if len(ds) < (1 if len(cs) == 2 else 2): return None, 0.0   # 2 列: 唯一一段列距即可定槽
     p = statistics.median(ds)
+    if NF_SLOT_ANCHOR:
+        _pr = statistics.median(ds[:max(1, int(0.6 * len(ds)))])
+        if _pr < 0.85 * p:
+            p = _pr
     if p <= 0: return None, 0.0
     return [cs[0] - p / 2.0] + [(a + b) / 2.0 for a, b in zip(cs, cs[1:])] + [cs[-1] + p / 2.0], p
 
@@ -2644,6 +2663,9 @@ def _nf_frame(pi, k):
             'out_l': None, 'out_l_th': V_FRAME_TH, 'out_r': None, 'out_r_th': V_FRAME_TH,
             'thin': [], 'pitch': pitch, 'hx_l': il, 'hx_r': ir, 'bar': (0.0, 0.0),
             'virtual': True, 'cells': edges, 'page_px': (pw, ph), 'fixed': bool(fixed),
+            # taskCJ: 槽窗口锚定用 —— 最终列带按带心升序(= nf_edges 里 cs 的顺序, 与槽一一对应)。
+            #   bands 里含 nf_fill_bands 补齐列 + nf_short_bands 短列, 顺序不定, 故此处显式排序。
+            'bands': sorted(bands, key=lambda b: b[0] + b[1]),
             'box': box, 'rows': body, 'sb': _sb,
             'toc': bool(_tocst), 'toc_rows': _toc_rows, 'toc_stat': _tocst}
 
@@ -2760,15 +2782,38 @@ def _trim_marks(keep, t, hbig, step):
     return tp, bt
 
 
-def _slots_of_edges(ink, dink, edges, it, ib, row_frac=0.0):
+def _anchor_wins(edges, anchors=None, pitch=0.0):
+    """槽格边界 -> 逐槽 x 窗口 [(e0,e1)]; taskCJ 的「病态槽锚定」在这里(纯函数, 便于单测)。
+    判据 = 槽被拉宽(宽 > 1.25 x pitch)且槽中点偏离本列带心 > 0.25 x pitch; 命中后窗口收到
+    「本列带心 ± 半列距」, 两端仍不小于本列墨迹带 ± 4pt(不切墨)。普通槽判据不成立 ->
+    窗口与 edges 逐位相同。"""
+    n = len(edges) - 1
+    win = [(edges[i], edges[i + 1]) for i in range(n)]
+    if anchors is not None and pitch > 0 and len(anchors) == n:
+        for i, (a0, a1) in enumerate(anchors):
+            e0, e1 = win[i]
+            c = (a0 + a1) / 2.0
+            if (e1 - e0) > 1.25 * pitch and abs((e0 + e1) / 2.0 - c) > 0.25 * pitch:
+                win[i] = (min(c - pitch / 2.0, a0 - 4.0),
+                          max(c + pitch / 2.0, a1 + 4.0))
+    return win
+
+
+def _slots_of_edges(ink, dink, edges, it, ib, row_frac=0.0, anchors=None, pitch=0.0):
     """槽格边界 edges(pt) -> 逐槽统计 [{x0,x1,nr,hm,step,runs,top,bot}] 或 None。
     框驱动槽格(§1.98: 内框等分/墨迹列带栅格)与无框伪槽格(§1.975: 墨迹列带)共用同一套口径,
     保证两种来源的槽统计可比(XSCALE/PUNCT_* 的源侧样本即取自这里)。
-    row_frac: >0 时按「槽宽 x row_frac」给 _slot_runs 的行墨迹下限(滤印刷细线, 只无版框路径传)。"""
+    row_frac: >0 时按「槽宽 x row_frac」给 _slot_runs 的行墨迹下限(滤印刷细线, 只无版框路径传)。
+    anchors/pitch(taskCJ, 只无版框路径传): 本列墨迹带 [(x0,x1)] 与稳健列距。锚定判据 =
+      槽被拉宽(宽 > 1.25 x pitch)且槽中点偏离本列带心 > 0.25 x pitch —— 此时槽心被一侧
+      空白按 (G_R-G_L)/4 拉偏(见 nf_edges 与 docs/vert_taskCJ_diagnosis.md §3)。命中后窗口
+      收到「本列带心 ± 半列距」, 两端仍不小于本列带缘 ± 4pt(不切墨)。普通槽两条判据都
+      不成立 -> x0/x1 与旧口径逐位相同。"""
     n = len(edges) - 1
-    _rf = [max(1, int(round(row_frac * (edges[i + 1] - edges[i]) * 2))) if row_frac > 0 else 1
+    win = _anchor_wins(edges, anchors, pitch)
+    _rf = [max(1, int(round(row_frac * (win[i][1] - win[i][0]) * 2))) if row_frac > 0 else 1
            for i in range(n)]
-    raw = [_slot_runs(ink, edges[i], edges[i + 1], it, ib, min_h=0.0, row_floor=_rf[i]) for i in range(n)]
+    raw = [_slot_runs(ink, win[i][0], win[i][1], it, ib, min_h=0.0, row_floor=_rf[i]) for i in range(n)]
     # 异常长 run 剔掉(> 3x 全页 run 高中位): 淡界行线/扫描黑边被并进槽内时会连成一条竖贯 run
     #   (实测 p32: 两槽的 run 高 768pt -> 字号被算成 873pt, 该页判不适配)
     _al = sorted(b - a for rs in raw for a, b in rs if b - a >= 4.0)
@@ -2778,7 +2823,7 @@ def _slots_of_edges(ink, dink, edges, it, ib, row_frac=0.0):
     #   ① 只剔「贴扫描窗口边」的 run(版框横线/装订黑边一定贴窗边; 正文字墨离墨带顶 ~12pt);
     #   ② 合并成长 run 的连续字(相邻字墨相碰)不剔 —— 取首 run 顶/末 run 底即为该列墨迹上下缘。
     _ea, _eb = (it + 2.0), (ib - 2.0)
-    draw = [_slot_runs(dink, edges[i], edges[i + 1], it, ib, min_h=0.0, row_floor=_rf[i]) for i in range(n)]
+    draw = [_slot_runs(dink, win[i][0], win[i][1], it, ib, min_h=0.0, row_floor=_rf[i]) for i in range(n)]
     slots = []
     for i in range(n):
         rs = [r for r in raw[i] if 4.0 <= r[1] - r[0] <= _cap]
@@ -2800,7 +2845,7 @@ def _slots_of_edges(ink, dink, edges, it, ib, row_frac=0.0):
                 if gp < gap: j, gap = k, gp
             if gap <= _dd:
                 keep[j][0] = min(keep[j][0], t[0]); keep[j][1] = max(keep[j][1], t[1])
-        slots.append({'x0': edges[i], 'x1': edges[i + 1], 'nr': len(rs),
+        slots.append({'x0': win[i][0], 'x1': win[i][1], 'nr': len(rs),
                       'hm': (hs[len(hs) // 2] if hs else 0.0), 'step': step0,
                       'runs': rs,                        # taskJ-B: 空格检测用(逐字墨迹 run)
                       'keep': keep,                      # taskS: 引號修剪用(与文本配对后做)
@@ -2894,7 +2939,9 @@ def page_metrics_rf(pi):
         if gv:
             ink = _nf_ink(pi)
             dink = src_gray(pi) < 0.75 * _nf_ink_gray(src_gray(pi))
-            slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'], row_frac=NF_ROW_FRAC)
+            slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'], row_frac=NF_ROW_FRAC,
+                                    anchors=(gv.get('bands') if NF_SLOT_ANCHOR else None),
+                                    pitch=gv.get('pitch', 0.0))
             m = _metrics_finish(pi, gv, slots, gv['in_t'], gv['in_b'], gv['in_r'] - gv['in_l'])
     _metrics_cache_rf[pi] = m
     return m
@@ -2943,10 +2990,14 @@ def page_metrics(pi):
             # 槽统计: 原口径被合理性校验否决时, 再用「带行墨迹下限」的口径重算一次(taskP):
             #   槽窗口里混进印刷细线(残界行线)时原口径的字 run 会被连成一条 -> 字号虚高被否决;
             #   下限口径能滤掉细线。只在原口径被否决时才换(实测源页 9 反而只有原口径对)。
-            slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'])
+            slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'],
+                                    anchors=(gv.get('bands') if NF_SLOT_ANCHOR else None),
+                                    pitch=gv.get('pitch', 0.0))
             m = _metrics_finish(pi, gv, slots, gv['in_t'], gv['in_b'], gv['in_r'] - gv['in_l'])
             if not m and NF_ROW_FRAC > 0:
-                slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'], row_frac=NF_ROW_FRAC)
+                slots = _slots_of_edges(ink, dink, gv['cells'], gv['in_t'], gv['in_b'], row_frac=NF_ROW_FRAC,
+                                        anchors=(gv.get('bands') if NF_SLOT_ANCHOR else None),
+                                        pitch=gv.get('pitch', 0.0))
                 m = _metrics_finish(pi, gv, slots, gv['in_t'], gv['in_b'], gv['in_r'] - gv['in_l'])
                 if m: print('    [无框伪槽格·重试] p%d 原口径被否决 -> 行墨迹下限口径采用' % (pi + 1))
             if NF_SLOT_DBG:
@@ -3095,7 +3146,11 @@ def _split_slot_y(ink, sl, it, ib, step_ref, rows, rmin=2.0):
                     'step': (ds[len(ds) // 2] if ds else 0.0),
                     'runs': runs,
                     'keep': [list(r) for r in g],
-                    'top': g[0][0], 'bot': g[-1][1], 'ysplit': True})
+                    'top': g[0][0], 'bot': g[-1][1], 'ysplit': True,
+                    # taskCJ: 标记「y 拆分子槽」—— col_puts 只对这类槽按本子槽墨高定字号
+                    #   (目录分支 _toc_puts 的单行槽也带 ysplit, 但那边的字号已按本行实测算好,
+                    #    不能再被这条覆盖)。
+                    'absub': True})
     return out
 
 def _align_rows_slots(rows, slots, skip=8.0, prior=0.0, geom=False, pitch=0.0, step=0.0):
@@ -3432,6 +3487,26 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     n = len(t)
     if n == 0: return [], None
     F = m['font']
+    # taskCJ: 「y 拆分子槽」(书眉/页码/共槽分段)按**本子槽实测墨高**定字号 —— 它与正文可能不同字号。
+    #   修前一律用页字号: 实测 p159 书眉「第六回 西門慶…」墨高 20.0pt 而正文 22.5pt, 页字号 26.0
+    #   画出来的字比源书大 13%; 页码子槽 hm=18.0 -> 20.8pt(源书同为小字)。
+    #   墨高取 run 高的 75 分位(_big_hm, 与 §1.976 同口径: 排标点碎片/并字长 run)。
+    #   细笔画/断裂 run 的兜底(实测 p721 页码「一六一」: 「六」被拆成两条 run, 75 分位只有 10pt,
+    #   按墨高会把字号算成 11.5pt, 源书约 20pt): 若字高 < 0.75 x (子槽跨度/字数) —— 字形墨高
+    #   远小于该字在列里占的跨度, 说明 run 不可靠 —— 改用**子槽跨度反推**
+    #   F = (跨度 - 墨高)/(字数-1)(即每个字占一个前进格)。
+    if NF_SLOT_ANCHOR and sl is not None and sl.get('absub'):
+        _hb = _big_hm(sl.get('runs') or [])
+        if _hb > 0:
+            _T, _B = sl.get('top'), sl.get('bot')
+            if _T is not None and _B is not None and _B > _T and n > 1:
+                _span = _B - _T
+                if _hb < 0.75 * _span / float(n):
+                    _hb = max(_hb, (_span - _hb) / float(n - 1) * INK_RATIO)
+            F = max(4.0, round(_hb / INK_RATIO, 1))
+            if os.environ.get('VERT_SUB_DBG'):
+                print('    [SUB-DBG] %s hm=%.1f big=%.1f top=%s bot=%s n=%d -> F=%.1f'
+                      % (t[:8], sl.get('hm') or 0.0, _hb, _T, _B, n, F))
     cap = m['step_cap']
     ink_h = INK_RATIO * F
     T = sl['top'] if (sl and sl.get('top') is not None) else m['band_t']

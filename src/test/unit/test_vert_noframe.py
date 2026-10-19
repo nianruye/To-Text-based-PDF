@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _loader import load            # noqa: E402
 
 _FUNCS = ['nf_body_rows', 'nf_join_rows', 'nf_edges', 'nf_fill_bands', 'nf_fit', 'nf_fit_align',
+          '_anchor_wins',
           '_ink_bands',
           '_nf_ink_gray', '_nf_page_px', '_nf_thr', '_calib_xscale_w', '_calib_med', '_runs',
           '_band_union',
@@ -67,7 +68,7 @@ WZ7 = dict(PW_PX=1843.6, PH_PX=2886.0, page_w=921.8, page_h=1443.0, PT_PER_PX=2.
            FRAG_OVL_PX=24.0, NF_MIN_COL=2, NF_COV=0.12, NF_FIT_K=(0.7, 1.6), NF_FIT_RES=0.5,
            NF_FIX_INV=True, NF_FIT_ALIGN_POS=True, NF_FIT_LAND=True, NF_FIT_PAD=1.0,
            NF_RETRY_BEST=True,
-           NF_SLOT_DBG=False, NF_FRAME_ALLX=False,
+           NF_SLOT_DBG=False, NF_FRAME_ALLX=False, NF_SLOT_ANCHOR=True,
            NF_LINE_CV=0.75, NF_LINE_RV=0.45, NF_LINE_VLEN=0.50, NF_LINE_HLEN=0.55,
            NF_BOX_WMIN=0.35, NF_BOX_HMIN=0.35, NF_HROW_AR=2.0, NF_HROW_CHAR=0.60,
            NF_POS_PRIOR=60.0, all_rows={}, _nf_box_cache={}, _nf_ink_cache={},
@@ -151,6 +152,71 @@ class TestEdges:
         """带数 < 3 -> 不可用(该页交回流式)"""
         ns = _ns()
         assert ns['nf_edges']([(100.0, 120.0)]) == (None, 0.0)
+
+    def test_robust_pitch_sparse_page(self):
+        """taskCJ: 稀疏页(实测 p149)列距被 709pt 空白污染 -> 取小差值中位 = 44.6(真值)。
+        旧口径 median([44.6,709.2]) = 376.9 -> 首末槽外扩 188pt, 槽心偏 +83pt。"""
+        ns = _ns()
+        bands = [(53.0, 77.0), (761.0, 787.0), (806.0, 831.0)]   # 中心 65.0 / 774.0 / 818.5
+        e, p = ns['nf_edges'](bands)
+        assert p == pytest.approx(44.5, abs=1e-9)
+        assert e[0] == pytest.approx(65.0 - p / 2.0)
+        assert e[-1] == pytest.approx(818.5 + p / 2.0)
+        # =0(A/B 旧口径): 全体中位 376.75 -> 末槽被撑到 ~211pt
+        ns0 = _ns(extra={'NF_SLOT_ANCHOR': False})
+        e0, p0 = ns0['nf_edges'](bands)
+        assert p0 == pytest.approx(376.75, abs=1e-9)
+        assert e0[-1] - e0[-2] > 200.0
+
+    def test_robust_pitch_keeps_normal_page(self):
+        """普通页列距抖动 ±5%: 稳健值只小 1-2% -> 不替换(否则首末槽外缘漂 0.3pt,
+        普通列 \\put x 不再逐位不变)。"""
+        ns = _ns()
+        bands = [(100.0, 120.0), (142.5, 162.5), (186.0, 206.0), (229.0, 249.0),
+                 (272.5, 292.5), (316.0, 336.0), (359.5, 379.5)]
+        cs = [110.0, 152.5, 196.0, 239.0, 282.5, 326.0, 369.5]
+        e, p = ns['nf_edges'](bands)
+        assert p == pytest.approx(43.5, abs=1e-9)      # 全体中位(稳健值 43.0 未达替换阈值)
+        assert e == [cs[0] - p / 2.0] + [(a + b) / 2.0 for a, b in zip(cs, cs[1:])] \
+            + [cs[-1] + p / 2.0]
+
+
+class TestAnchorWins:
+    """taskCJ: 槽窗口锚定(病态槽回中 / 普通槽逐位不变 / 不切本列墨)。"""
+
+    def test_pathological_slot_centered(self):
+        """p159 槽 2: edges 由相邻带心中点给出 [309.25,529.0], 带心 507.75, 列距 44.75 ->
+        窗口收到 [485.4,530.1](中心 507.75)。"""
+        ns = _ns()
+        edges = [88.4, 309.25, 529.0]
+        anchors = [(85.0, 116.5), (497.5, 518.0)]
+        win = ns['_anchor_wins'](edges, anchors, 44.75)
+        c0 = (win[0][0] + win[0][1]) / 2.0
+        assert c0 == pytest.approx((85.0 + 116.5) / 2.0)          # 槽 1 也回中
+        assert win[0][0] <= 85.0 and win[0][1] >= 116.5           # 不切本列墨
+        assert win[1][0] == pytest.approx(507.75 - 44.75 / 2.0)   # 槽 2 回中
+        assert win[1][1] == pytest.approx(507.75 + 44.75 / 2.0)
+        assert (win[1][0] + win[1][1]) / 2.0 == pytest.approx(507.75)
+
+    def test_ordinary_slots_bitwise(self):
+        """普通槽: 宽 ≈ 列距, 中点偏差 < 0.25 列距 -> 窗口与 edges 逐位相同。"""
+        ns = _ns()
+        edges = [90.0, 130.0, 170.0, 210.0]
+        anchors = [(100.0, 120.0), (140.0, 160.0), (180.0, 200.0)]
+        win = ns['_anchor_wins'](edges, anchors, 40.0)
+        assert win == [(90.0, 130.0), (130.0, 170.0), (170.0, 210.0)]
+
+    def test_band_wider_than_pitch_not_clipped(self):
+        """带缘保护: 本列墨迹带比列距还宽时, 窗口不小于带宽 + 8pt(不切墨)。"""
+        ns = _ns()
+        win = ns['_anchor_wins']([0.0, 400.0], [(100.0, 180.0)], 40.0)
+        assert win[0][0] <= 96.0 and win[0][1] >= 184.0
+
+    def test_no_anchors_unchanged(self):
+        """无 anchors(有版框路径) -> edges 原样。"""
+        ns = _ns()
+        edges = [10.0, 50.0, 90.0]
+        assert ns['_anchor_wins'](edges) == [(10.0, 50.0), (50.0, 90.0)]
 
 
 class TestFillBands:
