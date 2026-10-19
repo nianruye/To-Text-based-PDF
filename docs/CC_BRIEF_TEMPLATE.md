@@ -70,3 +70,41 @@ lines/coords（spotting）        = 0-based 索引（页 p 用 str(p-1)）
 
 **先探针，后改码。** 改代码前必须先写一个探针/自检脚本，把关键数值打出来并写进报告。
 **没有数值证据的修改一律不接受。**
+
+---
+
+## 附：CC 启动范式（实测，缺一步启动就失败）
+
+```bash
+cd /opt/test
+PROMPT="${PREAMBLE}$(cat docs/vert_taskXX_brief.md)"
+echo "$PROMPT" > /tmp/cc_xx_prompt.txt
+
+IS_SANDBOX=1 setsid nohup claude -p "$PROMPT" \
+  --max-turns 160 \
+  --output-format stream-json --verbose \
+  --dangerously-skip-permissions \
+  > /tmp/vert_taskXX.jsonl 2>&1 < /dev/null &
+```
+
+**三个必踩的坑**：
+
+| 坑 | 现象 | 修法 |
+|---|---|---|
+| root 下 `--dangerously-skip-permissions` 被拒 | `cannot be used with root/sudo privileges` | **前置 `IS_SANDBOX=1`** |
+| `$(cat prompt)` 在 `bash -c '...'` 里被吃 | prompt 为空 / 启动即退 | prompt 写脚本文件或先 `echo` 到 `/tmp` 再 `$(cat 该文件)` |
+| 前台长 `sleep` 等 CC | terminal 超时 SIGTERM 连带杀掉 CC 进程组 | 只用 `background=true` 且 CC 本身走 `setsid nohup` |
+
+**监控**：`stream-json` 写到 `/tmp/vert_taskXX.jsonl`，`ccwatch` 只 glob `/tmp/vert_task*.jsonl`。
+
+**结束判据**：文件末尾出现 `"subtype":"success"`（成功）或 `"subtype":"error_max_turns"`（撞上限）。
+
+---
+
+## 附：等价性验证口径（踩过）
+
+| 比什么 | 是否有效 | 原因 |
+|---|---|---|
+| `.tex` 源码 md5 | ✅ | 确定性文本 |
+| **PDF md5** | ❌ | 内嵌 CreationDate，每次构建都不同 |
+| PDF 逐页文本 / 字符量 | ✅ | 内容等价 |
