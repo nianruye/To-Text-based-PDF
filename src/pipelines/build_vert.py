@@ -179,6 +179,25 @@ def n_cells(t):
     np_ = sum(1 for c in t if c in PUNCT_HANG)
     return max(1, len(t) - int(round((1.0 - PUNCT_CELL) * np_)))
 
+def _step_chars(t):
+    """步进分类用的「格数」口径(taskCK): **连续拉丁字母串按 1 格计**, 其余字符各 1 格。
+    为什么: 竖排里一个西文词是侧排的一片, 沿列方向只占约一格; 但 OCR 文本逐字母计数,
+    (y 跨度 / 字数) 会把词多的列步进低估 —— 实测 p35 的 'narrative art）)下,可以分辨的有寓言,
+    包括exemplum allegory,moral fable' 57 字 / 2009px -> 17.6pt, 而该列真步进 ~25.7pt,
+    于是被 page_rows/note_rows 的「小字注」步进判据误判成边注(渲染到一条 7pt 宽的碎墨列上,
+    与同 x 的正文列叠字)。标点/数字仍各计 1 格(wz7 标点占格, PUNCT_CELL=1 同口径)。"""
+    n, i, L = 0, 0, len(t)
+    while i < L:
+        c = t[i]
+        if ('a' <= c <= 'z') or ('A' <= c <= 'Z'):
+            i += 1
+            while i < L and (('a' <= t[i] <= 'z') or ('A' <= t[i] <= 'Z')):
+                i += 1
+            n += 1
+        else:
+            i += 1; n += 1
+    return max(1, n)
+
 def char_cells(t):
     """逐字格号 [(cell, hanging)]。
     hanging=True 表示「本字墨迹不对齐本格顶」(标点): 标定/拟合的**预测锚点**是**前一字格顶**
@@ -851,14 +870,43 @@ def special_rows(k):
     for r in rows:
         x0, x1, y0, y1, t = r
         if y1 - y0 >= _lh or not (2 <= len(t) <= 10): continue
-        if not (x0 > _br or x1 < _bl): continue
+        _hit_band = (x0 > _br or x1 < _bl)
+        if os.environ.get('VERT_SPECIAL_DBG'):
+            print('    [特殊行候选] %r x%.1f-%.1f y%.1f-%.1f len%d bl=%.1f br=%.1f -> %s' % (
+                t[:12], x0, x1, y0, y1, len(t), _bl, _br, '入带' if _hit_band else '不在边带'))
+        if not _hit_band: continue
         frag = False
         for o in rows:
             if o is r: continue
             if o[2] <= y0 and y1 <= o[3] and (o[3] - o[2]) > (y1 - y0) and min(x1, o[1]) - max(x0, o[0]) > -_fo:
                 frag = True; break
         if frag: continue      # 边注/正文长列里的断行碎片, 非书眉页码
+        # taskCK: **同列成链**的行不是书眉/页码, 而是正文列被 OCR 断开的首/末段。
+        #   实测 wz7 每章末页的左缘列 = 「第N回 + 回目上句 + 回目下句」, OCR 拆成 3 行且 x 带相同;
+        #   「第N回」在左页边带内(短行) -> 被认成书眉, 由 special_tex 用源墨迹单独画一遍;
+        #   其余回目行被 _merge_col_rows 合成正文列, 但槽跨度含「第N回」的墨 -> col_puts 把回目字
+        #   摊满整列, 与 special_tex 画的书眉在 y 上交错(文本层乱序, 审计列内叠字)。
+        #   判据: 邻近行(上或下)与本站 x 带重叠 >= 60% 小者宽, y 间距 <= 2.5 x 邻行步进,
+        #   且邻行像正文/回目(>= 4 字; 页码/短注 2-3 字不算) -> 本站是该列的一段, 不认领。
+        _chain = False
+        if _NF['on']:                      # 只无版框伪槽格路径(wz6 有版框 -> 逐位不变)
+            for o in rows:
+                if o is r: continue
+                if len(o[4]) < 4: continue      # 邻行须像正文/回目(页码/短注 2-3 字不算)
+                ox0, ox1, oy0, oy1, ot = o
+                if min(x1, ox1) - max(x0, ox0) < 0.6 * min(x1 - x0, ox1 - ox0): continue
+                _so = (oy1 - oy0) / float(_step_chars(ot))
+                if _so <= 0: continue
+                if 0 <= oy0 - y1 <= 2.5 * _so or 0 <= y0 - oy1 <= 2.5 * _so:
+                    _chain = True; break
+        if _chain:
+            if os.environ.get('VERT_SPECIAL_DBG'):
+                print('    [特殊行拒认] p? %r x%.1f-%.1f y%.1f-%.1f -> 同列成链(正文列一段)'
+                      % (t[:12], x0, x1, y0, y1))
+            continue
         kind = 'pn' if all(c in NUM_CHARS for c in t) else 'hd'
+        if os.environ.get('VERT_SPECIAL_DBG'):
+            print('    [特殊行认领] %s %r x%.1f-%.1f y%.1f-%.1f' % (kind, t[:12], x0, x1, y0, y1))
         out.append((kind, t, x0, x1, y0, y1))
     return out
 
@@ -1011,7 +1059,8 @@ def note_rows(k):
     for r in rows:
         x0, x1, y0, y1, t = r
         if len(t) < 2 or (x0, x1, y0, y1, t) in claimed: continue
-        step = (y1 - y0) / float(len(t))
+        # taskCK: 连续拉丁串按 1 格计(同 page_rows) —— 词多的正文列不因逐字母计数被误判成边注
+        step = (y1 - y0) / float(_step_chars(t) if _NF['on'] else len(t))
         if not (NOTE_STEP_MIN <= step < NOTE_STEP_RATIO * FS_px): continue
         if (x0 < _bl and x1 <= lx + NOTE_LX_TOL_PX) or t.startswith('*'):
             out.append(r)
@@ -3354,7 +3403,10 @@ def page_rows(k, m, pi, prov=None):
     if os.environ.get('VERT_NF_DBG'):
         print('    [行分组] p%d 原始 %d -> 认领后 %d; 版心内 %d 页外 %d' % (
             pi + 1, len(all_rows[k]), len(inb), len(ins), len(out_rows)))
-    step_px = statistics.median([(r[3] - r[2]) / float(len(r[4])) for r in inb]) if inb else 60.0
+    # taskCK: 步进格数口径只在无版框(NF)路径换成 _step_chars; 有版框书(wz6)仍按 len,
+    #   保证既有产物逐字节不变。
+    _nstep = _step_chars if (m['g'].get('virtual') or _NF['on']) else len
+    step_px = statistics.median([(r[3] - r[2]) / float(_nstep(r[4])) for r in inb]) if inb else 60.0
     ins = _merge_col_rows(ins, step_px, prov)
     out_rows = _merge_col_rows(out_rows, step_px, prov)
     if os.environ.get('VERT_NF_DBG'):
@@ -3373,17 +3425,21 @@ def page_rows(k, m, pi, prov=None):
     if note_x is not None:
         body = [r for r in sht if not (note_x[0] <= (r[0] + r[1]) / 4.0 <= note_x[1])]
         note = [r for r in sht if note_x[0] <= (r[0] + r[1]) / 4.0 <= note_x[1]]
-    st = sorted(((r[3] - r[2]) / float(len(r[4]))) for r in lng)
+    st = sorted(((r[3] - r[2]) / float(_nstep(r[4]))) for r in lng)
     gmax, gi = 0.0, -1
     for j in range(len(st) - 1):
         rat = st[j + 1] / max(1e-6, st[j])
         if rat > gmax: gmax, gi = rat, j
     # 阈值 1.18: 单一字号页的最大步进间隙比实测 <= 1.13(全书 196/224 页 <1.20), 而正文/双行小字
     #   注的步进比实测 1.21-1.62(p4 1.246 / p162 1.55) -> 1.18 分隔两类且不误切单字号页。
-    if gmax >= 1.18 and len(st) >= 4:
+    # taskCK: 步进口径改用 _step_chars(连续拉丁串算 1 格) —— 词多的列不再被低估成「小字注」;
+    #   且 **m['note'] 为空时不做步进分裂**: 槽统计已经给出「本页没有小字号列」的证据,
+    #   此时行步进的离群只可能是 OCR 行盒松紧(实测 p1598「，,聽了，,正是：:」10 字/130pt ->
+    #   13pt, 被当注排成 9pt/步进5pt, 与正文列叠字), 一律按正文渲染。
+    if gmax >= 1.18 and len(st) >= 4 and (m['note'] or not _NF['on']):
         thr = (st[gi] + st[gi + 1]) / 2.0
-        b2 = [r for r in lng if (r[3] - r[2]) / float(len(r[4])) > thr]
-        n2 = [r for r in lng if (r[3] - r[2]) / float(len(r[4])) <= thr]
+        b2 = [r for r in lng if (r[3] - r[2]) / float(_nstep(r[4])) > thr]
+        n2 = [r for r in lng if (r[3] - r[2]) / float(_nstep(r[4])) <= thr]
         # 交叉验证(源图容量判据): 拆出来的两类都要装得下 —— 注位 = 注槽 x2(双行小字), 正文位 = 正文槽;
         #   不一致则不做拆分(实测 p20 间隙比 1.218 但只有 1 行偏大 -> 是标题行, 不是注页)。
         #   taskP2(NF 伪槽格页加严): 无版框书的伪槽格是**按墨迹列带**建的, 每条列带本就是一条真列,
@@ -3515,16 +3571,24 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     #   F = (跨度 - 墨高)/(字数-1)(即每个字占一个前进格)。
     if NF_SLOT_ANCHOR and sl is not None and sl.get('absub'):
         _hb = _big_hm(sl.get('runs') or [])
+        _T, _B = sl.get('top'), sl.get('bot')
+        _span = (_B - _T) if (_T is not None and _B is not None and _B > _T) else 0.0
         if _hb > 0:
-            _T, _B = sl.get('top'), sl.get('bot')
-            if _T is not None and _B is not None and _B > _T and n > 1:
-                _span = _B - _T
-                if _hb < 0.75 * _span / float(n):
-                    _hb = max(_hb, (_span - _hb) / float(n - 1) * INK_RATIO)
+            if _span > 0 and n > 1 and _hb < 0.75 * _span / float(n):
+                _hb = max(_hb, (_span - _hb) / float(n - 1) * INK_RATIO)
             F = max(4.0, round(_hb / INK_RATIO, 1))
-            if os.environ.get('VERT_SUB_DBG'):
-                print('    [SUB-DBG] %s hm=%.1f big=%.1f top=%s bot=%s n=%d -> F=%.1f'
-                      % (t[:8], sl.get('hm') or 0.0, _hb, _T, _B, n, F))
+        # taskCK: **run 高不可靠**的跨度兜底(细笔画数码: 「二/三」的笔画是 2-4pt 横画,
+        #   _big_hm 只能测到半字高)。判据(任务书): F_run < 0.5 x 页字号 且 子槽跨度能容纳
+        #   n 字(span/n 在页字号 0.6-1.5 倍内) -> F = span/n/0.9; 单字 -> 页字号。
+        if _NF['on'] and _span > 0 and _hb / INK_RATIO < 0.5 * m['font']:
+            _Fs = _span / float(n) / 0.9
+            if n > 1 and 0.6 * m['font'] <= _Fs <= 1.5 * m['font']:
+                F = max(4.0, round(_Fs, 1))
+            elif n == 1:
+                F = m['font']
+        if os.environ.get('VERT_SUB_DBG'):
+            print('    [SUB-DBG] %s hm=%.1f big=%.1f top=%s bot=%s n=%d -> F=%.1f'
+                  % (t[:8], sl.get('hm') or 0.0, _hb, _T, _B, n, F))
     cap = m['step_cap']
     ink_h = INK_RATIO * F
     T = sl['top'] if (sl and sl.get('top') is not None) else m['band_t']
@@ -3722,14 +3786,18 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
     pitch = g.get('pitch') or (ir - il) / max(1, len(slots))
 
     def _font_est(st, nc, span):
-        """本列字号估计(taskCJ4): run 高中位口径对**多笔画数字**失效 —— 「二/三」的 run 是
-        横画(高 3-4pt), hm/INK_RATIO 只有 3.5pt, 而整列跨度/字数 ≈ 17pt。故:
+        """本列字号估计(taskCJ4 + taskCK): run 高中位口径对**多笔画数字**失效 —— 「二/三」的
+        run 是横画(高 3-4pt), hm/INK_RATIO 只有 3.5pt, 而整列跨度/字数 ≈ 17pt。故:
           · run 口径可信(F_run >= 0.7 x 页字号) -> 用 F_run(普通正文列, 与修前同值);
-          · 否则 nc >= 2 -> 墨迹段跨度/字数/0.9(竖排 n 字跨度 ≈ n x 字号);
-          · 单字 -> 0.9 x 页字号(单字墨迹(一/三)的 run 高与跨度都不反映字号)。"""
+          · run 口径不可信 -> 跨度口径, **但仅当跨度能容纳 n 字**(span/nc 在页字号 0.6-1.5 倍内,
+            taskCK 判据): F = span/nc/0.9(竖排 n 字跨度 ≈ n x 字号);
+          · 跨度也不可信 / 单字 -> 0.9 x 页字号(单字墨迹(一/三)的 run 高与跨度都不反映字号)。"""
         F_run = st['hm'] / INK_RATIO
         if Fmed > 0 and F_run >= 0.7 * Fmed: return F_run
-        if nc >= 2 and span > 0: return span / float(nc) / 0.9
+        if nc >= 2 and span > 0:
+            _Fs = span / float(nc) / 0.9
+            if Fmed <= 0 or (0.6 * Fmed <= _Fs <= 1.5 * Fmed):
+                return _Fs
         return 0.9 * Fmed
 
     def _ok_stat(st, nc, bw, fe):
@@ -3835,7 +3903,11 @@ def _nf_rescue_rows(pi, m, rows, slots, pairs, skip=(), placed=None):
             _seg = _segment(_band_y_runs(a2, b2), rows[ri])
             if not _seg: continue
             _sy0, _sy1 = _seg[0][0], _seg[-1][1]
-            st2 = _band_stats(ink, a2, b2, _sy0, _sy1, pad=0.0)
+            # taskCK: 纯数码行(页码)的笔画是 2-4pt 细横画, 4pt run 下限会把上半字滤掉
+            #   -> 只余下半字的 top/bot, 字号被后续字号保护压到 4pt; 数码行用 1pt 下限取全笔画。
+            _is_num = bool(rows[ri][4].strip()) and all(
+                c in NUM_CHARS for c in rows[ri][4].replace('\n', '').strip())
+            st2 = _band_stats(ink, a2, b2, _sy0, _sy1, pad=0.0, min_h=(1.0 if _is_num else 4.0))
             fe2 = _font_est(st2, nc, _sy1 - _sy0)
             _ok = _ok_stat(st2, nc, b2 - a2, fe2)
             if os.environ.get('VERT_RESCUE_DBG'):
@@ -4182,6 +4254,40 @@ def page_puts(k, pi, m):
     prev_bot = None
     for ri, si in pairs:
         sl = slots[si]
+        # taskCK: **行↔槽 y 跨度夹取**(只无版框伪槽格页)。槽 top/bot 是该 x 带**全部墨迹**的
+        #   上下缘; 当同一 x 带里还有**另一条 OCR 行**(页码/书眉与正文列共 x 带, 或回目列被
+        #   OCR 断开)时, 槽跨度会包含那条行的墨 —— col_puts 把本行少数字摊满整列, 与另行渲染的
+        #   元素在 y 上交错(实测 p997 回目列槽 233-1115 含页码「四三七」墨, 回目 23 字被摊到
+        #   1050 处与页码叠字; p705 回目列槽 274-1178 含页码「一四五」墨, 同理)。
+        #   判据: 本行 OCR y 带盖不住槽跨度(< 75%) **且** 槽内确有一条与本行 y 段不重叠的
+        #   其它 OCR 行(x 带相交) -> 把槽夹到本行 y 带(±半步进)。正常满列两条都不满足, 逐位不变。
+        _st0, _sb0 = sl.get('top'), sl.get('bot')
+        if (m['g'].get('virtual') and _st0 is not None and _sb0 is not None
+                and _sb0 - _st0 > 0):
+            _ry0, _ry1 = rows[ri][2] / 2.0, rows[ri][3] / 2.0
+            _pad = max(2.0, 0.5 * (sl.get('step') or m.get('step_cap') or 0.0))
+            _T1, _B1 = max(_st0, _ry0 - _pad), min(_sb0, _ry1 + _pad)
+            if _B1 - _T1 > 0 and (_B1 - _T1) < 0.75 * (_sb0 - _st0):
+                _other = False
+                for _oj, _o in enumerate(rows):
+                    if _oj == ri: continue
+                    if min(_o[1], sl['x1'] * 2.0) - max(_o[0], sl['x0'] * 2.0) <= 0: continue
+                    _oy0, _oy1 = _o[2] / 2.0, _o[3] / 2.0
+                    if (_oy0 < _sb0 and _oy1 > _st0
+                            and (_oy1 < _ry0 - _pad or _oy0 > _ry1 + _pad)):
+                        _other = True; break
+                if _other:
+                    sl = dict(sl); sl['top'], sl['bot'] = _T1, _B1
+                    # run 表同口径夹取: 否则 fit_gaps 仍拿「页码/书眉那一段」的 run 当本列字位,
+                    # 把本行文字往下摊(实测 p997 夹取后仍插 4 格、末字「陽」被推到 y1056 与页码叠字)。
+                    if sl.get('runs'):
+                        sl['runs'] = [r for r in sl['runs'] if r[1] > _T1 - 0.5 and r[0] < _B1 + 0.5]
+                    if sl.get('keep'):
+                        sl['keep'] = [r for r in sl['keep'] if r[1] > _T1 - 0.5 and r[0] < _B1 + 0.5]
+                    if os.environ.get('VERT_ROWCLIP_DBG'):
+                        print('    [行槽夹取] p%d 槽 x%.1f-%.1f %.1f-%.1f -> %.1f-%.1f | %s'
+                              % (pi + 1, sl['x0'], sl['x1'], _st0, _sb0, _T1, _B1,
+                                 rows[ri][4][:16]))
         # taskS: 槽首/槽尾的**引號类小墨**修剪(只 NF 路径; 见 _trim_marks)。放在这里做是因为
         #   它需要**文本反证**(首/末字是不是标点), 而文本要到「行 ↔ 槽配好」才有。
         if m['g'].get('virtual') and sl.get('keep'):
@@ -4280,12 +4386,16 @@ def page_puts(k, pi, m):
         '' if ok else '<<不适配, 回退流式'))
     return puts, pairs, ok
 
-def _band_stats(ink, x0, x1, it, ib, pad=2.0):
+def _band_stats(ink, x0, x1, it, ib, pad=2.0, min_h=4.0):
     """区带 x0-x1(pt) 内的墨迹 run 统计 -> {nr, hm, step, top, bot}(pt)。
     先剔「竖线列」(该列墨占比 > 0.6: 版框线/界行线 —— 否则长 run 贯穿内框, 字高会被测成框高),
     再按 page_metrics 同口径统计(run 高限 4pt..3×中位)。
     pad: y 窗两端内缩量(pt, 默认 2 = 原口径)。taskCJ4: 残余列补救传 pad=0 —— 它的 y 窗是
-      **本行 OCR y 带**(短列/页码), 再内缩 2pt 会把首/末字的墨切掉(实测 p702「唱：」行高 57pt)。"""
+      **本行 OCR y 带**(短列/页码), 再内缩 2pt 会把首/末字的墨切掉(实测 p702「唱：」行高 57pt)。
+    min_h(taskCK): 「像字 run」的高下限(pt, 默认 4 = 原口径)。**纯数码行(页码)传 1.0** ——
+      页码「二/三」的笔画是 2-4pt 的细横画, 4pt 下限会把上半字整段滤掉, 只余下半字:
+      实测 p70「二六」原口径 top/bot=1098.5/1116.5 (真值 1077/1116.5), 字号被后继字号保护
+      压成 4pt、两字间距 1.3pt(审计列内叠字)。"""
     xa, xb = int(x0 * 2), int(x1 * 2)
     ya, yb = int((it + pad) * 2), int((ib - pad) * 2)
     z = {'nr': 0, 'hm': 0.0, 'step': 0.0, 'top': None, 'bot': None}
@@ -4297,7 +4407,7 @@ def _band_stats(ink, x0, x1, it, ib, pad=2.0):
     hs = sorted(b - a for a, b in rs)
     hm0 = hs[len(hs) // 2] if hs else 0.0
     cap = max(40.0, 3.0 * hm0)
-    rs = [r for r in rs if 4.0 <= r[1] - r[0] <= cap]
+    rs = [r for r in rs if min_h <= r[1] - r[0] <= cap]
     hs = sorted(b - a for a, b in rs)
     cs = sorted((a + b) / 2.0 for a, b in rs)
     ds = sorted(d for d in (cs[j + 1] - cs[j] for j in range(len(cs) - 1)) if d < 80)
