@@ -11,7 +11,7 @@
 
 验收项（每条给 PASS/FAIL/WARN + 明细）:
   R1 逐列字块数对账   源图该列墨迹字块数 vs 产物该列字符数 | 差>2 报警（抓 OCR 漏字/幻觉）
-  R2 列内字距均匀性   同列相邻字步进的变异系数 CV | CV>0.15 报警（抓「字距空太多」）
+  R2 列内字距异常     同列相邻字步进 >3x 中位的处数>2 | 抓「多插空格」（合法段落空格=2x，不报）
   R3 空隙源图依据     产物插入的空白，源图同 y 位置必须有空白 | 无依据的空白报警
   R4 标题列首位置     字号>1.3x正文的行必须在该列 y 最小处 | 否则报警（抓标题跑中间）
   R5 引号开闭配对     每页 ﹁/﹂ 数量差 | 差>2 报警
@@ -42,7 +42,9 @@ except ImportError:
 
 # ---- 判据阈值（都可用命令行/环境覆盖）----
 R1_TOL = 2          # 字块数差容忍（字）
-R2_CV = 0.15        # 列内步进变异系数上限
+R2_CV = 0.15        # （已弃用，保留兼容）列内步进变异系数上限
+R2_GAP_MUL = 3.0    # 「空 >=N 格」判为异常步进（合法段落空格 = 2 格）
+R2_GAP_N = 2        # 单列允许的异常步进处数上限
 R3_TOL_PT = 6.0     # 产物空白段最小高度（pt），超过才查源图
 R4_DISP = 1.30      # 放大字号判据（正文的倍数）
 R5_TOL = 2          # 引号差容忍
@@ -92,29 +94,39 @@ def count_blocks_1d(profile, min_len=3):
 
 
 # ------------------------------------------------------------------ 产物侧
+PUNCT_SET = set('，。、；：？！「」『』（）〔〕【】﹁﹂︵︶︹︺…⋯—～·　')
+
+
 def out_columns(page):
-    """产物页 -> 按 x 聚成列：[{x, chars:[(y,ch)]}]（近似：x 相邻 ≤3pt 归同列）"""
+    """产物页 -> 按 x 聚成列：[{x, chars:[(y,ch,punct)]}]（近似：x 相邻 ≤3pt 归同列）
+
+    口径修正（2026-10-20）：旧版用 sp['bbox'][1] 当 y —— **竖排 span 的 bbox 高 ≈ 3x 字号**，
+    不同字形的 bbox 顶边差异极大，步进噪声随之爆炸（R2 的 CV 判据实测在 75% 的页上误报，
+    1313/1748 页 FAIL）。改用 rawdict 的 char['origin']（真实基线），并给每个字打
+    「是否标点」标记：竖排标点用 PUNCT_DX/DY 单独定位，origin 与汉字不同源，R2 必须排除。
+    """
     items = []
-    for b in page.get_text('dict')['blocks']:
+    for b in page.get_text('rawdict')['blocks']:
         for ln in b.get('lines', []):
-            for sp in ln['spans']:
-                for ch in sp['text']:
-                    if ch.strip() == '':
+            for sp in ln.get('spans', []):
+                for c in sp.get('chars', []):
+                    ch = c.get('c') or ''
+                    if not ch or ch.isspace():
                         continue
-                    bb = sp['bbox']
-                    items.append((bb[0], bb[1], ch))
+                    o = c.get('origin') or (sp['bbox'][0], sp['bbox'][3])
+                    items.append((o[0], o[1], ch, ch in PUNCT_SET))
     if not items:
         return []
-    items.sort()
+    items.sort(key=lambda z: (z[0], z[1]))
     cols = []
-    for x, y, ch in items:
+    for x, y, ch, pu in items:
         if cols and abs(x - cols[-1]['x']) <= 3.0:
-            cols[-1]['chars'].append((y, ch))
+            cols[-1]['chars'].append((y, ch, pu))
         else:
-            cols.append({'x': x, 'chars': [(y, ch)]})
+            cols.append({'x': x, 'chars': [(y, ch, pu)]})
     for c in cols:
         c['chars'].sort()
-        c['text'] = ''.join(ch for _, ch in c['chars'])
+        c['text'] = ''.join(ch for _, ch, _ in c['chars'])
     return cols
 
 
@@ -203,7 +215,9 @@ def check_page(src_doc, out_doc, pi, coords_page, rows_of_page):
     cvs = []
     bad_cv = []
     for c in cols:
-        ys = [y for y, _ in c['chars']]
+        # 排除标点：竖排标点用 PUNCT_DX/DY 单独定位，origin 与汉字不同源，
+        #   混进来会把 CV 抬到 0.2-0.3（实测 1313/1748 页误报）
+        ys = [y for y, _ch, pu in c['chars'] if not pu]
         if len(ys) < 5:
             continue
         steps = [ys[i + 1] - ys[i] for i in range(len(ys) - 1)]
@@ -213,18 +227,20 @@ def check_page(src_doc, out_doc, pi, coords_page, rows_of_page):
         mu = statistics.median(steps)
         if mu <= 0:
             continue
-        cv = statistics.pstdev(steps) / mu
-        cvs.append(cv)
-        if cv > R2_CV:
-            big = [(round(st), round(st / mu, 2)) for st in steps if st > mu * 1.8]
-            bad_cv.append((round(c['x']), round(cv, 3), big[:3]))
+        # 口径修正（2026-10-20）：CV 判据不可用 —— 渲染端按源书段落/对话分隔插入**一个空格**
+        #   （step = 2x 中位）是正确行为，CV 把它算进方差 -> 有段落就报警（实测 p100/p300/p444
+        #   CV 全在 0.4-0.8，全书 1313/1748 页 FAIL）。改成数「空 >=3 格」的处数：
+        #   真该抓的是多插空格 / 字号与步进不匹配，不是合法的段落空一格。
+        big = [(round(st), round(st / mu, 2)) for st in steps if st > mu * R2_GAP_MUL]
+        if len(big) > R2_GAP_N:
+            bad_cv.append((round(c['x']), round(len(big), 1), big[:3]))
     if cvs:
         rep['metrics']['r2_cv_med'] = round(statistics.median(cvs), 3)
         rep['metrics']['r2_bad'] = len(bad_cv)
         if bad_cv:
             rep['issues'].append(('R2', 'FAIL' if len(bad_cv) > 2 else 'WARN',
-                                  '%d 列字距不均(CV>%.2f): %s' %
-                                  (len(bad_cv), R2_CV, '; '.join('x%d CV%.3f 异常步进%s' % b for b in bad_cv[:3]))))
+                                  '%d 列步进异常(空>=%.0f格 的处数>%d): %s' %
+                                  (len(bad_cv), R2_GAP_MUL, R2_GAP_N, '; '.join('x%d CV%.3f 异常步进%s' % b for b in bad_cv[:3]))))
 
     # ---------- R4 标题列首位置 ----------
     if cols:
@@ -237,7 +253,7 @@ def check_page(src_doc, out_doc, pi, coords_page, rows_of_page):
         if sizes:
             body = statistics.median(sizes)
             for c in cols:
-                ys = [y for y, _ in c['chars']]
+                ys = [y for y, _ch, _pu in c['chars']]
                 if not ys:
                     continue
                 ytop = min(ys)
