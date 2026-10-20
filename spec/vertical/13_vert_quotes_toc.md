@@ -1,6 +1,7 @@
 # 13. 竖排引號误识修复 + 引號占格口径 + 目录页版式（taskU）
 
-状态：**implemented**（任务 A/B）；任务 C **implemented 但默认关**（机制已实现，`VERT_TOC_RESCUE_OK=1` 启用，见 §3）
+状态：**implemented**（任务 A/B）；任务 C **implemented 但默认关**（机制已实现，`VERT_TOC_RESCUE_OK=1` 启用，见 §3）；
+目录页独立分支（taskCH / taskCH2）**implemented**（见 §7）
 实现：`src/pipelines/build_vert.py` §1.997（新）/ §1.976 `_trim_marks` ④（改）/ `_nf_rescue_rows`（改）/ `page_puts` 适配判据（改，默认等价旧行为）
 测试：`src/test/unit/test_vert_taskU.py`（13 项）；报告 [docs/vert_quote_toc_report.md](../../docs/vert_quote_toc_report.md)
 
@@ -57,5 +58,24 @@
 
 1. 10 处「文本比源书少一字」的歧义列未改（位置闸门拦下，见报告 §1.5）。
 2. 294 处「行↔槽」配对整体错位的列不在本轮范围。
-3. 目录页默认仍走 v2 流式（换取不丢字）；`VERT_TOC_RESCUE_OK=1` 可换版式但 4 页各少 10-30 字。
+3. 目录页（`nf_toc_shape` 命中页）已改走 `_toc_puts` 独立分支，**不再**走 v2 流式；
+   未命中页不受影响。`VERT_TOC_RESCUE_OK=1` 仍可换补救版式但 4 页各少 10-30 字。
 4. 双引號 ﹃/﹄ 墨高上限未标定（样本仅 14 个）→ `VERT_QFIX_DOUBLE` 默认关。
+
+## 7. 契约 D：目录页独立分支（taskCH / taskCH2）
+
+- **判定**：`nf_toc_shape` 用**原始 OCR 行**（`nf_join_rows` / 列内合并之前）的列内分层形态，不看行数比
+  （列内 >=2 层 + 首层 <=6 字且短于其余层 + 其余层字数中位 <=20 + 形态列 >=6 + 首层 y 顶跨 <= max(3% 页高, 40pt)）。
+  命中 -> `g['toc']=True`、`g['toc_rows']=原始行`；`page_puts` 开头直接走 `_toc_puts`，
+  不再进入 `_dual` / `_split_slot_y` / 槽补丁。
+- **渲染**：行按 x 心归列（容差 `0.30 x 列距`），列内按 y 升序 = 层；每层一个**自带 OCR y 跨度**的槽，
+  同列多层共用同一 x（p48 表格式目录：16 回 x 3 层）。
+- **标题边界（taskCH2）**：真标题（「金瓶梅詞話總目錄」「詞話第二冊目錄」）仍由 §1.995 标题署名路径渲染；
+  但**目录网格行**（本行所在 x 带内 >=2 行，`_toc_grid_layers`）不得被标题路径认领 —— 否则该层被
+  `_toc_puts` 剔除后画在墨带中心、不回原列（实测 p48「玳安嬉遊蝴蝶巷」x588.9 vs 应 583.7 -> 字压字）。
+  页边行（页码/书眉）交 `special_tex`。
+- **补丁处置**：「补列」已删除；「全列做槽」不再服务目录页（目录页走不到），保留为**非目录页**的
+  槽集补足规则（删除会让 p969/p491 页码列落位回归，见 docs/vert_taskCH_report.md §2.2）。
+- **不变量**：未命中 `nf_toc_shape` 的页不进入新护栏（`g['toc']` 为假），普通正文路径不变；
+  wz6 有版框、不走 NF 路径，`vert.tex` 逐字节相同。
+- 验收数字：[docs/vert_taskCH_report.md](../../docs/vert_taskCH_report.md)。

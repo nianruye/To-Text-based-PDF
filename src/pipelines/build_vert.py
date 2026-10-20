@@ -2090,6 +2090,24 @@ def _toc_seglen(s):
     return len(s.replace('\n', '').replace(' ', '').replace('　', ''))
 
 
+def _toc_grid_layers(rows, cx, tol):
+    """目录网格层数(taskCH2): 原始 OCR 行按 x 心归带(相邻心差 <= tol px 同带)后,
+    与 x 心 cx 同带的行数。真标题/署名行自成一带 -> 1; 目录列的回次/上句/下句同带 -> 2-3;
+    不在任何带内 -> 0。供 `_page_specials` 判断「这一行是目录列的一层, 不是标题」。"""
+    groups = []
+    for c, i in sorted(((r[0] + r[1]) / 2.0, i) for i, r in enumerate(rows)):
+        if groups and c - groups[-1][-1][0] <= tol:
+            groups[-1].append((c, i))
+        else:
+            groups.append([(c, i)])
+    best_d, best_n = tol + 1.0, 0
+    for gr in groups:
+        d = min(abs(c - cx) for c, _i in gr)
+        if d <= tol and d < best_d:
+            best_d, best_n = d, len(gr)
+    return best_n
+
+
 def nf_toc_shape(rows, pitch, ph):
     """目录页形态判据(taskCH)。入参 = **原始 OCR 行**(px)、本页列距(pt)、页高(px)。
     返回 {ncol, multi, shorttop, topspread, pitch} 或 None(非目录页)。
@@ -4064,17 +4082,17 @@ def page_puts(k, pi, m):
     #   ③ 位置口径配对(B: x/y 硬约束 + 位置代价, 两侧可跳过)。
     # taskCE: TOC 页即使 OCR 帧未标定也走这里 —— 伪版心由本页正文行盒定, 行与列带同在 OCR 帧,
     #   位置仍可比(实测 p53/p55 行心与列带心差 <= 0.5pt); y 拆槽用 TOC 口径(rmin 滤点线)。
-    # taskCH: 原 taskCG2「补列」补丁已删除(目录页改由 `_toc_puts` 独立路径处理)。
-    # taskCG5「全列做槽」**保留**, 但只服务**非目录页**: 目录页在 page_puts 开头已被 `_toc_puts`
-    #   接管, 走不到这里。删掉它会回归 3 个正文页的**页码列落位** —— 实测 p491/p969/p1736:
-    #   页码行(3 字短行, 在版心内最左)因墨高小被判进 m['note'], m['body'] 少一槽 -> 行数 > 槽数,
-    #   页码行被 DP 塞进最右正文槽(实测 p969「四〇九」从 x105.5 跑到 x738.9)。字符量不变,
-    #   但版式错位, 属真回归。判据保持原样(行数 > 槽数 且 检测列 >= 行数 -> 用全部检测列)。
+    # taskCH2: 目录页的槽补丁已不存在 —— 目录页在 page_puts 开头由 `_toc_puts` 接管, 走不到这里。
+    #   下面这条是**非目录页的槽集补足规则**(原 taskCG5「全列做槽」): 无版框页里页码这类短数码列
+    #   墨高小, 会被判进 m['note'] -> m['body'] 少一槽 -> 行数 > 槽数时 DP 把页码行塞进右侧正文槽。
+    #   实测删掉它: p969「四〇九」x106.4 -> x738.9、p491「四四七」x104.8 -> x563.1(非目录页,
+    #   违反 taskCH2 ④.4「普通正文页一字不动」); p1736 不变。故保留为**非目录页**槽集选择规则,
+    #   与目录分支零耦合(目录页永远走不到)。判据: 行数 > body 槽数 且 检测列数 >= 行数 -> 用全部列。
     if (m['g'].get('virtual') and len(rows) > len(slots)
             and len(m['slots']) >= len(rows) and len(m['slots']) > len(slots)):
         _n0 = len(slots)
         slots = sorted(m['slots'], key=lambda x: (-(x['x0'] + x['x1']), x.get('top') or 0.0))
-        print('    [全列做槽] p%d 行%d > 槽%d, 检测列%d >= 行数 -> 改用全部列'
+        print('    [槽集补足] p%d 行%d > 槽%d, 检测列%d >= 行数 -> 改用全部列'
               % (pi + 1, len(rows), _n0, len(m['slots'])))
     _ab = (AB_FIX or _toc) and (not _dual) and m['g'].get('virtual') and (m['g'].get('fixed') or _toc)
     if _ab:
@@ -5124,6 +5142,33 @@ def _page_specials(k, pi, g, ink, rows, verbose=True):
             hm = sorted(kept)[len(kept) // 2] if kept else 0.0
             if (len(rr) >= 0.6 * n_cells(r[4]) and hm >= DISP_RATIO * body_h):
                 disp_rows.append(r)
+    # taskCH2: 目录页的**网格行不是标题/署名**。目录 p48 这类表格目录每个回占一个 x 带、
+    #   三个 y 层(回次 / 回目上句 / 回目下句); 层行被 nf_toc_shape 判为目录后, `_toc_puts`
+    #   按层渲染 —— 但若本函数把其中一层(实测 p48「玳安嬉遊蝴蝶巷」, 因邻列墨迹并进邻域窗,
+    #   字高被量成正文 1.65 倍)认领成标题, 该行会被 `_toc_puts` 剔除、改由 `_display_put`
+    #   画在**墨带中心**, 于是这一层不回原列(实测产物 x588.9, 列应在 x583.7)并与邻列字压字。
+    #   判据: 本行所在 x 带(原始 OCR 行、与 nf_toc_shape 同口径 0.30x 列距归带)里 >=2 行 ->
+    #   是目录网格行, 不可认领。真标题(「金瓶梅詞話總目錄」/「詞話第二冊目錄」)自成一带
+    #   (实测组内 1 行), 不受影响。
+    if g.get('toc') and disp_rows:
+        _tr = g.get('toc_rows') or []
+        _to2 = NF_TOC_COL_TOL * pitch * 2.0          # pt -> px
+        _keep = []
+        for r in disp_rows:
+            _cx = (r[0] + r[1]) / 2.0
+            # 页边行(页码/书眉)不属于目录网格, 也不该在这里当标题: 交 special_tex 按页边口径
+            #   渲染(实测 p54 右下角页码「一〇」x838.5 在伪版心右缘外, 网格行解锁后会成为唯一
+            #   「大字号行」而被标题判据认领)。
+            if not (il - 2.0 <= _cx <= ir + 2.0):
+                continue
+            _nlay = _toc_grid_layers(_tr, _cx, _to2)
+            if _nlay >= 2:
+                if verbose:
+                    print('    [目录网格] p%d 「%s」所在 x 带 %d 层 -> 不作标题(交 _toc_puts)'
+                          % (pi + 1, r[4][:14], _nlay))
+                continue
+            _keep.append(r)
+        disp_rows = _keep
     # 标题/署名行**稀少性**护栏: 大字号行只应是页内的少数行(章题页 1-3 条)。实测 wz7 p291 那类
     #   「年号大字 + 小字正文」页若把正文当基准, 会出现大批「大字号行」—— 那是整页字号分层, 不是标题,
     #   交给既有步进分类处理(不在这里动)。判据 = 大字号行数 <= max(1, 25% 长行数)。

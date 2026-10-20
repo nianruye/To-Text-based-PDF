@@ -202,6 +202,7 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 | 13_vert_quotes_toc §3 | 引號占格口径：文本首/末字是引號时**不剔**列首/列尾小墨 | §1.976 `_trim_marks` ④（常量 `QFIX_QFAM` 定义在其前） |
 | 13_vert_quotes_toc §4 | 目录页：补救列带补 `runs` + y 统计窗 = 伪版心 ∪ 该行 OCR y 带 + 适配判据开关 | `_nf_rescue_rows`（`_ynwin`）/ `page_puts` 的 `ok`（`TOC_RESCUE_OK`，默认 0） |
 | 13_vert_quotes_toc（开关） | `VERT_QFIX` / `VERT_QFIX_MAX_RATIO` / `_MIN_RATIO` / `_W_RATIO` / `_VPOS` / `_HPOS` / `_POS_LO` / `_POS_HI` / `_DOUBLE` / `_DBG` / `_REPORT` / `VERT_TOC_RESCUE_OK` | §1.997 / §1.98 常量块 |
+| 13_vert_quotes_toc §7 | 目录页独立分支（taskCH/CH2）：原始行形态判定 + `_toc_puts` 按 (x 带, y 层) 渲染；目录网格行不得被标题路径认领 | §1.95x `nf_toc_shape` / `_toc_grid_layers` / `_toc_puts`；`_page_specials` 的 `g['toc']` 护栏；`page_puts` 开头 `g['toc']` 分支 |
 
 > taskU 的引號判别只走**无版框伪槽格页**（`m['g']['virtual']`），有版框书（wz6）不在影响面内
 > （实测 `vert.tex` md5 逐字节相同）；`_trim_marks` ④ 同理（该函数只被 `page_puts` 调用）。
