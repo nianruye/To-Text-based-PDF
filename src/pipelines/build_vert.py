@@ -1158,11 +1158,19 @@ def _pair_rows_cols_x(rows, cols, tag, pi):
         hh = (r[3] - r[2]) / float(n_)          # 单字高(px)
         pad = 0.5 * hh
         lo, hi = rx0 - pad, rx1 + pad
+        # taskCL-1g: x 与 y 必须**双向**重叠。竖排同一列的上下两段（书眉 + 页码）x 带相同,
+        #   只看 x 会把页顶书眉的墨当成页底页码的列（实测 p210 页码 OCR y1148 配到 y315 的墨,
+        #   落点错且与书眉共列 -> 列内叠字各 3 处）。打分用重叠面积, 取最大。
+        rlo, rhi = float(r[2]) - pad, float(r[3]) + pad
         best, bov, bd = None, -1.0, 1e18
         for i, c in enumerate(cols):
             if i in used:
                 continue
-            ov = min(hi, c[2]) - max(lo, c[0])
+            ovx = min(hi, c[2]) - max(lo, c[0])
+            ovy = min(rhi, c[3]) - max(rlo, c[1])
+            if ovx <= 0 or ovy <= 0:
+                continue
+            ov = ovx * ovy
             d = abs((c[0] + c[2]) / 2.0 - (rx0 + rx1) / 2.0)
             if ov > bov + 1e-9 or (abs(ov - bov) <= 1e-9 and d < bd):
                 best, bov, bd = i, ov, d
