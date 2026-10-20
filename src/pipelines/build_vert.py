@@ -1169,16 +1169,16 @@ def _pair_rows_cols_x(rows, cols, tag, pi):
             ovx = min(hi, c[2]) - max(lo, c[0])
             if ovx <= 0:
                 continue
-            # 页外行(书耳/篇名, x 在图像边缘 0-27pt)的 OCR x/y 都不可靠,
-            #   只查 x 重叠(y 判据会把 wz6 的 12 处书耳全拒掉 -> tex md5 变);
-            #   边注(版心内小字注)才要求 x 与 y 双向重叠。
-            if tag != '页外':
-                ovy = min(rhi, c[3]) - max(rlo, c[1])
-                if ovy <= 0:
+            ov = ovx
+            # taskCL-1i: y 用量级判据, 不要求严格重叠。
+            #   「完全在页面另一段」(y 间隙 > 2 x 行高) 才算配错 —— 实测:
+            #   wz7 p210 页码(y1148-1250) vs 书眉列(y315-438): 间隙 710pt -> 拒 ✓
+            #   wz6 p162 注行 vs 其字列: y 只轻微错开 -> 接受 ✓(硬性重叠会误伤 3 处真边注)
+            ovy = min(rhi, c[3]) - max(rlo, c[1])
+            if ovy <= 0:
+                _ygap = max(rlo - c[3], c[1] - rhi)
+                if _ygap > 2.0 * max(1.0, float(r[3]) - float(r[2])):
                     continue
-                ov = ovx * ovy
-            else:
-                ov = ovx
             d = abs((c[0] + c[2]) / 2.0 - (rx0 + rx1) / 2.0)
             if ov > bov + 1e-9 or (abs(ov - bov) <= 1e-9 and d < bd):
                 best, bov, bd = i, ov, d
