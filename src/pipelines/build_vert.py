@@ -1054,6 +1054,10 @@ NOTE_INK_RATIO = float(os.environ.get('VERT_NOTE_INK_RATIO') or 0.88)   # 单字
 #   「的講演」「這是毛澤」相邻字墨迹间隙 0.25-1.0pt vs 源书同处 1.5-2.0pt, 8x 放大看已粘连)。
 #   故按「满字墨高 <= 0.95 x 步进」压字号再重算步进(整段墨迹上下缘仍与源书对齐)。
 NOTE_INK_MAX = float(os.environ.get('VERT_NOTE_INK_MAX') or 0.94)   # 满字墨高上限(em; §1.956 按当前字体标定)
+# taskCL-1: 边注/页外「行 ↔ 墨迹字列」配对的距离护栏（单位 = 本书实测列距）
+NOTE_PAIR_X = os.environ.get('VERT_NOTE_PAIR_X', '1') not in ('0', 'false', 'False')
+NOTE_PAIR_TOL = float(os.environ.get('VERT_NOTE_PAIR_TOL') or 0.55)   # x 列距
+NOTE_PAIR_TOL_FRAC = float(os.environ.get('VERT_NOTE_PAIR_TOL_FRAC') or 0.030)  # 列距测不出时的页宽比例
 
 def note_rows(k):
     """本页边注行 [(x0,x1,y0,y1,t)]; 书眉/页码优先认领, 剩下的版心外小字才算边注"""
@@ -1132,6 +1136,51 @@ def note_cols(pi, k, rows=None, zone=None, zone_y=None):
     out.sort(key=lambda c: -c[0])
     return out
 
+def _pair_rows_cols_x(rows, cols, tag, pi):
+    """行 ↔ 墨迹字列 配对（taskCL-1）。返回 [(row, col 或 None)]，col=None 表示
+    「本行墨迹没有在区带里成列」-> 调用方退回该行自己的 OCR 坐标。
+
+    判据 = **x 区间重叠**（两侧各放宽半个字高），不依赖任何反推量：
+      · 合法: 边缘小字 OCR x 偏 40pt，注文自身宽 100px -> 与自己的墨迹列仍重叠
+      · 病态(p444): 行 1212-1269(放宽 1187-1294) vs 隔壁诗列 1299-1329 -> 不重叠 -> 拒
+    旧口径（按顺序 zip）零校验；v1（中心距 x 反推列距）实测容差被算成 89.7px 放过 71.4px。
+    多条候选时取「重叠量最大」的，其次取中心最近；一对一贪心，行按 x 降序（竖排阅读序）。
+    """
+    if not rows:
+        return []
+    if not cols:
+        return [(r, None) for r in rows]
+    used = set()
+    out = []
+    for r in sorted(rows, key=lambda r: -(r[0] + r[1])):
+        rx0, rx1 = float(r[0]), float(r[1])
+        n_ = max(1, len(r[4]))
+        hh = (r[3] - r[2]) / float(n_)          # 单字高(px)
+        pad = 0.5 * hh
+        lo, hi = rx0 - pad, rx1 + pad
+        best, bov, bd = None, -1.0, 1e18
+        for i, c in enumerate(cols):
+            if i in used:
+                continue
+            ov = min(hi, c[2]) - max(lo, c[0])
+            d = abs((c[0] + c[2]) / 2.0 - (rx0 + rx1) / 2.0)
+            if ov > bov + 1e-9 or (abs(ov - bov) <= 1e-9 and d < bd):
+                best, bov, bd = i, ov, d
+        if os.environ.get('VERT_NOTE_PAIR_DBG'):
+            print('    [配对调试] 「%s」行x%.1f-%.1f 最近列x%.1f-%.1f 重叠%.1f 中心距%.1f 列数%d -> %s'
+                  % (r[4][:12], rx0, rx1,
+                     (cols[best][0] if best is not None else -1.0),
+                     (cols[best][2] if best is not None else -1.0),
+                     bov, bd, len(cols), '接受' if bov > 0 else '拒(退自位)'))
+        if best is not None and bov > 0:
+            used.add(best)
+            out.append((r, cols[best]))
+        else:
+            print('  [%s-自位] p%d 「%s」OCR x%.1f-%.1f 区带内无重叠墨迹列 -> 用本行自身坐标'
+                  % (tag, pi + 1, r[4][:16], rx0 / 2.0, rx1 / 2.0))
+            out.append((r, None))
+    return out
+
 def note_tex(k, pi, rows=None, zone=None, zone_y=None, tag='边注'):
     """边注 tex 片段: 逐字 \\put。OCR 边注行按 x0 降序(竖排阅读序)配对实测字列(同样 x 降序):
     注文太长时会在下一子列续排(如 p4 注头在右子列、末尾 "的講演" 续在左子列), 子列间无白缝, 只能靠结构配对。
@@ -1141,7 +1190,15 @@ def note_tex(k, pi, rows=None, zone=None, zone_y=None, tag='边注'):
     out = []
     rows = sorted(note_rows(k) if rows is None else rows, key=lambda r: -r[0])
     cols = note_cols(pi, k, rows=rows, zone=zone, zone_y=zone_y)
-    for (x0, x1, y0, y1, t), (ix0, iy0, ix1, iy1, gh, st) in zip(rows, cols):
+    pairs = _pair_rows_cols_x(rows, cols, tag, pi) if NOTE_PAIR_X else list(zip(rows, cols))
+    for row, col in pairs:
+        if col is None:                       # 自位兜底: 本行墨迹未在区带里成列
+            x0, x1, y0, y1, t = row
+            n_ = max(1, len(t))
+            gh = (y1 - y0) / float(n_)
+            col = (x0, y0, x1, y1, gh, gh)
+        (x0, x1, y0, y1, t) = row
+        ix0, iy0, ix1, iy1, gh, st = col
         n = len(t)
         font = round(min(26.0, max(9.0, gh / 2.0 / NOTE_INK_RATIO)), 1)
         gink = NOTE_INK_RATIO * font                          # 渲染单字墨高(pt)
