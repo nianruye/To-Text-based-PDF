@@ -1167,10 +1167,18 @@ def _pair_rows_cols_x(rows, cols, tag, pi):
             if i in used:
                 continue
             ovx = min(hi, c[2]) - max(lo, c[0])
-            ovy = min(rhi, c[3]) - max(rlo, c[1])
-            if ovx <= 0 or ovy <= 0:
+            if ovx <= 0:
                 continue
-            ov = ovx * ovy
+            # 页外行(书耳/篇名, x 在图像边缘 0-27pt)的 OCR x/y 都不可靠,
+            #   只查 x 重叠(y 判据会把 wz6 的 12 处书耳全拒掉 -> tex md5 变);
+            #   边注(版心内小字注)才要求 x 与 y 双向重叠。
+            if tag != '页外':
+                ovy = min(rhi, c[3]) - max(rlo, c[1])
+                if ovy <= 0:
+                    continue
+                ov = ovx * ovy
+            else:
+                ov = ovx
             d = abs((c[0] + c[2]) / 2.0 - (rx0 + rx1) / 2.0)
             if ov > bov + 1e-9 or (abs(ov - bov) <= 1e-9 and d < bd):
                 best, bov, bd = i, ov, d
@@ -1198,7 +1206,11 @@ def note_tex(k, pi, rows=None, zone=None, zone_y=None, tag='边注'):
     out = []
     rows = sorted(note_rows(k) if rows is None else rows, key=lambda r: -r[0])
     cols = note_cols(pi, k, rows=rows, zone=zone, zone_y=zone_y)
-    pairs = _pair_rows_cols_x(rows, cols, tag, pi) if NOTE_PAIR_X else list(zip(rows, cols))
+    # taskCL-1h: 护栏只对「边注」(版心内小字注, OCR x 可靠)生效。
+    #   页外行(书耳/篇名, OCR x 在图像边缘 0-27pt)的 OCR x 天然永远不与墨迹列重叠 ——
+    #   旧顺序 zip 在那里是对的(靠墨迹定位), 套护栏会把 wz6 的 12 处书耳全打成自位 -> tex md5 变。
+    pairs = (_pair_rows_cols_x(rows, cols, tag, pi)
+             if (NOTE_PAIR_X and tag == '边注') else list(zip(rows, cols)))
     for row, col in pairs:
         if col is None:                       # 自位兜底: 本行墨迹未在区带里成列
             x0, x1, y0, y1, t = row
