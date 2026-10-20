@@ -89,7 +89,7 @@ def prod_columns(pdf_page):
     xs = sorted(set(x for x, _ in ch), reverse=True)
     groups = []
     for x in xs:
-        if groups and groups[-1][-1] - x <= 6:
+        if groups and groups[-1][-1] - x <= 15:
             groups[-1].append(x)
         else:
             groups.append([x])
@@ -97,7 +97,10 @@ def prod_columns(pdf_page):
     for gg in groups:
         gs = set(gg)
         ys = sorted(y for x, y in ch if x in gs)
-        out.append(((gg[0] + gg[-1]) / 2.0, ys))
+        # 列 x 跨度 = 该组 x 的最小/最大 ± 半个字宽（产物 origin_x 是字左上角基线，
+        #   列宽取不到时用组内 x 跨度 + 6pt 兜底）
+        cx0, cx1 = min(gg) - 6.0, max(gg) + 6.0
+        out.append((cx0, cx1, ys))
     return out
 
 
@@ -145,10 +148,12 @@ def main():
         if not pcols:
             continue
         for blk in blocks:
-            # 取与源块 x 范围重叠/相邻（±20pt）的所有产物列，合并其 y 后求最大空隙
+            # 只取 **与源块 x 范围真正重叠** 的产物列（用列自身的 x 跨度判，
+            #   不固定外扩 ±N pt —— 外扩会把邻列正文包进来、邻列字符填掉空隙，
+            #   实测 p85 因此把「页码在 y1209、空隙 380pt」误判成违规）
             ys = []
-            for xc, yy in pcols:
-                if blk['x0'] - 20 <= xc <= blk['x1'] + 20:
+            for c_x0, c_x1, yy in pcols:
+                if c_x1 > blk['x0'] and c_x0 < blk['x1']:
                     ys.extend(yy)
             ys.sort()
             got, med = max_gap(ys)

@@ -737,7 +737,13 @@ def _nf_ink_gray(a):
         if v > best: best, bk = v, t
     return bk
 
-NF_LINE_CV = float(os.environ.get('VERT_NF_LINE_CV') or 0.75)     # 竖线列判据: 列墨占比(印刷直线≈1)
+NF_LINE_CV = float(os.environ.get('VERT_NF_LINE_CV') or 0.75)
+# taskCK2: 行↔槽 y 跨度夹取的兜底 —— 槽跨度 > 2.5x 行跨度时无条件夹取
+#   (修 p86 那类「邻列墨迹渗入使子槽 top 被拉高 300pt」, 见夹取块内注释)
+ROWCLIP_SPAN = os.environ.get('VERT_ROWCLIP_SPAN', '1') not in ('0', 'false', 'False')
+# taskCK2: 槽跨度 > N x (字数 x 步进) 时无条件夹取（该行装不满这个槽，说明槽含别的墨）
+ROWCLIP_FILL = float(os.environ.get('VERT_ROWCLIP_FILL') or 1.6)
+     # 竖线列判据: 列墨占比(印刷直线≈1)
 NF_LINE_RV = float(os.environ.get('VERT_NF_LINE_RV') or 0.45)     # 横线行判据(与 frame_geom V_H_COV 同源)
 NF_LINE_VLEN = 0.50     # 竖线纵向跨度下限(页高比例; 版框/界行线近乎贯穿, 正文列的字间空隙达不到)
 NF_LINE_HLEN = 0.55     # 横线横向跨度下限(纸宽比例; 与 frame_geom 同值)
@@ -4276,6 +4282,21 @@ def page_puts(k, pi, m):
                     if (_oy0 < _sb0 and _oy1 > _st0
                             and (_oy1 < _ry0 - _pad or _oy0 > _ry1 + _pad)):
                         _other = True; break
+                # taskCK2: `_other` 只覆盖「多出的跨度来自另一条 OCR 行」这一种成因。
+                #   实测 p86 的反例: 槽窗口左缘 819.7 恰等于邻列右缘, 邻列墨迹渗入该带,
+                #   y 拆子槽的 top 被拉到 832(页码墨实际在 1181-1233), 而 832 处没有对应
+                #   任何 OCR 行 -> _other=False -> 夹取不执行 -> 页码被摊到 y898、字号 72pt。
+                #   兜底: 槽跨度 > 2.5 x 行跨度 时无条件夹取(正常满列比值 <1.5 不触发;
+                #   p100 实测 40/51.7=0.77 逐位不变; p86 396.5/51.9=7.6 触发)。
+                # 判据换成「槽跨度 vs 该行正常需要量」（上一版用 2.5x 行 OCR 跨度, 实测只修好
+                #   p86 那种 2 字页码; p85 回目 18 字跨度 500pt 而槽 1110pt, 比值仅 2.2 漏掉）。
+                #   need = 字数 x 步进(step_cap 已按 source 实测); 槽 > 1.6 x need -> 夹。
+                #   正常满列 44 字 need 1122 vs 槽 1110 -> 不夹; p100 页码 51 vs 槽 40 -> 不夹。
+                if (not _other) and ROWCLIP_SPAN and (_ry1 - _ry0) > 0:
+                    _nc = len([c for c in rows[ri][4] if not c.isspace()])
+                    _stp = sl.get('step') or m.get('step_cap') or 0.0
+                    if _nc > 0 and _stp > 0 and (_sb0 - _st0) > ROWCLIP_FILL * _nc * _stp:
+                        _other = True
                 if _other:
                     sl = dict(sl); sl['top'], sl['bot'] = _T1, _B1
                     # run 表同口径夹取: 否则 fit_gaps 仍拿「页码/书眉那一段」的 run 当本列字位,
