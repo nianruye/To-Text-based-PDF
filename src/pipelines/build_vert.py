@@ -5970,6 +5970,15 @@ QSF_RING_CTR = float(os.environ.get('VERT_QSF_RING_CTR') or 0.35)             # 
 QSF_RING_EDGE = float(os.environ.get('VERT_QSF_RING_EDGE') or 0.05)           # ring: 四边最薄
 QSF_PAD_X = float(os.environ.get('VERT_QSF_PAD_X') or 2.0)       # 取样 x 两侧收紧(pt)
 QSF_MIN_GLYPH = float(os.environ.get('VERT_QSF_MIN_GLYPH') or 0.20)  # 单字形最小尺寸/字格(排碎墨)
+# corner 的**单字形 sanity**(不是分类阈值): 真引号宽 18-21pt / 墨高 8.5-9.5pt = 宽约 0.7-0.8 字、
+#   宽高比 1.9-2.4。实测把「小圆环/句号」裁成 7.5x7.5 时四角特征被抗锯齿噪声拉成极差 0.35-0.6
+#   -> 误判 corner（全书约 148 处；主控复核 p31 w8.5 h7.5 宽高比 1.13 确系句号）。
+#   汉字碎片(20x18)同样会误判。故加三道取样 sanity —— 不满足 -> other(不动)，
+#   判据本身（四角/中心/宽高比阈值）不变。
+QSF_MIN_W = float(os.environ.get('VERT_QSF_MIN_W') or 0.45)      # corner: 墨宽/字格 下限
+QSF_MAX_W = float(os.environ.get('VERT_QSF_MAX_W') or 1.15)      # corner: 墨宽/字格 上限(并字/横线)
+QSF_MIN_AR = float(os.environ.get('VERT_QSF_MIN_AR') or 1.3)     # corner: 宽高比 下限
+QSF_MAX_AR = float(os.environ.get('VERT_QSF_MAX_AR') or 4.0)     # corner: 宽高比 上限  # 单字形最小尺寸/字格(排碎墨)
 _qsf_stat = {'cand': 0, 'corner': 0, 'replace': 0, 'append': 0, 'ring': 0, 'bar': 0,
              'other': 0, 'norun': 0}
 _qsf_log = []
@@ -6126,6 +6135,13 @@ def _qsf_run_feat(ink, sl, run, cell_pt):
     if max(f['w'], f['h']) / sc < QSF_MIN_GLYPH * cell_pt:
         return 'other', f, '碎墨(%.1fx%.1fpt)' % (f['w'] / sc, f['h'] / sc)
     cls, desc = _qsf_classify(f, cell_pt, sc)
+    if cls == 'corner':
+        _w, _h = f['w'] / sc, f['h'] / sc
+        _ar = _w / _h if _h > 0 else 99.0
+        if not (QSF_MIN_W * cell_pt <= _w <= QSF_MAX_W * cell_pt):
+            return 'other', f, '窄/宽墨(%.1fx%.1fpt) %s' % (_w, _h, desc)
+        if not (QSF_MIN_AR <= _ar <= QSF_MAX_AR):
+            return 'other', f, '宽高比%.2f %s' % (_ar, desc)
     return cls, f, desc
 
 def _qsf_pick_tail(ink, sl, step):
