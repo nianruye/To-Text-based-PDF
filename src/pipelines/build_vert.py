@@ -6177,12 +6177,12 @@ def _qsf_plan(pi, sl, step, m, ch, text=None):
 
     # taskCM-fix: 上下文护栏 —— ﹁ 与 ﹂ 墨迹形状相同(都是直角)，分类器分不出开闭。
     #   用户 p618 实测产物出现「：﹁﹂」（空引号对）；全书 v14 18 处 -> v17 32 处（QSF 新造 14 处）。
-    #   ① 紧跟冒号的那一格是开引号 ﹁ 的位置（GB/T 15834-2011 5.2.3 引号成对；
+    #   ① 紧跟冒号的那一格是开引号 ﹁ 的位置（OCR 文本里写作半角「U+300C，渲染时才映射成 ﹁）（GB/T 15834-2011 5.2.3 引号成对；
     #      全书 12429 个 ﹁ 里 94.1% 紧跟冒号，positional prior 极强）
     #   ② 改动后会形成 ﹁﹂ 相邻 = 空引号对
     if text is not None and len(text) >= 2:
         _pv = text[-2]
-        if _pv == '：' or _pv == '﹁':
+        if _pv in ('：', '﹁', '「', '『'):
             _qsf_stat['ctx_skip'] = _qsf_stat.get('ctx_skip', 0) + 1
             return None
     if not QSF_ON or not _NF['on'] or src_doc is None or sl is None or m is None:
