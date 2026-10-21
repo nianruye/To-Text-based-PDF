@@ -3745,7 +3745,7 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     _qsf = None
     if (QSF_ON and _NF['on'] and src_doc is not None and pi is not None and sl is not None
             and t and t[-1] in ('。', '一')):
-        _qsf = _qsf_plan(pi, sl, step, m, t[-1])
+        _qsf = _qsf_plan(pi, sl, step, m, t[-1], t)
         if QSF_DBG:
             _qsf_audit(pi, sl, t, step, m)
     out = []
@@ -5979,7 +5979,7 @@ QSF_MIN_W = float(os.environ.get('VERT_QSF_MIN_W') or 0.45)      # corner: 墨�
 QSF_MAX_W = float(os.environ.get('VERT_QSF_MAX_W') or 1.15)      # corner: 墨宽/字格 上限(并字/横线)
 QSF_MIN_AR = float(os.environ.get('VERT_QSF_MIN_AR') or 1.3)     # corner: 宽高比 下限
 QSF_MAX_AR = float(os.environ.get('VERT_QSF_MAX_AR') or 4.0)     # corner: 宽高比 上限  # 单字形最小尺寸/字格(排碎墨)
-_qsf_stat = {'cand': 0, 'corner': 0, 'replace': 0, 'append': 0, 'ring': 0, 'bar': 0,
+_qsf_stat = {'cand': 0, 'corner': 0, 'replace': 0, 'append': 0, 'ring': 0, 'bar': 0, 'ctx_skip': 0,
              'other': 0, 'norun': 0}
 _qsf_log = []
 
@@ -6027,6 +6027,7 @@ def _qsf_classify(f, cell_pt, px_per_pt=2.0):
 
 def _qsf_decide(ch, tail_cls, prev_cls):
     """尾格形状 + 文本末字 -> 'replace'(1:1 换) / 'append'(补一字) / None(不动)。纯函数。"""
+
     if tail_cls != 'corner':
         return None
     if ch == '一':
@@ -6171,8 +6172,19 @@ def _qsf_pick_tail(ink, sl, step):
         prev_cls, _pf, _pd = _qsf_run_feat(ink, sl, runs[j - 1], step)
     return runs, j, cls, feat, desc, prev_cls
 
-def _qsf_plan(pi, sl, step, m, ch):
+def _qsf_plan(pi, sl, step, m, ch, text=None):
     """列尾闭引号判别 -> {'action','run','cls','prev','feat'} 或 None。只读源图, 不改任何状态。"""
+
+    # taskCM-fix: 上下文护栏 —— ﹁ 与 ﹂ 墨迹形状相同(都是直角)，分类器分不出开闭。
+    #   用户 p618 实测产物出现「：﹁﹂」（空引号对）；全书 v14 18 处 -> v17 32 处（QSF 新造 14 处）。
+    #   ① 紧跟冒号的那一格是开引号 ﹁ 的位置（GB/T 15834-2011 5.2.3 引号成对；
+    #      全书 12429 个 ﹁ 里 94.1% 紧跟冒号，positional prior 极强）
+    #   ② 改动后会形成 ﹁﹂ 相邻 = 空引号对
+    if text is not None and len(text) >= 2:
+        _pv = text[-2]
+        if _pv == '：' or _pv == '﹁':
+            _qsf_stat['ctx_skip'] = _qsf_stat.get('ctx_skip', 0) + 1
+            return None
     if not QSF_ON or not _NF['on'] or src_doc is None or sl is None or m is None:
         return None
     ink = _frame_ink(pi, m['g'])
