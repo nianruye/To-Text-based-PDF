@@ -3741,10 +3741,19 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     x_put = xc - XSCALE * F / 2.0                            # taskJ-A: 横向压缩后字心仍居中于槽中心
     pitch = (sl['x1'] - sl['x0']) if sl else m['w'] / N_COL_FRAME    # 本格格距(pt)
     Fp = PUNCT_SIZE * F                                      # 标点字号(源书标点墨迹明显小于正文)
+    # taskCM: 列尾闭引号形状纠错(只无版框书)。在算完 step/top 之后、铺字之前判: 只读源图。
+    _qsf = None
+    if (QSF_ON and _NF['on'] and src_doc is not None and pi is not None and sl is not None
+            and t and t[-1] in ('。', '一')):
+        _qsf = _qsf_plan(pi, sl, step, m, t[-1])
+        if QSF_DBG:
+            _qsf_audit(pi, sl, t, step, m)
     out = []
     k = 0                                                    # 当前格号(挤格标点不推进)
     for ci, ch in enumerate(t):
         k += gap_at.get(ci, 0)                               # 该字符前的空格格(taskJ-B): 只推进不落墨
+        if ci == n - 1 and _qsf is not None and _qsf['action'] == 'replace':
+            ch = '」'                                        # 1:1 码位替换(字数/格数不动; 渲染为 ﹂)
         if ch in PUNCT_HANG and k > 0:                       # 标点: 贴前一字格右下区(单独字号)
             tx = sl['x0'] + PUNCT_DX * pitch if sl else xc - pitch / 2.0 + PUNCT_DX * pitch
             # 锚点 = **前一字格顶**(PUNCT_DY 的标定语义, 见 §1.956): 循环变量 k = **下一个空闲
@@ -3767,6 +3776,12 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
         _Fm = F * PARA_MARK_SIZE
         out.append(_put_tex('⊙', xc - XSCALE * _Fm / 2.0,
                             page_h - _T0 - PARA_MARK_DY * _Fm, _Fm,
+                            clamp=_pv_clamp_on(m)))
+    if _qsf is not None and _qsf['action'] == 'append':
+        # 补字(taskCM): 源书尾格有引号墨而 OCR 完全没给这个字(末字「。」是源书里**前一个**句号),
+        #   故追加一个 \put —— 既有字的 k/step/top 全不变, 只多画这一个引号。
+        #   落位用**源图实测墨顶**(run[0]) 而非渲染格位: 合并列被均分压缩, 渲染格位比源墨高 1-2 格。
+        out.append(_put_tex('」', x_put, page_h - (_qsf['run'][0] + INK_ASC * F), F,
                             clamp=_pv_clamp_on(m)))
     return out, top + ink_h + (max(k, 1) - 1) * step
 
@@ -5919,6 +5934,274 @@ def nf_fix_quotes(k, pi, m):
         all_rows[k] = newrows
     return nfix
 
+# ---------- 1.998) 竖排闭引号 ﹂ 被 OCR 读成「。」/「一」的格位形状纠错(taskCM) ----------
+# 背景(用户实测 wz7 源页 444): 源书诗句列尾「…衙。﹂」的闭引号 ﹂ 被 OCR 读成「。」或「一」
+#   (`致死冤魂塞滿衙。` / `溟冷飢鬼揮鍾馗。一` 两列用户看到的都是句号/「一」), 渲染端照 OCR
+#   文本画 -> 闭引号整列缺失。本段在**渲染端**做码位纠错: 用源图墨迹形状判「尾格其实是引号」,
+#   只改码位/补一个引号, 不动既有字的字数/格数/列位/字号。
+# 与 §1.997(taskU-A) 的分工: taskU 处理正文里的「一」(run/DP 对齐 + 竖画位置判据, 已改回 79 处);
+#   本段处理**列尾的「。」/「一」**。取样不用 OCR 行盒猜, 用渲染端已算好的槽位 + 源图墨迹 run:
+#   实测 wz7 大量诗句列是**上下半句合并列**(OCR 两行 y 间隔 <= 2.5 步进), 渲染端按合并后字数
+#   均分步进 -> 列尾格位比源书高 1-2 格; 而列尾引号墨又比正文淡(阈值 185 下仅 1.3-8.5pt),
+#   不进 slot 的 top/bot。故取「本列 x 带内、槽底附近的最后一条墨 run」—— 它就是源书该列
+#   最末一个字的真实墨迹(窗口天然只含一个字形, 正是外部工具拿不到的那块图)。
+# 判据(与 tmp_vert/cj5/shape_clf2.py 逐字相同, 由 8 个已标真值反推; **不要改阈值**):
+#   bar    : 宽高比 >= 1.8 且 高 <= 0.30 x 字格   (汉字「一」: 单条长横, 无竖臂)
+#   corner : 四角极差 >= 0.35 且 最大角 >= 0.40 且 中心 <= 0.45  (直角引号: 实心交点 + 两臂)
+#   ring   : 中心 <= 0.35 且 四边最薄 >= 0.05 且 四角极差 < 0.35 (句号: 闭合圆环, 四角均衡)
+#   其余 -> other(不动)
+# 动作(见 _qsf_decide): 尾格 corner + 末字「一」-> 1:1 换成闭引号; 末字「。」且**前一条 run
+#   是 ring** -> 说明这个「。」是 OCR 读对的句号、尾格那条小墨是 OCR 读丢的引号 -> 追加一个
+#   闭引号(QSF_APPEND; 落在源墨迹位置, 不动既有字); 其余 corner -> 1:1 换成闭引号。
+#   替换/追加都用 '」'(渲染端 §1.0c 转竖排形态 ﹂ 并按 BR_SIZE 标定字号; 文本层即 U+FE42)。
+# 只走无版框书(_NF['on']); 有版框书(wz6)整段不执行 -> 逐字节零回归。
+QSF_ON = os.environ.get('VERT_QSF', '1') not in ('0', 'false', 'False')
+QSF_DBG = os.environ.get('VERT_QSF_DBG') == '1'
+QSF_APPEND = os.environ.get('VERT_QSF_APPEND', '1') not in ('0', 'false', 'False')
+QSF_MIN_PIX = int(os.environ.get('VERT_QSF_MIN_PIX') or 24)      # 墨迹像素下限(< = 无墨, 不动)
+QSF_TAIL_DN = float(os.environ.get('VERT_QSF_TAIL_DN') or 1.3)   # 槽底向下找 run 的外扩(步进倍数)
+QSF_MIN_RUN = float(os.environ.get('VERT_QSF_MIN_RUN') or 2.5)   # 尾 run 高下限(pt, 排扫描噪点)
+QSF_BAR_AR = float(os.environ.get('VERT_QSF_BAR_AR') or 1.8)     # bar 判据: 宽高比下限
+QSF_BAR_H = float(os.environ.get('VERT_QSF_BAR_H') or 0.30)      # bar 判据: 墨高/字格 上限
+QSF_CORNER_SPREAD = float(os.environ.get('VERT_QSF_CORNER_SPREAD') or 0.35)   # corner: 四角极差
+QSF_CORNER_MAX = float(os.environ.get('VERT_QSF_CORNER_MAX') or 0.40)         # corner: 最大角
+QSF_CORNER_CTR = float(os.environ.get('VERT_QSF_CORNER_CTR') or 0.45)         # corner: 中心上限
+QSF_RING_CTR = float(os.environ.get('VERT_QSF_RING_CTR') or 0.35)             # ring: 中心上限
+QSF_RING_EDGE = float(os.environ.get('VERT_QSF_RING_EDGE') or 0.05)           # ring: 四边最薄
+QSF_PAD_X = float(os.environ.get('VERT_QSF_PAD_X') or 2.0)       # 取样 x 两侧收紧(pt)
+QSF_MIN_GLYPH = float(os.environ.get('VERT_QSF_MIN_GLYPH') or 0.20)  # 单字形最小尺寸/字格(排碎墨)
+_qsf_stat = {'cand': 0, 'corner': 0, 'replace': 0, 'append': 0, 'ring': 0, 'bar': 0,
+             'other': 0, 'norun': 0}
+_qsf_log = []
+
+def _qsf_analyze(g):
+    """格内墨迹二值图 -> 形状特征 dict 或 None(判据与 tmp_vert/cj5/shape_clf2.py analyze 相同)。"""
+    import numpy as np
+    ys, xs = np.where(g)
+    if len(ys) < QSF_MIN_PIX:
+        return None
+    y0, y1, x0, x1 = ys.min(), ys.max(), xs.min(), xs.max()
+    sub = g[y0:y1 + 1, x0:x1 + 1]
+    h, w = sub.shape
+    if h < 2 or w < 2:
+        return None
+
+    def dens(a0, a1, b0, b1):
+        r0, r1 = int(a0 * h), max(int(a1 * h), int(a0 * h) + 1)
+        c0, c1 = int(b0 * w), max(int(b1 * w), int(b0 * w) + 1)
+        blk = sub[r0:r1, c0:c1]
+        return float(blk.mean()) if blk.size else 0.0
+
+    return dict(h=h, w=w, fill=float(sub.mean()),
+                c1=dens(0, .30, 0, .30), c2=dens(0, .30, .70, 1.),
+                c3=dens(.70, 1., 0, .30), c4=dens(.70, 1., .70, 1.),
+                ctr=dens(.30, .70, .30, .70),
+                top=dens(0, .20, .20, .80), bot=dens(.80, 1., .20, .80),
+                lef=dens(.20, .80, 0, .20), rig=dens(.20, .80, .80, 1.))
+
+def _qsf_classify(f, cell_pt, px_per_pt=2.0):
+    """形状特征 -> ('bar'|'corner'|'ring'|'other', 说明串)。阈值 = 8 个已标真值反推值。"""
+    hpt, wpt = f['h'] / px_per_pt, f['w'] / px_per_pt
+    ar = wpt / hpt if hpt else 99.0
+    corners = [f['c1'], f['c2'], f['c3'], f['c4']]
+    spread = max(corners) - min(corners)
+    desc = '四角%.2f/%.2f/%.2f/%.2f 极差%.2f 中心%.2f w%.1f h%.1f' % (
+        f['c1'], f['c2'], f['c3'], f['c4'], spread, f['ctr'], wpt, hpt)
+    if ar >= QSF_BAR_AR and hpt <= QSF_BAR_H * cell_pt:
+        return 'bar', desc
+    if spread >= QSF_CORNER_SPREAD and max(corners) >= QSF_CORNER_MAX and f['ctr'] <= QSF_CORNER_CTR:
+        return 'corner', desc
+    if (f['ctr'] <= QSF_RING_CTR and min(f['top'], f['bot'], f['lef'], f['rig']) >= QSF_RING_EDGE
+            and spread < QSF_CORNER_SPREAD):
+        return 'ring', desc
+    return 'other', desc
+
+def _qsf_decide(ch, tail_cls, prev_cls):
+    """尾格形状 + 文本末字 -> 'replace'(1:1 换) / 'append'(补一字) / None(不动)。纯函数。"""
+    if tail_cls != 'corner':
+        return None
+    if ch == '一':
+        return 'replace'
+    if ch == '。' and prev_cls == 'ring' and QSF_APPEND:
+        return 'append'
+    return 'replace'
+
+def _qsf_win_x(sl, ink_w):
+    """取样 x 窗(px, 2x): 槽中心 ±0.75 x 本槽宽。**不能直接用槽带** —— 实测槽格是标定后的均匀
+    栅格, 有整列偏移(源页 444 的列墨迹 x519-543 被排进槽 529-555, 偏 +11pt), 按槽带裁会把
+    引号的竖臂切掉(实测四角特征退化成一条横线 -> 误判 bar)。槽中心只当先验, 实际墨迹 run 说了算。"""
+    sc = 2.0
+    pitch = max(8.0, sl['x1'] - sl['x0'])
+    cx = (sl['x0'] + sl['x1']) / 2.0
+    rad = pitch
+    return int(max(0, round((cx - rad) * sc))), int(min(ink_w, round((cx + rad) * sc))), cx
+
+def _qsf_col_xrun(ink, sl, ylo, yhi):
+    """宽 x 窗 + y 窗内, 取**离槽中心最近**的一条墨迹 x-run(px 界) -> (xa, xb) 或 None。
+    这一步定的是「本列」的 x 带: 槽格是标定后的均匀栅格, 可能有整列偏移(实测源页 444 列墨迹
+    x519-543 被排进槽 529-555), 按槽带裁会切掉引号竖臂; 而直接放宽到整页会把邻列的连续正文
+    投影进来(实测列 f 的 y-run 被邻列连成整段, 列尾小墨根本分不出来)。所以先按 x 距离认列,
+    再在该列内做 y 投影。"""
+    sc = 2.0
+    H, W = ink.shape
+    xa, xb, cx = _qsf_win_x(sl, W)
+    ya = int(max(0, round((ylo + 0.5) * sc)))
+    yb = int(min(H, round((yhi - 0.5) * sc)))
+    if xb <= xa or yb <= ya:
+        return None
+    strip = ink[ya:yb, xa:xb]
+    rad = max(8.0, sl['x1'] - sl['x0'])
+    pick = None
+    # x 投影按 4pt 桥接: 同一列不同字的笔画覆盖的 x 子区间之间有缝(实测列 b 被切成
+    #   x680-684 一条竖笔, 只有真列宽 653-699 的 1/6); 列间空白 >= 10pt, 不会被桥接跨过。
+    for a, b in _runs(strip.any(axis=0), 8):
+        if b - a < 4:                                    # 宽 < 2pt = 噪点/列缝渗墨
+            continue
+        xpa, xpb = (xa + a) / sc, (xa + b + 1) / sc
+        d = abs((xpa + xpb) / 2.0 - cx)
+        if d <= rad and (pick is None or d < pick[0]):
+            pick = (d, a, b)
+    if pick is None:
+        return None
+    return xa + pick[1], xa + pick[2] + 1
+
+def _qsf_runs_wide(ink, sl, ylo, yhi):
+    """本列 x 带内的墨迹 y-run 列表(页顶向下 pt, 自上而下)。y 窗不套 QSF_MIN_RUN 过滤 ——
+    列尾的引号/句号本身就是小墨(1.3-8.5pt), 过滤掉就看不到它了。"""
+    sc = 2.0
+    H, _W = ink.shape
+    bd = _qsf_col_xrun(ink, sl, ylo, yhi)
+    if bd is None:
+        return []
+    ya = int(max(0, round((ylo + 0.5) * sc)))
+    yb = int(min(H, round((yhi - 0.5) * sc)))
+    if yb <= ya:
+        return []
+    sub = ink[ya:yb, bd[0]:bd[1]]
+    out = []
+    for a, b in _runs(sub.any(axis=1), 1):
+        if b - a < 2:
+            continue
+        out.append(((ya + a) / sc, (ya + b + 1) / sc))
+    return out
+
+def _qsf_tail_runs(ink, sl, step):
+    """本列槽底附近的源图墨 run 列表(页顶向下 pt), 列表顺序 = 自上而下。
+    窗口 = [槽顶 - 0.5 步进, 槽底 + QSF_TAIL_DN 步进]: 向上留余量给「整列只有一两个字」的短列;
+    向下外扩是捞**淡墨引号** —— 实测它常落在 slot bot 之下(wz7 p444 列尾 ﹂ 在槽底外 0.8-1.1
+    步进; 该墨在阈值 185 下只有 1.3-8.5pt, 不进 _slot_runs 的 dink 统计 -> slot bot 少算一格)。"""
+    top, bot = sl.get('top'), sl.get('bot')
+    if top is None or bot is None or step <= 0:
+        return []
+    ylo = max(0.0, top - 0.5 * step)
+    yhi = min(page_h, bot + QSF_TAIL_DN * step)
+    if yhi <= ylo:
+        return []
+    return _qsf_runs_wide(ink, sl, ylo, yhi)
+
+def _qsf_run_feat(ink, sl, run, cell_pt):
+    """一条墨 run -> 单字形裁剪 -> (cls, 特征 dict, 说明串)。
+    取样口径(v2 外部工具 6/9 失败的原因 —— 必须按字形裁, 不能按列/窗口裁):
+      ① 在 run 的 y 带内认**本列**的 x 带(_qsf_col_xrun: 离槽中心最近的墨迹 x-run);
+      ② 在该 x 带内重算 y 范围 -> 只含一个字形(邻列/上下字的墨都不进包围盒)。"""
+    import numpy as np
+    sc = 2.0
+    H, _W = ink.shape
+    bd = _qsf_col_xrun(ink, sl, run[0] - 1.0, run[1] + 1.0)
+    if bd is None:
+        return None, None, '槽中心 x 窗内无墨'
+    ya = int(max(0, round((run[0] - 0.5) * sc)))
+    yb = int(min(H, round((run[1] + 0.5) * sc)))
+    sub = ink[ya:yb, bd[0]:bd[1]]
+    ys = np.where(sub.any(axis=1))[0]
+    if len(ys) < 2:
+        return None, None, '墨迹不足'
+    y0, y1 = ya + ys.min(), ya + ys.max() + 1
+    crop = ink[y0:y1, bd[0]:bd[1]]
+    f = _qsf_analyze(crop)
+    if f is None:
+        return None, None, '墨迹不足(%d px)' % int(crop.sum())
+    # 单字形尺寸 sanity(不是判据阈值): 真引号/句号/「一」的较长边 >= 0.25 字格; 碎墨(实测
+    #   p444 列 b 下方 2 步进处一条 2.5x4.5pt 噪点)不参与分类, 否则会被四角特征误判成 corner。
+    if max(f['w'], f['h']) / sc < QSF_MIN_GLYPH * cell_pt:
+        return 'other', f, '碎墨(%.1fx%.1fpt)' % (f['w'] / sc, f['h'] / sc)
+    cls, desc = _qsf_classify(f, cell_pt, sc)
+    return cls, f, desc
+
+def _qsf_pick_tail(ink, sl, step):
+    """列尾取样(与判据同源): 从下往上找第一条能给出形状结论(corner/ring/bar)的**小墨** run。
+    为什么要遍历候选: 列尾下方可能有扫描噪点/断笔碎点(实测 p444 列 f 环下 2pt 处有一条 4pt 碎墨),
+    它判成 other 就放弃会漏掉上面那条真引号/句号。最多看 4 条。
+    返回 (runs, idx, cls, feat, desc, prev_cls) 或 None。"""
+    runs = _qsf_tail_runs(ink, sl, step)
+    if not runs:
+        return None
+    cands = []
+    for j in range(len(runs) - 1, -1, -1):
+        _h = runs[j][1] - runs[j][0]
+        if QSF_MIN_RUN <= _h < 0.6 * step:          # 小墨 = 标点/引号(正文字高 ~0.9 步进)
+            cands.append(j)
+    if not cands:
+        cands = [len(runs) - 1]
+    last = None
+    for j in cands[:4]:
+        cls, feat, desc = _qsf_run_feat(ink, sl, runs[j], step)
+        last = (j, cls, feat, desc)
+        if cls in ('corner', 'ring', 'bar'):
+            break
+    j, cls, feat, desc = last
+    prev_cls = None
+    if j > 0:
+        prev_cls, _pf, _pd = _qsf_run_feat(ink, sl, runs[j - 1], step)
+    return runs, j, cls, feat, desc, prev_cls
+
+def _qsf_plan(pi, sl, step, m, ch):
+    """列尾闭引号判别 -> {'action','run','cls','prev','feat'} 或 None。只读源图, 不改任何状态。"""
+    if not QSF_ON or not _NF['on'] or src_doc is None or sl is None or m is None:
+        return None
+    ink = _frame_ink(pi, m['g'])
+    pick = _qsf_pick_tail(ink, sl, step)
+    if pick is None:
+        _qsf_stat['norun'] += 1
+        return None
+    runs, idx, cls, feat, desc, prev_cls = pick
+    tail = runs[idx]
+    _qsf_stat['cand'] += 1
+    if cls in _qsf_stat:
+        _qsf_stat[cls] += 1
+    act = _qsf_decide(ch, cls, prev_cls)
+    if QSF_DBG:
+        print('    [QSF] p%d 列x%.1f-%.1f top%.1f bot%.1f step%.2f 末字%r 尾墨y%.1f-%.1f %s 前条=%s -> %s'
+              % (pi + 1, sl['x0'], sl['x1'], sl.get('top') or 0.0, sl.get('bot') or 0.0, step,
+                 ch, tail[0], tail[1], desc, prev_cls, act))
+    if not act:
+        return None
+    _qsf_stat[act] += 1
+    _qsf_log.append({'page': pi + 1, 'col_x': [round(sl['x0'], 1), round(sl['x1'], 1)],
+                     'step': round(step, 2), 'char': ch, 'action': act, 'cls': cls, 'prev': prev_cls,
+                     'run': [round(tail[0], 1), round(tail[1], 1)],
+                     'w': round(feat['w'] / 2.0, 2), 'h': round(feat['h'] / 2.0, 2),
+                     'desc': desc})
+    return {'action': act, 'run': tail, 'cls': cls, 'prev': prev_cls, 'feat': feat}
+
+def _qsf_audit(pi, sl, text, step, m):
+    """诊断(只 QSF_DBG): 列出本列头 2 / 尾 3 条墨 run 的形状判定, 供 8 样本真值逐条对账。"""
+    ink = _frame_ink(pi, m['g'])
+    runs = _qsf_tail_runs(ink, sl, step)
+    if not runs:
+        return
+    for i in sorted(set([0, 1, len(runs) - 3, len(runs) - 2, len(runs) - 1])):
+        if not (0 <= i < len(runs)):
+            continue
+        cls, _f, desc = _qsf_run_feat(ink, sl, runs[i], step)
+        print('[QSF-AUDIT] ' + json.dumps({
+            'page': pi + 1, 'x0': round(sl['x0'], 1), 'x1': round(sl['x1'], 1),
+            'top': round(sl.get('top') or 0.0, 1), 'bot': round(sl.get('bot') or 0.0, 1),
+            'step': round(step, 2),
+            'i': i, 'nrun': len(runs), 'run': [round(runs[i][0], 1), round(runs[i][1], 1)],
+            'cls': cls, 'desc': desc, 'nchar': len(text), 'text': text[:16]},
+            ensure_ascii=False))
+
 # ---------- 2) 每页内容 ----------
 def page_tex(k, drop_notes=False):
     """一页: 正文列(从右到左)逐列渲染, \\par 强制断列(列断点=源书)
@@ -7079,6 +7362,22 @@ if _qfix_log or _qfix_stat['cand'] or _qfix_all:
         _qfix_stat['cand'], _qfix_stat['fixed'], _qfix_stat['dash'], _qfix_stat['skip'], _qf))
     print('[引號判别·召回] 源图引號墨: 文本已读对 %d / OCR 读丢(文本无此字) %d / 对到「一」但未判为引號 %d / 其它 %d'
           % (_qfix_recall['ocr_ok'], _qfix_recall['dropped'], _qfix_recall['missed'], _qfix_recall['other']))
+
+# ---------- 2.53) 列尾闭引号形状纠错清单落盘(taskCM) ----------
+# 逐处记录(页/列 x/末字/尾墨 y·w·h/四角特征/动作) -> JSON, 供人工复核误改率与「追加」样本。
+if _qsf_log or _qsf_stat['cand']:
+    _qj = os.environ.get('VERT_QSF_REPORT') or os.path.join(TMP, 'qsf.json')
+    json.dump({'on': bool(QSF_ON), 'append': bool(QSF_APPEND), 'stat': _qsf_stat,
+               'crit': {'bar_ar': QSF_BAR_AR, 'bar_h': QSF_BAR_H,
+                        'corner_spread': QSF_CORNER_SPREAD, 'corner_max': QSF_CORNER_MAX,
+                        'corner_ctr': QSF_CORNER_CTR, 'ring_ctr': QSF_RING_CTR,
+                        'ring_edge': QSF_RING_EDGE},
+               'items': sorted(_qsf_log, key=lambda g: (g['page'], g['col_x'][0]))},
+              open(_qj, 'w', encoding='utf8'), ensure_ascii=False, indent=1)
+    print('[闭引号纠错] 尾格候选 %d -> 改回 %d (1:1 替换 %d / 补字 %d) / 尾格真句号 %d / 真「一」%d / 其它 %d -> %s'
+          % (_qsf_stat['cand'], _qsf_stat['replace'] + _qsf_stat['append'],
+             _qsf_stat['replace'], _qsf_stat['append'], _qsf_stat['ring'], _qsf_stat['bar'],
+             _qsf_stat['other'], _qj))
 
 # ---------- 2.55) 影印页清单落盘(§1.995c; 验证端 --expect-low 的输入 = 这里的数据驱动结果) ----------
 if _FAX:
