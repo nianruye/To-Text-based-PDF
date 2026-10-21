@@ -5978,6 +5978,11 @@ QSF_MIN_GLYPH = float(os.environ.get('VERT_QSF_MIN_GLYPH') or 0.20)  # 单字形
 QSF_MIN_W = float(os.environ.get('VERT_QSF_MIN_W') or 0.45)      # corner: 墨宽/字格 下限
 QSF_MAX_W = float(os.environ.get('VERT_QSF_MAX_W') or 1.15)      # corner: 墨宽/字格 上限(并字/横线)
 QSF_MIN_AR = float(os.environ.get('VERT_QSF_MIN_AR') or 1.3)     # corner: 宽高比 下限
+# 开/闭引号方向判据: 竖排 ﹁(开) 是 ┐（横在上+竖在右），﹂(闭) 是 └（竖在左+横在下），
+#   两者 180 度旋转关系。四角极差这类「有没有角」的判据 rotation-invariant，分不出开闭。
+#   bias = (c1+c2)-(c3+c4) = 上组 - 下组：>0 横在上 = 开引号。
+#   （用户 p1400 实测：四角 0.69/0.82/0.00/0.30 bias +1.21 = 开引号，被误改成 ﹂）
+QSF_OPEN_BIAS = float(os.environ.get('VERT_QSF_OPEN_BIAS') or 0.0)
 QSF_MAX_AR = float(os.environ.get('VERT_QSF_MAX_AR') or 4.0)     # corner: 宽高比 上限  # 单字形最小尺寸/字格(排碎墨)
 _qsf_stat = {'cand': 0, 'corner': 0, 'replace': 0, 'append': 0, 'ring': 0, 'bar': 0, 'ctx_skip': 0,
              'other': 0, 'norun': 0}
@@ -6027,6 +6032,8 @@ def _qsf_classify(f, cell_pt, px_per_pt=2.0):
 
 def _qsf_decide(ch, tail_cls, prev_cls):
     """尾格形状 + 文本末字 -> 'replace'(1:1 换) / 'append'(补一字) / None(不动)。纯函数。"""
+    if tail_cls == 'corner_open':
+        return None          # 开引号位置：不是闭引号，不动（见 QSF_OPEN_BIAS 注释）
 
     if tail_cls != 'corner':
         return None
@@ -6143,6 +6150,9 @@ def _qsf_run_feat(ink, sl, run, cell_pt):
             return 'other', f, '窄/宽墨(%.1fx%.1fpt) %s' % (_w, _h, desc)
         if not (QSF_MIN_AR <= _ar <= QSF_MAX_AR):
             return 'other', f, '宽高比%.2f %s' % (_ar, desc)
+        _bias = (f['c1'] + f['c2']) - (f['c3'] + f['c4'])
+        if _bias > QSF_OPEN_BIAS:
+            return 'corner_open', f, '开引号(bias%+.2f) %s' % (_bias, desc)
     return cls, f, desc
 
 def _qsf_pick_tail(ink, sl, step):

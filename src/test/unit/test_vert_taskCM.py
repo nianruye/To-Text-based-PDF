@@ -33,7 +33,7 @@ _FUNCS = ['_qsf_analyze', '_qsf_classify', '_qsf_decide', '_qsf_run_feat',
 _CONSTS = ['QSF_ON', 'QSF_DBG', 'QSF_APPEND', 'QSF_MIN_PIX', 'QSF_MIN_RUN', 'QSF_TAIL_DN',
            'QSF_BAR_AR', 'QSF_BAR_H', 'QSF_CORNER_SPREAD', 'QSF_CORNER_MAX',
            'QSF_CORNER_CTR', 'QSF_RING_CTR', 'QSF_RING_EDGE', 'QSF_PAD_X', 'QSF_MIN_GLYPH',
-           'QSF_MIN_W', 'QSF_MAX_W', 'QSF_MIN_AR', 'QSF_MAX_AR',
+           'QSF_MIN_W', 'QSF_MAX_W', 'QSF_MIN_AR', 'QSF_MAX_AR', 'QSF_OPEN_BIAS',
            '_qsf_stat', '_qsf_log']
 _SC = 2.0
 
