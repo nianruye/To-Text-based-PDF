@@ -1183,11 +1183,11 @@ def _pair_rows_cols_x(rows, cols, tag, pi):
             if ov > bov + 1e-9 or (abs(ov - bov) <= 1e-9 and d < bd):
                 best, bov, bd = i, ov, d
         if os.environ.get('VERT_NOTE_PAIR_DBG'):
-            print('    [配对调试] 「%s」行x%.1f-%.1f 最近列x%.1f-%.1f 重叠%.1f 中心距%.1f 列数%d -> %s'
-                  % (r[4][:12], rx0, rx1,
-                     (cols[best][0] if best is not None else -1.0),
-                     (cols[best][2] if best is not None else -1.0),
-                     bov, bd, len(cols), '接受' if bov > 0 else '拒(退自位)'))
+            _cands = ' '.join('[%.0f-%.0f y%.0f-%.0f]' % (c[0], c[2], c[1], c[3])
+                              for c in cols[:6])
+            print('    [配对调试] 「%s」行x%.1f-%.1f y%.1f-%.1f 包容x%.0f-%.0f pad%.1f 列数%d 候选%s -> %s'
+                  % (r[4][:10], rx0, rx1, float(r[2]), float(r[3]), lo, hi, pad,
+                     len(cols), _cands, '接受' if bov > 0 else '拒'))
         if best is not None and bov > 0:
             used.add(best)
             out.append((r, cols[best]))
