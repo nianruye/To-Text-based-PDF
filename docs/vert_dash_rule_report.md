@@ -150,6 +150,38 @@ context new : '...\n書\n—\n—\n導\n讀\n...'
 
 `—` 保留在文本层（`3 Tr` 不可见），字符量/文本内容与改前完全相同 -> **不涉及数据口径变化**。
 
+### 3.6 300 页样本 A/B（`verify_vert`，竖排 DoD）
+
+数据 `data/wz7/wz7_spotting_{lines,coords}.json` + `tmp_vert/wz7/wz7_sample300.pdf`（300 页，含 70 页影印页）。
+
+```bash
+# 规则开（默认 nf）
+VERT_TMP=/tmp/vertD300_run /usr/bin/python3 src/pipelines/build_vert.py \
+  data/wz7/wz7_spotting_lines.json data/wz7/wz7_spotting_coords.json \
+  tmp_vert/taskD/d300.pdf tmp_vert/wz7/wz7_sample300.pdf
+# 规则关（旧实现）
+VERT_DASH_RULE=0 VERT_TMP=/tmp/vertD300_off_run /usr/bin/python3 src/pipelines/build_vert.py ... tmp_vert/taskD/d300_off.pdf ...
+# verify（--expect-low = build 落盘的影印页清单）
+/usr/bin/python3 src/test/verify_vert.py tmp_vert/taskD/d300.pdf ... --expect-low "$LOW"
+```
+
+| 项 | 规则开（默认 nf） | 规则关（`VERT_DASH_RULE=0`） |
+|---|---|---|
+| `verify_vert` 退出码 | **PASS (0)** | **PASS (0)** |
+| 页数 | 300 = 300 | 300 = 300 |
+| 字符量 | 128671 / 130732 = 98.4% | 同左（逐页相同） |
+| 差异 >80 字页 | 8（预期 8 / 非预期 0） | 同左 |
+| 整页丢失 | 0 | 0 |
+| 越界 span / 矢量 | **0 / 0** | **0 / 0** |
+
+A/B 更强证据：
+
+- `vert.tex` 内容 diff = **只有 318 条「旧 dash put -> rule + 原字 3 Tr」**（另 70 条 diff 是影印页贴图
+  的临时目录路径 `/tmp/vertD300_off_run` vs `/tmp/vertD300_run`，与内容无关）；
+- 300 页**文本层逐页完全相同**（总 257189 字，diff 页 0）。
+
+（构建/验证输出：`tmp_vert/taskD/build300.log`、`verify300.txt`、`verify300_off.txt`，不进库。）
+
 ## 4. 附带发现（不在本任务范围，已登记）
 
 1. **patched 数据里仍有 OCR 误读的破折号**。全库 `—` 共 263 个字符：88 对 `——` + 87 个单 `—`，
