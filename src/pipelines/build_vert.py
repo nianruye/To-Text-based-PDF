@@ -288,12 +288,38 @@ def _txtbox_clamp_y(y_pt, F, page_hi):
     """\put 的 y(自页底)按**实测文本框**夹回页内 -> 新 y。见上方 §1.0a3。"""
     return min(max(y_pt, 0.5 - TXTBOX_C + TXTBOX_DN * F), page_hi - 0.5 - TXTBOX_C - TXTBOX_UP * F)
 
-def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False):
+# ---------- 1.0a4) 竖排破折号 = 整格矢量竖线(taskD) ----------
+# 源书竖排破折号是**一条连续竖线**(用户实测 p57「論金瓶梅這部書——導讀」):
+#   横排字形 U+2014 是横线(w0.803 h0.051 em); 竖排字形 U+FE31 虽是竖线形态, 但墨高只占 0.858 格,
+#   两格相接正中留 0.142 em 的缝(字号 25pt 时约 3.5pt) -> 用户不接受「两条竖线拼接」。
+#   并排字形天然带 side bearing, 「连续/贯穿」只能画矢量: 每个破折号在本格画一条**满格高**的竖线
+#   (高度 = 本列 step), 相邻两格严丝合缝 -> 一条连续竖线。文本层保留原字(3 Tr 不可见, 可搜索,
+#   verify_vert 的字符量不变), 见 _put_tex 的 rule_h 参数。
+#   注意: 西文侧排(LAT_DASH / _latin_put)不走这里 —— 那里的破折号本来就是横向长横线。
+DASH_CHARS = '—―–'                     # 破折号类(与西文侧排 LAT_DASH 同码位; 侧排不经过 _put_tex)
+DASH_RULE_W = float(os.environ.get('VERT_DASH_RULE_W') or 0.040)   # 线宽/字号(字体 U+FE31 墨宽比)
+DASH_RULE_MODE = os.environ.get('VERT_DASH_RULE', 'nf')            # 0=关 / nf=仅无版框页(默认) / all=全部
+
+def _dash_rule_on(m):
+    """本列是否启用「竖排破折号 -> 整格矢量竖线」(§1.0a4)。
+    nf(默认)只对无版框伪槽格页开 —— 有版框书(如 wz6)的 vert.tex 必须逐字节零回归;
+    all/1/on 对全部竖排列开, 0/off 全关。"""
+    mode = globals().get('DASH_RULE_MODE', 'nf')
+    if mode in ('0', 'off', 'false', 'False', ''):
+        return False
+    if mode in ('1', 'all', 'on'):
+        return True
+    return bool(m and m['g'].get('virtual'))
+
+def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None):
     """单字 \\put 片段(pt, 页左上原点 y 向下)。xs = 横向压缩(默认 XSCALE)。
     xs<1 时用自带 q/<K> 0 0 1 0 0 cm ... Q 包住该字(只缩 x 保字高, 状态精确还原不污染后续内容,
     见上方 §1.0a 根因说明); 传入的 x_pt 是缩放后字盒左缘的目标页坐标, 内部按 PAGE_ORIGIN_BP 反解。
-    括号走 §1.0c 的竖排形态替换(字号/位置一并校正), 其余字不受影响。"""
+    括号走 §1.0c 的竖排形态替换(字号/位置一并校正), 其余字不受影响。
+    rule_h(可选, bp): 竖排破折号要画满的**格高** —— 传了就改成「不可见原字 + 整格矢量竖线」,
+    见 §1.0a4; 不传(None)则与旧实现逐位相同。"""
     xs = XSCALE if xs is None else xs
+    x0_pt = x_pt                                   # 破折号线心定位用(压缩前的字盒左缘)
     ch, F, x_pt, y_pt = _br_put(ch, x_pt, y_pt, F, xs)
     if clamp:
         # 夹回页内(只无框伪槽格页传 True, 见 _pv_clamp_on 注释): 必须在 _br_put **之后** ——
@@ -302,13 +328,30 @@ def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False):
         #   1.734F + 4.9pt(p104 那 1 条 ﹁ 越界 5.93pt 即此)。
         y_pt = _txtbox_clamp_y(y_pt, F, page_h)
         x_pt = min(max(x_pt, 0.5), page_w - F - 0.5)
+    # 用 globals().get: ast 抽取式单测的合成命名空间没有这几个模块级名, 裸引用会 NameError
+    dash = bool(rule_h) and ch in globals().get('DASH_CHARS', '—―–')
     body = _vb(r'\fontsize{%spt}{%spt}\selectfont %s' % (round(F, 1), round(F, 1), _esc_ch(ch)))
     if abs(xs - 1.0) > 1e-6:
         ks = ('%.4f' % xs).rstrip('0').rstrip('.')
         x_pt = (x_pt - PAGE_ORIGIN_BP) / float(ks) + PAGE_ORIGIN_BP   # 反解: 变换绕页 x=72bp
         body = (r'\special{pdf:literal direct q %s 0 0 1 0 0 cm}%s'
                 r'\special{pdf:literal direct Q}') % (ks, body)
-    return r'\put(%.1f,%.1f){%s}' % (x_pt * PT2BP, y_pt * PT2BP, body)
+    if dash:
+        # 3 Tr = 不可见文本渲染模式: 文本层保留原字(可搜索 / 字符量不变), 画面由下面的 rule 画
+        body = (r'\special{pdf:literal direct q 3 Tr}' + body
+                + r'\special{pdf:literal direct Q}')
+    put = r'\put(%.1f,%.1f){%s}' % (x_pt * PT2BP, y_pt * PT2BP, body)
+    if dash:
+        # 竖线几何: 高度 = 本格 step; 基线在格顶下 INK_ASC*F 处, 故 rule 底端 = 基线下
+        #   (step - INK_ASC*F) -> 负 lift。相邻两格首尾相接(高度恰为一格), 中间无缝。
+        w = float(globals().get('DASH_RULE_W', 0.040)) * F        # 线宽(TeX pt)
+        h = rule_h * PT2BP                                        # 格高(TeX pt)
+        lift = (float(globals().get('INK_ASC', 0.94)) * F - rule_h) * PT2BP
+        xc = x0_pt + xs * F / 2.0                                 # 列心(页面 bp)
+        xr = xc * PT2BP - w / 2.0                                 # rule 左缘(TeX pt)
+        put = (r'\put(%.2f,%.2f){\rule[%.4fpt]{%.4fpt}{%.4fpt}}'
+               % (xr, y_pt * PT2BP, lift, w, h)) + put
+    return put
 
 # ---------- 1.0b) 列内空隙(源书空一格)对齐(taskJ-B) ----------
 # 背景(用户实测反馈②): 源书问答体「問：」「答：」后空一格, OCR 不保留 -> 我们的列里没有这一格,
@@ -3556,27 +3599,10 @@ def page_rows(k, m, pi, prov=None):
                 print('        x%7.1f-%7.1f y%7.1f n%3d %s' % (r[0] / 2, r[1] / 2, r[2] / 2, len(r[4]), r[4][:28]))
     return body, note, out_rows
 
-# 竖排破折号字形: U+2014(—) 在字体里是横线(w0.803 h0.051 em, 宽高比 15.75),
-#   竖排里该用 U+FE31(︱ VERT EM DASH: w0.040 h0.858 em，宽高比 0.05)。
-#   用户实测 p57「論金瓶梅這部書——導讀」源书是一条竖线，产物画成两个横线。
-# 竖向拉伸系数 = 1 / 0.858（U+FE31 的墨高占格比），让每个 ︱ 铺满整格，
-#   两格相接才是一条连续竖线（否则中间有 0.142em 的缝）。{\scalebox...} 用 {} 限定作用域防变换泄漏。
-_VDASH_SY = 1.166
-VERT_DASH_MAP = {  # 竖排破折号 -> 竖线字形（字面 U+FE31，不用 \char 以免 uplatex 竖排上下文不认）
-    '—': '{\\scalebox{1}[1.166]{︱}}',
-    '―': '{\\scalebox{1}[1.166]{︱}}',
-    '–': '{\\scalebox{1}[1.166]{︱}}',
-}
-VERT_DASH = os.environ.get('VERT_VERT_DASH', '0') != '0'
-# 默认关: 目标是用 U+FE31 竖线字形替代横的 U+2014，但 scalebox 在竖排文档里未定义
-#   (graphicx 未加载, 实测 Undefined control sequence)。待改用 plain rule 或加载 graphicx 后开启。
-
-
 def _esc_ch(t):
-    """单字 LaTeX 转义(与旧正文流同一组: % # & _)；竖排破折号换成竖排字形。"""
-    # 用 globals().get: ast 抽取式单测的合成命名空间没有这两个模块级名，裸引用会 NameError
-    if globals().get('VERT_DASH', True) and t in globals().get('VERT_DASH_MAP', {}):
-        t = globals()['VERT_DASH_MAP'][t]
+    """单字 LaTeX 转义(与旧正文流同一组: % # & _)。
+    竖排破折号不在此处改字形: 它要画成整格矢量竖线(见 §1.0a4 / _put_tex 的 rule_h),
+    且西文侧排也走本函数 —— 那里的破折号必须保持横向字形。"""
     return t.replace('%', r'\%').replace('#', r'\#').replace('&', r'\&').replace('_', r'\_')
 
 def _pv_clamp_on(m):
@@ -3756,6 +3782,9 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
             step = min(1.30 * cap, max(0.75 * cap, (B - T - ink_h) / (nc - 1)))
         if top + ink_h + (nc - 1) * step > guard_b:
             step = (guard_b - top - ink_h) / (nc - 1)
+    # taskD: 竖排破折号画「满一格」的矢量竖线(§1.0a4)。默认只在无版框页开(有版框书 vert.tex
+    #   逐字节零回归); VERT_DASH_RULE=all 可对全部竖排列生效, =0 关闭。
+    _rule_h = (step if step > 0 else ink_h) if _dash_rule_on(m) else None
     y0 = top + INK_ASC * F                                   # 首字基线(页顶向下, 墨顶在基线上方 0.94F)
     x_put = xc - XSCALE * F / 2.0                            # taskJ-A: 横向压缩后字心仍居中于槽中心
     pitch = (sl['x1'] - sl['x0']) if sl else m['w'] / N_COL_FRAME    # 本格格距(pt)
@@ -3785,7 +3814,7 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
             k += int(round(PUNCT_CELL))
             continue
         y_put = page_h - (y0 + k * step)
-        out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m)))
+        out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), rule_h=_rule_h))
         k += 1
     if _pm is not None:
         # 圈点画在让出来的首格(原 T0 起的一格), 字号同正文 —— 源书圈点也是整格大小。
