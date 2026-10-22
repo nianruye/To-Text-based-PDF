@@ -3556,8 +3556,27 @@ def page_rows(k, m, pi, prov=None):
                 print('        x%7.1f-%7.1f y%7.1f n%3d %s' % (r[0] / 2, r[1] / 2, r[2] / 2, len(r[4]), r[4][:28]))
     return body, note, out_rows
 
+# 竖排破折号字形: U+2014(—) 在字体里是横线(w0.803 h0.051 em, 宽高比 15.75),
+#   竖排里该用 U+FE31(︱ VERT EM DASH: w0.040 h0.858 em，宽高比 0.05)。
+#   用户实测 p57「論金瓶梅這部書——導讀」源书是一条竖线，产物画成两个横线。
+# 竖向拉伸系数 = 1 / 0.858（U+FE31 的墨高占格比），让每个 ︱ 铺满整格，
+#   两格相接才是一条连续竖线（否则中间有 0.142em 的缝）。{\scalebox...} 用 {} 限定作用域防变换泄漏。
+_VDASH_SY = 1.166
+VERT_DASH_MAP = {  # 竖排破折号 -> 竖线字形（字面 U+FE31，不用 \char 以免 uplatex 竖排上下文不认）
+    '—': '{\\scalebox{1}[1.166]{︱}}',
+    '―': '{\\scalebox{1}[1.166]{︱}}',
+    '–': '{\\scalebox{1}[1.166]{︱}}',
+}
+VERT_DASH = os.environ.get('VERT_VERT_DASH', '0') != '0'
+# 默认关: 目标是用 U+FE31 竖线字形替代横的 U+2014，但 scalebox 在竖排文档里未定义
+#   (graphicx 未加载, 实测 Undefined control sequence)。待改用 plain rule 或加载 graphicx 后开启。
+
+
 def _esc_ch(t):
-    """单字 LaTeX 转义(与旧正文流同一组: % # & _)。"""
+    """单字 LaTeX 转义(与旧正文流同一组: % # & _)；竖排破折号换成竖排字形。"""
+    # 用 globals().get: ast 抽取式单测的合成命名空间没有这两个模块级名，裸引用会 NameError
+    if globals().get('VERT_DASH', True) and t in globals().get('VERT_DASH_MAP', {}):
+        t = globals()['VERT_DASH_MAP'][t]
     return t.replace('%', r'\%').replace('#', r'\#').replace('&', r'\&').replace('_', r'\_')
 
 def _pv_clamp_on(m):
