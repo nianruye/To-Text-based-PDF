@@ -288,20 +288,35 @@ def _txtbox_clamp_y(y_pt, F, page_hi):
     """\put 的 y(自页底)按**实测文本框**夹回页内 -> 新 y。见上方 §1.0a3。"""
     return min(max(y_pt, 0.5 - TXTBOX_C + TXTBOX_DN * F), page_hi - 0.5 - TXTBOX_C - TXTBOX_UP * F)
 
-# ---------- 1.0a4) 竖排破折号 = 整格矢量竖线(taskD) ----------
+# ---------- 1.0a4) 竖排破折号 = 源图墨迹实测的一条连续竖线(taskD / taskD-R2) ----------
 # 源书竖排破折号是**一条连续竖线**(用户实测 p57「論金瓶梅這部書——導讀」):
-#   横排字形 U+2014 是横线(w0.803 h0.051 em); 竖排字形 U+FE31 虽是竖线形态, 但墨高只占 0.858 格,
-#   两格相接正中留 0.142 em 的缝(字号 25pt 时约 3.5pt) -> 用户不接受「两条竖线拼接」。
-#   并排字形天然带 side bearing, 「连续/贯穿」只能画矢量: 每个破折号在本格画一条**满格高**的竖线
-#   (高度 = 本列 step), 相邻两格严丝合缝 -> 一条连续竖线。文本层保留原字(3 Tr 不可见, 可搜索,
-#   verify_vert 的字符量不变), 见 _put_tex 的 rule_h 参数。
-#   注意: 西文侧排(LAT_DASH / _latin_put)不走这里 —— 那里的破折号本来就是横向长横线。
+#   横排字形 U+2014 是横线(w0.803 h0.051 em); 竖排字形 U+FE31 墨高只占 0.858 格,
+#   两格相接正中留 0.142 em 的缝 -> 用户不接受「两条竖线拼接」; 并排字形带 side bearing,
+#   连续/贯穿只能画矢量。
+# R2 口径(主控复核): OCR 把源书的**一个标点墨块**读成相邻两个 `—` 字符, 所以
+#   ① 相邻破折号字符**合起来画一条**线(不是一个字符一条);
+#   ② 线长/线位/线宽**全部从源图墨迹实测**(在源图该列该格区读竖直墨段),
+#      不用 step / F / INK_ASC 推算版面格 —— 那三者在 step ≠ F 的列上必然偏, 且每本书偏得不同;
+#   ③ 读不到墨迹(无源 PDF / 找不到竖直墨段)才退回兜底: 每个字符 1.0 step(旧行为), 并落日志。
+# 文本层保留原字(3 Tr 不可见, 可搜索, verify_vert 的字符量不变)。
+# 注意: 西文侧排(LAT_DASH / _latin_put)不走这里 —— 那里的破折号本来就是横向长横线。
 DASH_CHARS = '—―–'                     # 破折号类(与西文侧排 LAT_DASH 同码位; 侧排不经过 _put_tex)
-DASH_RULE_W = float(os.environ.get('VERT_DASH_RULE_W') or 0.040)   # 线宽/字号(字体 U+FE31 墨宽比)
+DASH_RULE_W_RAW = os.environ.get('VERT_DASH_RULE_W') or '0.040'    # 线宽/字号; 'src' = 用源图实测线宽
+DASH_RULE_W = (float(DASH_RULE_W_RAW) if DASH_RULE_W_RAW.replace('.', '', 1).isdigit() else 0.040)
 DASH_RULE_MODE = os.environ.get('VERT_DASH_RULE', 'nf')            # 0=关 / nf=仅无版框页(默认) / all=全部
+# 以下全部是**比值**(相对本列 step / 每组字符数), 只用于「这段墨是不是破折号线」的判据与日志;
+# 线的几何本身来自源图墨迹实测, 不由这些常数推算。wz7 实测: 线长/step = 1.26(两个字符一组)。
+DASH_LEN_RATIO = float(os.environ.get('VERT_DASH_LEN_RATIO') or 1.26)  # 参考比值(仅日志/验收对照)
+DASH_SEG_LO = float(os.environ.get('VERT_DASH_SEG_LO') or 0.45)   # 墨段长/(step×字符数) 下限(挡笔画碎片)
+DASH_SEG_HI = float(os.environ.get('VERT_DASH_SEG_HI') or 1.70)   # 上限(挡并字长 run / 整列粘连)
+DASH_SEG_OVL = float(os.environ.get('VERT_DASH_SEG_OVL') or 0.75) # 墨段须落在本组格区内的比例(挡邻字笔画)
+DASH_X_TOL = float(os.environ.get('VERT_DASH_X_TOL') or 0.25)     # 墨心距列心 / step
+DASH_W_MAX = float(os.environ.get('VERT_DASH_W_MAX') or 0.35)     # 实测线宽 / step 上限(挡字画笔)
+DASH_DBG = os.environ.get('VERT_DASH_DBG', '') not in ('', '0', 'false', 'False')
+_DASH_LOG = []                          # 每组实测/兜底记录(全书跑完落盘 + 打印中位数)
 
 def _dash_rule_on(m):
-    """本列是否启用「竖排破折号 -> 整格矢量竖线」(§1.0a4)。
+    """本列是否启用「竖排破折号 -> 矢量竖线」(§1.0a4)。
     nf(默认)只对无版框伪槽格页开 —— 有版框书(如 wz6)的 vert.tex 必须逐字节零回归;
     all/1/on 对全部竖排列开, 0/off 全关。"""
     mode = globals().get('DASH_RULE_MODE', 'nf')
@@ -311,15 +326,121 @@ def _dash_rule_on(m):
         return True
     return bool(m and m['g'].get('virtual'))
 
-def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None):
+def _dash_runs(t, k_of):
+    """文本 + 逐字格号 -> 相邻破折号组 [(ci0, ci1, k0, nd)]。
+    「相邻」= 文本相邻**且**格号连续(k_{i+1} = k_i + 1) —— 中间被 fit_gaps 插了空格的
+    两个 `—` 不算一组(它们之间确实有空隙)。纯函数。"""
+    dch = globals().get('DASH_CHARS', '—―–')
+    out = []
+    i, n = 0, len(t)
+    while i < n:
+        if t[i] in dch:
+            j = i
+            while j + 1 < n and t[j + 1] in dch and k_of[j + 1] == k_of[j] + 1:
+                j += 1
+            out.append((i, j, k_of[i], j - i + 1))
+            i = j + 1
+        else:
+            i += 1
+    return out
+
+def _dash_ink_seg(pi, g, xc, step, yc0, yc1, nd):
+    """源图读破折号墨块 -> {y0,y1,xc,w,ratio} / None(未标定)。
+    读法: 在本列列心 ±0.35×step、本组格区 ±0.5×step 的窗口里, 逐列找**最长连续墨段**;
+    段长 ∈ [DASH_SEG_LO, DASH_SEG_HI]×(step×nd) 且与本组格区重叠 ≥ DASH_SEG_OVL×段长
+    (挡上下邻字的笔画, 它们只与本格区部分重叠); 再量同段覆盖 ≥0.5 的连续墨列得线宽/线心;
+    线宽 ≤ DASH_W_MAX×step、线心距列心 ≤ DASH_X_TOL×step(挡字画笔/错列)。
+    返回的 y0/y1/xc/w 全部是源图墨迹实测值(pt, 页左上原点)。"""
+    if src_doc is None or pi is None or step <= 0.5:
+        return None
+    try:
+        ink = _frame_ink(pi, g)
+    except Exception:
+        return None
+    if ink is None or getattr(ink, 'size', 0) == 0:
+        return None
+    import numpy as np
+    H, W = ink.shape
+    pad = 0.5 * step
+    yw0 = max(0, int(round((yc0 - pad) * 2.0)))
+    yw1 = min(H, int(round((yc1 + pad) * 2.0)))
+    xw0 = max(0, int(round((xc - 0.35 * step) * 2.0)))
+    xw1 = min(W, int(round((xc + 0.35 * step) * 2.0)))
+    if yw1 - yw0 < 8 or xw1 - xw0 < 3:
+        return None
+    sub = ink[yw0:yw1, xw0:xw1]
+    spx = step * 2.0
+    lo = max(4, int(round(float(globals().get('DASH_SEG_LO', 0.45)) * nd * spx)))
+    hi = max(lo, int(round(float(globals().get('DASH_SEG_HI', 1.70)) * nd * spx)))
+    ovl = float(globals().get('DASH_SEG_OVL', 0.75))
+    ca0 = int(round(yc0 * 2.0)) - yw0
+    ca1 = int(round(yc1 * 2.0)) - yw0
+    best = None                              # (段长, 列号, 段顶, 段底) 全 px
+    for c in range(sub.shape[1]):
+        ys = np.where(sub[:, c])[0]
+        if len(ys) < 4:
+            continue
+        cuts = np.where(np.diff(ys) > 1)[0]
+        starts = np.r_[0, cuts + 1]
+        ends = np.r_[cuts, len(ys) - 1]
+        for si, ei in zip(starts, ends):
+            a, b = int(ys[si]), int(ys[ei])
+            L = b - a + 1
+            if not (lo <= L <= hi):
+                continue
+            ov = max(0, min(b, ca1) - max(a, ca0) + 1)
+            if ov < ovl * L:
+                continue
+            if best is None or L > best[0]:
+                best = (L, c, a, b)
+    if best is None:
+        return None
+    L, c0, a, b = best
+    cov = sub[a:b + 1].mean(axis=0)
+    cl, cr = c0, c0
+    while cl - 1 >= 0 and cov[cl - 1] >= 0.5:
+        cl -= 1
+    while cr + 1 < len(cov) and cov[cr + 1] >= 0.5:
+        cr += 1
+    w = (cr - cl + 1) / 2.0
+    xcm = (2 * xw0 + cl + cr + 1) / 4.0      # px 边界均值 -> pt
+    if w > float(globals().get('DASH_W_MAX', 0.35)) * step:
+        return None
+    if abs(xcm - xc) > float(globals().get('DASH_X_TOL', 0.25)) * step:
+        return None
+    y0 = (yw0 + a) / 2.0
+    y1 = (yw0 + b + 1) / 2.0
+    return {'y0': y0, 'y1': y1, 'xc': xcm, 'w': w, 'ratio': (y1 - y0) / step}
+
+def _dash_rule_tex(seg, F):
+    """源图实测墨段 -> 一条矢量竖线的 put 片段。高度/位置/线心取 seg(源图实测);
+    线宽默认 DASH_RULE_W×F(VERT_DASH_RULE_W 可覆盖; ='src' 时直接用源图实测线宽)。
+    put y 要减掉 FG 原点的系统性偏移(见 _fg_origin_shift 注释), 否则整条线比源图高 5.4pt
+    (p57 实测: 修正前 y 731.1-811.1, 源图 736.5-816.5)。"""
+    raw = str(globals().get('DASH_RULE_W_RAW', '0.040')).lower()
+    w = seg['w'] if raw == 'src' else float(globals().get('DASH_RULE_W', 0.040)) * F
+    h = seg['y1'] - seg['y0']
+    y = (page_h - seg['y1'] - _fg_origin_shift()) * PT2BP
+    return (r'\put(%.2f,%.2f){\rule{%.4fpt}{%.4fpt}}'
+            % ((seg['xc'] - w / 2.0) * PT2BP, y, w * PT2BP, h * PT2BP))
+
+def _fg_origin_shift():
+    """eso-pic FG \\put 原点的系统性偏移(bp)。
+    根因: 前言 `\\setlength{\\paperheight}{page_h pt}` 用的是 **bp 数值当 TeX pt**, 而物理页高
+    是 page_h bp(= page_h×PT2BP TeX pt) -> FG 原点比页真左下**高** page_h×(1−1/PT2BP)
+    (p57: 1437×0.003735 = 5.37pt, 实测 rule put y 与落点差 5.38)。
+    源图墨迹实测的线要落在**源图绝对 y**, 故 put y 减掉它; 正文/书眉沿用既有约定, 不动。"""
+    return page_h * (1.0 - 1.0 / PT2BP)
+
+def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None, invisible=False):
     """单字 \\put 片段(pt, 页左上原点 y 向下)。xs = 横向压缩(默认 XSCALE)。
     xs<1 时用自带 q/<K> 0 0 1 0 0 cm ... Q 包住该字(只缩 x 保字高, 状态精确还原不污染后续内容,
     见上方 §1.0a 根因说明); 传入的 x_pt 是缩放后字盒左缘的目标页坐标, 内部按 PAGE_ORIGIN_BP 反解。
     括号走 §1.0c 的竖排形态替换(字号/位置一并校正), 其余字不受影响。
-    rule_h(可选, bp): 竖排破折号要画满的**格高** —— 传了就改成「不可见原字 + 整格矢量竖线」,
-    见 §1.0a4; 不传(None)则与旧实现逐位相同。"""
+    rule_h(可选, bp): 破折号**兜底**路径 —— 每字画一条 1.0×rule_h 的竖线(旧 R1 行为), 见 §1.0a4。
+    invisible(可选): 只出不可见文本层(3 Tr), 不画线 —— 源图实测路径用(线由 _dash_rule_tex 单独画)。"""
     xs = XSCALE if xs is None else xs
-    x0_pt = x_pt                                   # 破折号线心定位用(压缩前的字盒左缘)
+    x0_pt = x_pt                                   # 兜底 rule 线心定位用(压缩前的字盒左缘)
     ch, F, x_pt, y_pt = _br_put(ch, x_pt, y_pt, F, xs)
     if clamp:
         # 夹回页内(只无框伪槽格页传 True, 见 _pv_clamp_on 注释): 必须在 _br_put **之后** ——
@@ -336,13 +457,13 @@ def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None):
         x_pt = (x_pt - PAGE_ORIGIN_BP) / float(ks) + PAGE_ORIGIN_BP   # 反解: 变换绕页 x=72bp
         body = (r'\special{pdf:literal direct q %s 0 0 1 0 0 cm}%s'
                 r'\special{pdf:literal direct Q}') % (ks, body)
-    if dash:
-        # 3 Tr = 不可见文本渲染模式: 文本层保留原字(可搜索 / 字符量不变), 画面由下面的 rule 画
+    if dash or invisible:
+        # 3 Tr = 不可见文本渲染模式: 文本层保留原字(可搜索 / 字符量不变), 画面由矢量线承担
         body = (r'\special{pdf:literal direct q 3 Tr}' + body
                 + r'\special{pdf:literal direct Q}')
     put = r'\put(%.1f,%.1f){%s}' % (x_pt * PT2BP, y_pt * PT2BP, body)
-    if dash:
-        # 竖线几何: 高度 = 本格 step; 基线在格顶下 INK_ASC*F 处, 故 rule 底端 = 基线下
+    if dash and not invisible:
+        # 兜底竖线(R1 行为): 高度 = 本格 step; 基线在格顶下 INK_ASC*F 处, 故 rule 底端 = 基线下
         #   (step - INK_ASC*F) -> 负 lift。相邻两格首尾相接(高度恰为一格), 中间无缝。
         w = float(globals().get('DASH_RULE_W', 0.040)) * F        # 线宽(TeX pt)
         h = rule_h * PT2BP                                        # 格高(TeX pt)
@@ -3782,9 +3903,52 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
             step = min(1.30 * cap, max(0.75 * cap, (B - T - ink_h) / (nc - 1)))
         if top + ink_h + (nc - 1) * step > guard_b:
             step = (guard_b - top - ink_h) / (nc - 1)
-    # taskD: 竖排破折号画「满一格」的矢量竖线(§1.0a4)。默认只在无版框页开(有版框书 vert.tex
-    #   逐字节零回归); VERT_DASH_RULE=all 可对全部竖排列生效, =0 关闭。
+    # taskD-R2: 相邻破折号字符 = 源图同一个墨块 -> 源图实测一条竖线(§1.0a4)。
+    #   默认只在无版框页开(有版框书 vert.tex 逐字节零回归); VERT_DASH_RULE=all 对全部竖排列生效。
+    #   读不到源图墨迹 -> 退回兜底(每字 1.0 step, 旧 R1 行为)并落日志。
     _rule_h = (step if step > 0 else ink_h) if _dash_rule_on(m) else None
+    _drule, _dseg = {}, {}                                   # ci -> run; run 首 -> 实测 seg/None
+    if _rule_h is not None:
+        _dpg = (pi + 1) if pi is not None else 0
+        _k_of = []                                           # 与下面渲染循环同一套格号推进
+        _kk = 0
+        for _ci, _ch in enumerate(t):
+            _kk += gap_at.get(_ci, 0)
+            _k_of.append(_kk)
+            if _ch in PUNCT_HANG and _kk > 0:
+                _kk += int(round(PUNCT_CELL))
+            else:
+                _kk += 1
+        for _ci0, _ci1, _k0, _nd in _dash_runs(t, _k_of):
+            for _c in range(_ci0, _ci1 + 1):
+                _drule[_c] = (_ci0, _ci1, _k0, _nd)
+            _seg = None
+            _why = '无源图' if (src_doc is None or pi is None) else '未测到竖直墨段'
+            if src_doc is not None and pi is not None:
+                _seg = _dash_ink_seg(pi, m['g'], xc, step,
+                                     top + _k0 * step, top + (_k0 + _nd) * step, _nd)
+            _dseg[_ci0] = _seg
+            if _seg is not None:
+                _DASH_LOG.append({'page': _dpg, 'x': round(xc, 1), 'n': _nd,
+                                  'text': t[_ci0:_ci1 + 1], 'fallback': False,
+                                  'y0': round(_seg['y0'], 2), 'y1': round(_seg['y1'], 2),
+                                  'len': round(_seg['y1'] - _seg['y0'], 2),
+                                  'ratio': round(_seg['ratio'], 3),
+                                  'w_src': round(_seg['w'], 2),
+                                  'w_ratio': round(_seg['w'] / max(F, 1e-6), 4),
+                                  'xc': round(_seg['xc'], 2), 'step': round(step, 2)})
+                if DASH_DBG:
+                    print('    [破折号] p%d x%.1f 「%s」%d 字: 源图 y %.2f-%.2f 长 %.2f '
+                          '(%.3f step) 线宽 %.2f 线心 x%.2f'
+                          % (_dpg, xc, t[_ci0:_ci1 + 1], _nd, _seg['y0'], _seg['y1'],
+                             _seg['y1'] - _seg['y0'], _seg['ratio'], _seg['w'], _seg['xc']))
+            else:
+                _DASH_LOG.append({'page': _dpg, 'x': round(xc, 1), 'n': _nd,
+                                  'text': t[_ci0:_ci1 + 1], 'fallback': True,
+                                  'why': _why, 'step': round(step, 2)})
+                if DASH_DBG:
+                    print('    [破折号] p%d x%.1f 「%s」%d 字: %s -> 未标定, 用兜底(%d x 1.0 step)'
+                          % (_dpg, xc, t[_ci0:_ci1 + 1], _nd, _why, _nd))
     y0 = top + INK_ASC * F                                   # 首字基线(页顶向下, 墨顶在基线上方 0.94F)
     x_put = xc - XSCALE * F / 2.0                            # taskJ-A: 横向压缩后字心仍居中于槽中心
     pitch = (sl['x1'] - sl['x0']) if sl else m['w'] / N_COL_FRAME    # 本格格距(pt)
@@ -3814,6 +3978,17 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
             k += int(round(PUNCT_CELL))
             continue
         y_put = page_h - (y0 + k * step)
+        if ci in _drule:
+            _ci0 = _drule[ci][0]
+            _seg = _dseg.get(_ci0)
+            if _seg is not None:
+                if ci == _ci0:                # 每组只在首字画一条源图实测竖线
+                    out.append(_dash_rule_tex(_seg, F))
+                out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), invisible=True))
+            else:                             # 未标定 -> 兜底: 每字 1.0 step(R1 行为)
+                out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), rule_h=_rule_h))
+            k += 1
+            continue
         out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), rule_h=_rule_h))
         k += 1
     if _pm is not None:
@@ -7474,6 +7649,30 @@ if _FAX:
     print('[影印页] 实际贴图 %d 页(检出 %d) -> %s' % (len(_FAX_DONE), len(_FAX), _fj))
     print('[影印页] 这 %d 页按设计**不重建文本** -> verify_vert 请用 --expect-low %s'
           % (len(_FAX_DONE), ','.join(str(x) for x in _FAX_DONE)))
+
+# ---------- 2.54) 破折号源图实测汇总(§1.0a4 taskD-R2; 线宽可标定量 + 兜底登记) ----------
+if _DASH_LOG:
+    _dash_ok = [r for r in _DASH_LOG if not r.get('fallback')]
+    _dash_fb = [r for r in _DASH_LOG if r.get('fallback')]
+    print('[破折号] 源图实测 %d 组 / 兜底 %d 组' % (len(_dash_ok), len(_dash_fb)))
+    if _dash_ok:
+        _rr = sorted(r['ratio'] for r in _dash_ok)
+        _ww = sorted(r['w_ratio'] for r in _dash_ok)
+        print('    线长/step: 中位 %.3f (p10 %.3f / p90 %.3f; 参考比值 %.2f) | '
+              '源图线宽/F: 中位 %.4f | 渲染线宽/F: %s'
+              % (statistics.median(_rr), _rr[int(0.1 * (len(_rr) - 1))],
+                 _rr[int(0.9 * (len(_rr) - 1))], DASH_LEN_RATIO,
+                 statistics.median(_ww), DASH_RULE_W_RAW))
+    if _dash_fb:
+        _pg = sorted(set(r['page'] for r in _dash_fb))
+        print('    兜底页 %d 页(前 20): %s%s' % (
+            len(_pg), _pg[:20], ' ...' if len(_pg) > 20 else ''))
+    _dj = os.environ.get('VERT_DASH_REPORT') or os.path.join(TMP, 'dash_segments.json')
+    json.dump({'mode': DASH_RULE_MODE, 'w_raw': DASH_RULE_W_RAW,
+               'ratio_ref': DASH_LEN_RATIO,
+               'runs': sorted(_DASH_LOG, key=lambda r: (r['page'], r['x']))},
+              open(_dj, 'w', encoding='utf8'), ensure_ascii=False, indent=1)
+    print('[破折号] 逐组明细 -> %s' % _dj)
 
 tex_path = os.path.join(TMP, 'vert.tex')
 open(tex_path, 'w', encoding='utf8').write('\n'.join(parts))
