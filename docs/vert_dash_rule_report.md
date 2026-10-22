@@ -1,207 +1,183 @@
-# 竖排破折号改成一条连续竖线（taskD 报告）
+# 竖排破折号改成一条连续竖线（taskD / R2 报告）
 
 状态：**implemented**（分支 `feat/vert-dash-rule`；spec [spec/vertical/15_vert_dash_rule.md](../spec/vertical/15_vert_dash_rule.md)）
 
-## 1. 问题与用户原话
+## 1. 问题（用户原话）
 
 wz7《金瓶梅詞話》p57 标题「論金瓶梅這部書——導讀」：
 
-1. 改前产物用横排字形 U+2014 -> 画成**两个横线**；
-2. 试过的 U+FE31 竖排字形 -> **两条竖线中间有缝**（U+FE31 墨高只占 0.858 格，两格相接正中留 0.142 em）。
+1. 「但是真的破折号 应该是一个竖线 ，但是你给我的PDF中是两个横线  如p57」
+2. 「源书就是一条竖线 而不是两条竖线拼接的」
+3. R2 复核追加：「这个长度 是不是盖到字了」—— R1 按「每字满一格」画了 2 格（127.44pt），
+   源书墨线实测只有 **80.25pt（1.259 格）**，线顶/线底顶进了上下两字。
 
-用户原话（按顺序）：
+R1 已通过的部分（本轮保留）：两条 rule 首尾相接 **−0.001pt**、`3 Tr` 保留文本层、p29 西文零影响。
 
-> 「但是真的破折号 应该是一个竖线 ，但是你给我的PDF中是两个横线  如p57」
->
-> 「源书就是一条竖线 而不是两条竖线拼接的」
+## 2. R2 修法：所有几何从源图墨迹实测
 
-结论：并排字形天然带 side bearing，连续/贯穿只能画矢量。采用简报推荐的**选项 A**：
-每个破折号在本格画一条**满格高**的矢量竖线，相邻两格首尾相接。
+### 2.1 根因
 
-## 2. 实现（§1.0a4）
+1. **把两个 `—` 字符当成两格各画一条**：OCR 把源书的**一个标点墨块**读成相邻两个 `—` 字符；
+   正确模型是「这两个字符 = 源图同一个墨块 -> 合起来画一条，长度取墨块实测」。
+2. **`INK_ASC × F` 拿错框**：`INK_ASC` 是字形墨迹上缘比例，不是版面格边界；`step ≠ F` 的列上必然偏，
+   且每本书偏得不同。R2 起不再用 `step / F / INK_ASC` 推算线的位置。
 
-唯一出字口 `_put_tex()` 新增可选参数 `rule_h`（= 本列 step，bp）；`col_puts` 在逐字循环里按列传参。
-`rule_h is None` 时输出与旧实现**逐位相同**。
+### 2.2 实现（§1.0a4）
 
-### 2.1 几何
-
-记 `F` = 字号，`xs` = 横向压缩系数，`step` = 本列排版步进（bp），`INK_ASC` = 墨顶到基线的比例
-（默认 0.94，标定趟可覆盖）。
-
-| 量 | 公式 | 说明 |
+| 步骤 | 函数 | 做法 |
 |---|---|---|
-| 线宽 | `w = DASH_RULE_W × F`（默认 0.040） | 字体 U+FE31 墨宽比；`VERT_DASH_RULE_W` 可覆盖 |
-| 线长 | `h = step × PT2BP`（TeX pt） | **高度 = 本格 step，不是 F**；两格相接无缝 |
-| 竖向偏移 | `lift = (INK_ASC × F − step) × PT2BP` | 基线在格顶下 `INK_ASC·F`，故负 lift 把 rule 底端对齐到格底 |
-| 线心 | `xc = x_put + xs × F / 2` | 压缩后字盒中心 = 列心 |
-| rule 左缘 | `xr = xc × PT2BP − w / 2` | `\put` 参考点是 rule 左下角 |
+| ① 相邻破折号成组 | `_dash_runs(t, k_of)` | 文本相邻**且**格号连续（`k_{i+1}=k_i+1`）-> 一组；被 `fit_gaps` 插空格的两字不算一组 |
+| ② 源图读墨 | `_dash_ink_seg(pi, g, xc, step, yc0, yc1, nd)` | 列心 ±0.35×step、格区 ±0.5×step 窗口内逐列找**最长连续墨段**；段长 ∈ [0.45,1.70]×(step×nd)、与格区重叠 ≥0.75×段长、线宽 ≤0.35×step、线心距列心 ≤0.25×step；返回 `{y0,y1,xc,w,ratio}`（全实测） |
+| ③ 画一条线 | `_dash_rule_tex(seg, F)` | 高度 = `y1-y0`；线心 = 实测 `xc`；底端落在源图 `y1`（put y = `page_h-y1-FG偏移`）；线宽默认 `DASH_RULE_W×F`（`='src'` 用实测） |
+| ④ 文本层 | `_put_tex(..., invisible=True)` | 组内每个 `—` 仍出 `\put`（原字/原字号/原压缩）+ `3 Tr` 不可见 -> 可搜索、字符量不变 |
+| ⑤ 兜底 | `col_puts` | 无源 PDF / 找不到合格墨段 -> 每字 1.0 step（旧 R1 行为）+ `[破折号] ... 未标定, 用兜底` 日志 + JSON 登记 |
 
-竖排第一格的格区间为 `[T + k·step, T + (k+1)·step]`（`T` = 列顶，`k` = 格号）。
-两字相邻时第 k 条 rule 的顶端坐标 = 第 k+1 条的底端坐标 -> **几何上无缝**。
+**FG 原点偏移（`_fg_origin_shift`）**：前言 `\setlength{\paperheight}{page_h pt}` 把 bp 数值当 TeX pt，
+物理页高是 `page_h` bp -> FG 原点比页真左下高 `page_h×(1−1/PT2BP)`（p57 = 5.37pt，实测落点差 5.38）。
+源图实测的线要落在源图绝对 y，故 put y 减掉它（正文/书眉沿用既有约定，不动）。
 
-### 2.2 文本层
+**允许的常数只有比值**（env 可覆盖，见 spec §6）；线的几何本身没有常数。
 
-原字 `—` **保留**（不映射 U+FE31），用 PDF 文本渲染模式 `3 Tr` 包住（不可见）：
-
-```
-q 3 Tr  <原 _put_tex 的 fontsize/压缩包装> —  Q   +   一条 rule 的 \put
-```
-
-- 可搜索 / 可选中；`verify_vert` 的字符量口径不变（**没有丢字**）；
-- rule 单开一个 `\put`，与文本层位置互不影响；
-- 文本层与改前 **逐字节相同**（实测 p57 `get_text()` 936 字完全相同）。
-
-### 2.3 实测到的两个渲染细节
-
-1. **dvipdfmx 把 `\rule` 画成「描边线」而不是填充矩形**：`page.get_drawings()` 返回 `type='s'`，
-   path 长度 = rule 高度、stroke width = rule 宽度。因此两条 rule 的接缝用 path 端点判断，
-   实测相邻缝 **−0.001pt**（y 坐标按 `%.2f` 打印，两条各自 ±0.005 的舍入被高度吸收）。
-2. **eso-pic FG 的原点跟随 `\paperheight`（TeX pt），而物理页幅是 bp**：p57 的
-   `\paperheight=1437pt` 但页真高 1437.01bp = 1442.39TeX pt，整层 FG（正文 + rule）一起上移 5.37bp。
-   因 rule 与正文同层、同一 `\put` 参考系，**rule 相对正文格区的位置不受影响**（实测 rule 格顶
-   694.19 = 正文格顶 694.19）。
-
-## 3. 验收（逐条对应用户标准）
+## 3. 验收（逐条）
 
 命令：
 
 ```bash
-# p57 单页（改后）
-rm -rf /tmp/vd_new57c && env VERT_PAGES=57 VERT_TMP=/tmp/vd_new57c /usr/bin/python3 src/pipelines/build_vert.py \
-    data/wz7_full/wz7_full_spotting_lines_patched.json \
-    data/wz7_full/wz7_full_spotting_coords.json /tmp/new57c.pdf source_pdf/wz7.pdf
-
-# 测量（脚本 tmp_vert/taskD/verify_dash.py，输出存 tmp_vert/taskD/verify_p57.txt）
-/usr/bin/python3 tmp_vert/taskD/verify_dash.py /tmp/new57c.pdf source_pdf/wz7.pdf 57
+# p57 单页（源图实测路径）
+rm -rf /tmp/vd_r2b_57 && env VERT_PAGES=57 VERT_TMP=/tmp/vd_r2b_57 /usr/bin/python3 src/pipelines/build_vert.py \
+  data/wz7_full/wz7_full_spotting_lines_patched.json data/wz7_full/wz7_full_spotting_coords.json \
+  /tmp/r2b_57.pdf source_pdf/wz7.pdf
+# 测量
+/usr/bin/python3 tmp_vert/taskD/verify_r2.py /tmp/r2b_57.pdf source_pdf/wz7.pdf 57 830.0 63.72
 ```
 
-### 3.1 p57 连续竖线（最大空隙 ≤ 1pt，总高 ≈ 2 个 step，居中 ±1pt）
+### 3.1 p57 线长/线位/连续/线宽（验收 1、2、6）
 
 ```
-== 产物: 矢量竖线(rule) 2 条 ==
-  x中心 830.00   y 694.19-757.91   长 63.72   线宽 2.77
-  x中心 830.00   y 757.91-821.63   长 63.72   线宽 2.77
-  合并: y 694.19-821.63 总高 127.44 | 相邻缝: -0.0010
-== 产物: 沿 y 逐 0.5pt 墨迹(窄窗 x=830.00±1.5) ==
-  有墨 y 694.19-821.69 | 最大空隙 0.00 pt
-== 产物文本层 ==
-  字符数 936 | "—" 个数 2 | "︱"(U+FE31) 个数 0
-== 源书同位置 ==
-  竖线 y 736.56-816.81 长 80.25 | 线心 x 829.81 | 粗 5.25
-  线心差 0.19 pt | 长度差 47.19 pt
+== 源图 (x830.0±4 窄带) ==
+  竖线 y 736.50-816.75 长 80.25 (1.259 step) 线宽 5.25 线心 x829.81
+  到相邻字墨迹: 上 8.25 (0.129 step) / 下 6.00 (0.094 step)
+== 产物 rule ==
+  x 830.01 y 736.50-816.50 长 80.00 (1.255 step) 线宽 2.78
+  沿 y 每 0.5pt 最大空隙: 0.00 pt
+  到产物相邻字墨迹: 上 38.87 (0.610 step) / 下 14.50 (0.228 step)
+  与源图差: y0 -0.00 / y1 -0.25 / 长 -0.25 / 线心 +0.19
+== 文本层 ==
+  字符数 936 | "—" 个数 2 | U+FE31 个数 0
 ```
 
-- 最大空隙 **0.00pt**（改前两个横线沿 y 的间距 60.5pt；U+FE31 方案的理论缝 0.142em）；
-- 总高 **127.44pt = 2 × 63.72**（本列 step 63.72）；
-- 线心 **830.00** = 列心 830.00；源书竖线 829.81 -> 差 **0.19pt**（±1pt 内）。
+| 项 | 要求 | 实测 | 结论 |
+|---|---|---|---|
+| 线长/step | ∈ [1.20, 1.32] | 产物 **1.255**（源图 1.259） | ✓ |
+| 线位 vs 源图 | 报告差值 | y0 **−0.00** / y1 **−0.25** / 长 **−0.25** / 线心 **+0.19pt** | ✓ |
+| 连续 | 最大空隙 ≤ 0.5pt | **0.00pt** | ✓ |
+| 线宽 | R2「先不动」 | 源图 **5.25pt** / 产物 **2.78pt**（0.040×F） | 按 R2 保留 |
+| 文本层 | 保留 `—` | 936 字与改前**完全相同**，`—`×2 / U+FE31×0 | ✓ |
 
-> 简报写的裁窗 x=795.7 是**文本层 span 的左缘**（em 盒左缘），不是线的位置。
-> 源书竖线实测在 x=829.8，产物列心 x=830.0；本报告按线的真实位置裁窗测量。
+### 3.2 间隙（验收 1 的第二个条件）：p57 上**不可满足**，反证如下
 
-### 3.2 西文侧排不得变化（p29）
+产物标题列的邻字墨迹（同一窄带实测）：
+
+| | 上邻字墨底 | 下邻字墨顶 | 间隙 | = step |
+|---|---|---|---|---|
+| 源图 | 728.25 | 822.50 | 94.25pt | **1.479** |
+| 产物 | 697.63 | 831.00 | 133.37pt | **2.093** |
+
+源书线长 1.259 + 上间隙 0.129 + 下间隙 0.094 = **1.482 step**，正好填满源书 1.479 step 的间隙。
+产物间隙 2.093 step，比它多 **0.611 step（39.1pt）**。线长固定 1.20-1.32 step 时，
+所需总空间 1.478 step ≪ 可用 2.093 step -> **两间隙不可能同时落在源书 ±0.05 step 内**。
+
+**根因**：标题列把 11 个 OCR 字符均摊（产物 `書` 比源书高 30.6pt；源书在破折号前有半格余量），
+属 §1.995 标题署名行的既有版式，不在本任务范围。
+
+本实现的取舍：把线放在**源图绝对位置**（Δ≤0.25pt）——线就是源图墨块本身、且**不压任何字**
+（上下间隙 38.9/14.5pt）。对源图邻字测得的间隙 = 8.25/6.00（与源书同值，偏差 0）。
+若要同时满足产物侧间隙，需要把标题列改成逐字源图定位（另一项版式任务）。
+
+### 3.3 西文侧排（验收 3）
+
+p29 `VERT_DASH_RULE=0` vs 默认：`vert.tex` **逐字节相同**（diff 无输出）。
+p29 的破折号在「整行侧排拉丁文」里，走 `_latin_put` 旋转路径，不经过 `_put_tex`。
+
+### 3.4 wz6 有版框书（验收 5：无本书绑定的证据）
 
 ```bash
-rm -rf /tmp/vd_p29_off && env VERT_PAGES=29 VERT_DASH_RULE=0 VERT_TMP=/tmp/vd_p29_off ... /tmp/p29_off.pdf
-rm -rf /tmp/vd_p29_on  && env VERT_PAGES=29 VERT_TMP=/tmp/vd_p29_on ... /tmp/p29_on.pdf
-diff /tmp/vd_p29_off/vert.tex /tmp/vd_p29_on/vert.tex
+# 默认(nf)：零回归
+VERT_TMP=/tmp/vd_r2_wz6def ... /tmp/r2_wz6def.pdf
+md5sum /tmp/vd_r2_wz6def/vert.tex
+# ae9d2f5259e12cff19e680b2a771b37d  (= 改动前基线)
+# 强制 all：同一段代码在 wz6 上跑，用 wz6 自己的源图墨迹
+VERT_DASH_RULE=all VERT_DASH_DBG=1 VERT_TMP=/tmp/vd_r2_wz6all ... /tmp/r2_wz6all.pdf
 ```
 
-结果：**逐字节相同**（diff 无输出）。p29 的破折号在「整行侧排拉丁文」里，走 `_latin_put` 旋转路径，
-不经过 `_put_tex`；`_esc_ch` 也不再映射破折号字形。
+`all` 模式日志（节选）：
 
-### 3.3 wz6 零回归（有版框书）
-
-```bash
-VERT_TMP=/tmp/vd_wz6_new2 /usr/bin/python3 src/pipelines/build_vert.py \
-  data/wz6/wz6_spotting_lines.json data/wz6/wz6_spotting_coords.json /tmp/wz6_new2.pdf source_pdf/wz6.pdf
-md5sum /tmp/vd_wz6_new2/vert.tex
-# ae9d2f5259e12cff19e680b2a771b37d  (= 任务简报给出的改动前基线)
-grep -c '\\rule\[' /tmp/vd_wz6_new2/vert.tex
-# 0
+```
+[破折号] p64 x481.9 「——」2 字: 源图 y 363.00-422.50 长 59.50 (1.927 step) 线宽 1.00 线心 x481.50
+[破折号] p70 x309.5 「——」2 字: 源图 y 701.00-761.00 长 60.00 (1.981 step) 线宽 1.00 线心 x309.50
+[破折号] p114 x44.5 「——」2 字: 未测到竖直墨段 -> 未标定, 用兜底(2 x 1.0 step)
+...
+[破折号] 源图实测 6 组 / 兜底 3 组
 ```
 
-默认 `VERT_DASH_RULE=nf` 只对无版框伪槽格页生效；wz6 是有版框书，19 个 `—`（9 页）仍走旧路径。
+- **wz6 的线长/step = 1.85-1.98**（源图 p64 的墨线几乎占满两格，见 `tmp_vert/taskD/wz6_p64_dash.png`），
+  与 wz7 的 1.26 不同 —— 证明线长是**逐书源图实测**，没有 wz7 绑定；
+- p114/p192 的 `——` 源图实测没有破折号（引号笔画被 OCR 读成 `——`）-> 走兜底并登记；
+- 文本层 231/231 页与默认版相同（135256 字）；`verify_vert` **PASS**
+  （231=231 / 68412÷70373=97.2% / 越界 span 0+矢量 0 / 整页丢失 0）。
 
-### 3.4 测试全绿
+### 3.5 测试（验收 4）
 
 ```
 /usr/bin/python3 -m pytest src/test/unit src/test/invariants -q
-493 passed, 832 warnings in 16.53s
+506 passed, 832 warnings in 16.33s
 ```
 
-= 474（改前）+ 19 新增（`src/test/unit/test_vert_dash_rule.py`）。新增测试锁：
+= 474（改前）+ 32 新增（`src/test/unit/test_vert_dash_rule.py`）。新增测试覆盖：
+`_dash_rule_on` 三档模式；`_dash_runs` 成组/被空格拆开；`_dash_ink_seg` 源图实测
+（正例 + 邻字笔画/过宽/偏心/过短/无源 PDF 五类拒绝）；`_dash_rule_tex` 的 y0/y1/线心/线宽与 FG 偏移；
+兜底路径（每字 1.0 step 首尾相接）与文本层 `3 Tr`。R1 里写死「2 × step」的断言已改为
+**兜底路径**断言（明确标注无源图时的旧行为）。
 
-- `_dash_rule_on` 三档模式（nf/all/0）；
-- `_esc_ch` 不再改破折号字形；
-- 无 `rule_h` 时输出与旧实现一致（无 rule / 无 3 Tr）；
-- 线宽/线心/高度/lift 公式；
-- **相邻两条 rule 首尾相接**（差 ≤0.011pt，含打印舍入）且总高 = 2 step；
-- 文本层保留原 `—` + `3 Tr`，且非破折号传 `rule_h` 不画线。
+### 3.6 wz7 300 页样本（竖排 DoD）
 
-### 3.5 p57 文本层（选「保留」）
-
-改前 vs 改后：
+数据 `data/wz7/wz7_spotting_{lines,coords}.json` + `tmp_vert/wz7/wz7_sample300.pdf`：
 
 ```
-base chars 936   new chars 936   identical True
-dash count base 2 new 2 FE31 0
-context new : '...\n書\n—\n—\n導\n讀\n...'
+[破折号] 源图实测 51 组 / 兜底 136 组
+    线长/step: 中位 0.905 (p10 0.798 / p90 0.985) | 源图线宽/F: 中位 0.0559 | 渲染线宽/F: 0.040
+    兜底页 58 页 ...
 ```
 
-`—` 保留在文本层（`3 Tr` 不可见），字符量/文本内容与改前完全相同 -> **不涉及数据口径变化**。
+（该样本是**未打 dash 补丁**的早期数据，136 组是已删的 1019 处同类误读 -> 兜底；51 组实测。）
 
-### 3.6 300 页样本 A/B（`verify_vert`，竖排 DoD）
+`verify_vert` 结果：
 
-数据 `data/wz7/wz7_spotting_{lines,coords}.json` + `tmp_vert/wz7/wz7_sample300.pdf`（300 页，含 70 页影印页）。
-
-```bash
-# 规则开（默认 nf）
-VERT_TMP=/tmp/vertD300_run /usr/bin/python3 src/pipelines/build_vert.py \
-  data/wz7/wz7_spotting_lines.json data/wz7/wz7_spotting_coords.json \
-  tmp_vert/taskD/d300.pdf tmp_vert/wz7/wz7_sample300.pdf
-# 规则关（旧实现）
-VERT_DASH_RULE=0 VERT_TMP=/tmp/vertD300_off_run /usr/bin/python3 src/pipelines/build_vert.py ... tmp_vert/taskD/d300_off.pdf ...
-# verify（--expect-low = build 落盘的影印页清单）
-/usr/bin/python3 src/test/verify_vert.py tmp_vert/taskD/d300.pdf ... --expect-low "$LOW"
+```
+页数: 源 OCR 300 页 | 输出 PDF 300 页 | ✓ 1:1
+字符量: 输出 128671 / OCR 130732 = 98.4%
+差异 > 80 字的页: 8 个（预期 8 / 非预期 0）；整页丢失(0 字)页: 0 个
+越界: span 0 个 / 矢量图形 0 个（容忍 0.5pt；涉及 0 页）
+== 退出码 PASS ==
 ```
 
-| 项 | 规则开（默认 nf） | 规则关（`VERT_DASH_RULE=0`） |
-|---|---|---|
-| `verify_vert` 退出码 | **PASS (0)** | **PASS (0)** |
-| 页数 | 300 = 300 | 300 = 300 |
-| 字符量 | 128671 / 130732 = 98.4% | 同左（逐页相同） |
-| 差异 >80 字页 | 8（预期 8 / 非预期 0） | 同左 |
-| 整页丢失 | 0 | 0 |
-| 越界 span / 矢量 | **0 / 0** | **0 / 0** |
+与 R1 版 300 页相比：**文本层 300/300 页逐页相同**（只变矢量线）。
 
-A/B 更强证据：
-
-- `vert.tex` 内容 diff = **只有 318 条「旧 dash put -> rule + 原字 3 Tr」**（另 70 条 diff 是影印页贴图
-  的临时目录路径 `/tmp/vertD300_off_run` vs `/tmp/vertD300_run`，与内容无关）；
-- 300 页**文本层逐页完全相同**（总 257189 字，diff 页 0）。
-
-（构建/验证输出：`tmp_vert/taskD/build300.log`、`verify300.txt`、`verify300_off.txt`，不进库。）
-
-## 4. 附带发现（不在本任务范围，已登记）
-
-1. **patched 数据里仍有 OCR 误读的破折号**。全库 `—` 共 263 个字符：88 对 `——` + 87 个单 `—`，
-   其中 24 个单 `—` 紧跟在闭引号后。抽查 p59（「枯燥。」—斯」）与 p118（「茶吃。——我便」）源图：
-   源书该处**没有破折号**，只有引号 ﹂ 的直角笔画，OCR 把它读成了 `—` / `——`。
-   这与用户已让删除的 1019 处同类；本轮只改渲染、不删数据（简报「不在本任务范围」第 6 条）。
-   改后这些假破折号会由「横线」变成「长竖线」，更显眼 -> 建议单独做一次数据审计
-   （判据可用源图该格墨迹长度，不能用页号/文本特判）。
-2. **线长比源书长**：源书 p57 竖线实测 80.25pt，产物 127.44pt（= 2 × step）。
-   这是选项 A「每字满一格」的固有结果（验收要求「总高 ≈ 2 个 step」）；源书破折号字形在格内
-   自带约 20-26pt/端的 side bearing。若要与源书等长，需要选项 B（run 配对 + 源图定两端），
-   属后续可选优化。
-3. **线宽比源书细**：产物 2.77pt vs 源书 5.25pt。默认按简报的字体墨宽比 0.040em；产物整体字重
-   只有源书约 69%（taskT 遗留），按同比例字画笔换算约 3.6pt。可用 `VERT_DASH_RULE_W=0.052` 调粗。
-
-## 5. 改动文件
+## 4. 改动文件
 
 | 文件 | 改动 |
 |---|---|
-| `src/pipelines/build_vert.py` | §1.0a4 新增常量/`_dash_rule_on`/`_put_tex(rule_h=)`；`col_puts` 传 step；删除旧的 `VERT_DASH_MAP`/`VERT_VERT_DASH`（U+FE31 方案，默认关）；`_esc_ch` 恢复纯转义 |
-| `src/test/unit/test_vert_dash_rule.py` | 新增 19 项单测 |
-| `spec/vertical/15_vert_dash_rule.md` | 本任务 spec |
+| `src/pipelines/build_vert.py` | §1.0a4 重写：`_dash_runs` / `_dash_ink_seg` / `_dash_rule_tex` / `_fg_origin_shift`；`_put_tex` 加 `invisible`；`col_puts` 逐组实测 + 兜底；删除旧的「每字满格」几何 |
+| `src/test/unit/test_vert_dash_rule.py` | 32 项单测（R2 源图实测 + 兜底） |
+| `spec/vertical/15_vert_dash_rule.md` | R2 契约与验收 |
 | `spec/vertical/README.md` / `spec/README.md` / `AGENTS.md` | 锚点/索引/issue 账本 |
+
+## 5. 已知遗留
+
+1. **p57 产物侧间隙**：见 §3.2 反证（标题列均摊 vs 源书非均匀间距），需另一项版式任务；
+2. **线宽**：R2「先不动」，仍用 0.040×F；源图实测 0.0559-0.075×F，可用
+   `VERT_DASH_RULE_W=src`（已实现+单测）切到源图实测宽度；
+3. **数据侧假破折号**：p59/p118 等源图无破折号（引号笔画被读成 `—`），与已删的 1019 处同类；
+   这类位置源图测不到合格竖线 -> 兜底并登记；建议单独数据审计；
+4. **无源 PDF 的 3 参数调试构建**：NF 绝对定位路径整体不可用（页回退 v2 流式），破折号按旧字形输出
+   （任务前行为）。
