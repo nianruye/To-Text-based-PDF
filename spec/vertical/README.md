@@ -16,7 +16,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 |---|---|---|
 | 逐页门限 / 去印刷线 / 伪版心 | §1.06 L625-755（`_nf_ink_gray` L627/`_nf_lines` L651/`_nf_delines` L672/`_nf_ink` L690/`_nf_box` L702）、§1.975 L1720-1966（`nf_body_rows` L1777/`nf_join_rows` L1784/`nf_short_cols` L1801/`nf_fill_bands` L1821/`nf_edges` L1866/`_nf_fix_page` L1855/`_nf_clamp_box` L1952） | 版心夹回纸幅（taskP2）、短列证据补带（taskP2） |
 | 伪槽格统计 / 行槽配平 | §1.98 L2027-2118（`_slots_of_edges` L2105）、L2152-2200（`_metrics_finish` L2152）、`_align_rows_slots` L2286、`page_rows` L2367（taskP2: NF 页注行数不得超过注槽数 +1） |
-| 列渲染 / 夹取 / 兜底 | `col_puts` L2486、`_pv_clamp_on` L2479、`_put_tex` L238、`_nf_hrow_page` L2570/`_nf_hrow_puts` L2586（横排页兜底）、`_nf_rescue_rows` L2619（残余列补救）、`page_puts` L2714（taskP2: 列框兜底重排）、`page_puts_loose` L2821 |
+| 列渲染 / 夹取 / 兜底 | `col_puts` L3669、`_pv_clamp_on` L3608、`_put_tex` L314、`_nf_hrow_page` L2570/`_nf_hrow_puts` L2586（横排页兜底）、`_nf_rescue_rows` L2619（残余列补救）、`page_puts` L2714（taskP2: 列框兜底重排）、`page_puts_loose` L2821 |
 | 逐页纸型 / 右缘 | 建排主循环 L3770-3795（taskP2: 小开本页右缘按本页纸宽夹取） |
 | **短列检出 / 标点占格 / 引號修剪**（taskS） | §1.0a0 L157-165（`PUNCT_CELL`/`_punct_own`）、§1.976 L1813-2077（`NF_SB_*`/`_big_hm` L1947/`_sb_ref_hm` L1962/`_sb_band` L1976/`nf_short_bands` L2030/`_sb_pitch` L2067）、`_trim_marks` L2408、调用点 `_nf_frame` L2316 / `_metrics_finish` / `page_puts` L3113、标定 `_calib_punct_cell` L4440 |
 | **标点墨迹口径**（taskT） | §1.956：`_calib_own_marks` L4614（占格书标点样本按格内墨心取）、`_calib_punct_ink` L4420（NF 用探针渲染实测墨心）、`_calib_src_page(...marks=False)` L4652/L4723（第一趟只收槽格记录）、标定执行 L4908（(b0) 先定 `PUNCT_CELL`）/ L4995（(c2) `PUNCT_INK` 口径） |
@@ -31,12 +31,13 @@ taskP / taskP2 为该路径新增/修正的锚点：
 | 04 | [frame_lines.md](04_frame_lines.md) | 版框线（双边外框 + 界行线 + 淡线栅格兜底；几何区间/线宽判据相对化） | L1126-1435（常量/`_grid_fit` L1181/`frame_geom` L1258/`frame_tex` L1404）+ §1.954 L1436-1496（线宽自标定） | 内框/界行线 vs 源墨迹 |
 | 05 | [pagenum_sequence.md](05_pagenum_sequence.md) | 页码序列拟合纠正（分段等差 + 邻页插值） | L1038-1125（`pn_parse` L1053/`pn_text` L1072/`pn_sequence_fix` L1076） | 纠正记录逐条复核 |
 | 06 | [derot.md](06_derot.md) | OCR 旋转坐标系页还原（`derot_rows`） | L1614-1719（`_ink_char_cols` L1633/`_lin_fit` L1663/`derot_rows` L1673） | 旋转页列位/字号 vs 源书 |
-| 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP）+ **taskP2 实测文本框夹取**（§1.0a3） | §1.0a L168-199（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex` L238）、§1.0a2 L200-217（`BOLD_W`/`_vb`）、§1.0a3 L218-237（`TXTBOX_*`/`_txtbox_clamp_y` L234）、§1.0b L260-405（`char_cells` L156/`fit_gaps` L284）、`col_puts` L2486、落盘 L3887 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
+| 07 | [07_glyph_width_gaps.md](07_glyph_width_gaps.md) | 字模横向压缩（A，q/cm/Q 精确还原，**不用 `\scalebox`**）+ 列内空隙还原（B，`fit_gaps` DP）+ **taskP2 实测文本框夹取**（§1.0a3）+ **taskD 破折号整格矢量竖线**（§1.0a4） | §1.0a L168-199（`XSCALE`/`PAGE_ORIGIN_BP`/`_put_tex` L314）、§1.0a2 L200-217（`BOLD_W`/`_vb`）、§1.0a3 L218-237（`TXTBOX_*`/`_txtbox_clamp_y` L234）、§1.0a4 L291-357（`DASH_CHARS` L299/`DASH_RULE_W` L300/`DASH_RULE_MODE` L301/`_dash_rule_on` L303/`_put_tex(rule_h=)`）、§1.0b L260-405（`char_cells` L156/`fit_gaps` L284）、`col_puts` L3669、落盘 L3887 | 逐字墨迹面积 vs 源书 ≤5%、空隙检出清单、`verify_vert` PASS |
 | 08 | [08_punct_vertical_forms.md](08_punct_vertical_forms.md) | 标点竖排形态（括号 → U+FE35…U+FE40 + 墨心回格心）+ OCR 列拆分归位（行首闭括号回上一列） | §1.0c L406-472（`VERT_FORMS`/`VERT_METRICS`/`BR_SIZE`/`_br_put` L459）、§1.0d L473-506（`BR_OPEN_OF`/`fix_split_brackets` L486 + 应用点 L517-528）、§1.9 `note_tex` L1005 | p3 对照图 + 抽查 ≥5 页 + `verify_vert` PASS |
 | 09 | [09_calibration.md](09_calibration.md) | **参数自标定 + 纸型无关化**（建排前从源图墨迹 + OCR + 字体文件测出本书参数：列数/字宽压缩/标点/括号/字体绑定组；所有「绝对量」门限改相对页幅/字步进 §8） | §0.5 L41-121、§1.05 L591-620、§1.85 L879-877、§1.954 L1436-1496、§1.955 L1497-1565、§1.96a L1566-1591、§1.956 L3093-3884（字体几何 L3255、源图样本 L3362、探针 L3469）；测试 `test_vert_calib.py` + `test_vert_paper_agnostic.py` | wz6 对账表（`N_COL_FRAME` 精确 12、`XSCALE` 0.863）+ 等价性 21 项 0.0000% + wz7 预检（列数 16/纸型/安全降级）+ `verify_vert` PASS |
 | 10 | [10_west_latin_fax.md](10_west_latin_fax.md) | **西文行侧排 / 标题署名行 / 影印页整页贴图**（只 NF 路径）：纯西文行判据 + 逐词/逐片实测落位 + 拉丁 TFM 字体口径 + 破折号单独成片；大字号行按源图墨迹实测渲染；影印页两道独立闸 + 整页贴源图（原始 JPEG 零重编码） | §1.995 L3093-3926（见上一节锚点表）；测试 `test_vert_taskR.py` | p29 西文行逐词对账（Δ沿起 0.00pt）+ 源页 5-28 全部贴图 + 未命中页不误判（分离度 3.8 倍）+ `verify_vert` PASS |
 | 11 | [11_short_col_punct_cell.md](11_short_col_punct_cell.md) | **短列检出（又曰：类低覆盖短列）** + **标点占格口径按本书标定** + 引號类小墨修剪：覆盖率分母换成「本行自身墨迹窗」+ 密度/字高三道判据；`PUNCT_CELL` 由源图逐槽反推（wz7=1 占格 / wz6=0 挤格） | §1.0a0 L157、§1.976 L1813-2077、`_trim_marks` L2408、`col_puts` 标点推进、`_calib_punct_cell` L4415；测试 `test_vert_taskS.py` | key54 两个 `又曰：` 落位 Δ≤2pt、空隙 4/5 列与源书同位置同格数、wz7 300 页 PASS（字符量 98.2%→98.4%）、wz6 逐字节零回归 |
 | 12 | [12_punct_ink_calib.md](12_punct_ink_calib.md) | **标点墨迹口径标定**（尺寸/格内位置/锚点）：`PUNCT_CELL` 提前到采样之前 + 占格书标点样本按「格内墨心」取（不再靠 DP 预测，否则命中前字笔画碎片）+ 不做尺寸窗筛选（保 `！：；？`）+ NF 的 `PUNCT_INK` 改用探针渲染实测墨心（与 tate 实际字形同源） | §1.956 采样/标定：L4614 `_calib_own_marks`、L4420 `_calib_punct_ink`、L4652/L4723 `_calib_src_page(marks=False)`、L4908 (b0)、L4995 (c2)；消费端 `col_puts` L2833；测试 `test_vert_taskT.py` | 15 页 1717 条双侧实测：标点墨心绝对位置差 −11.25pt→**−0.25pt**、相对前字 −10.00→**+1.00pt**、墨高差 0.00pt；wz7 300 页 PASS（字符量 128683 与基线逐页相同）、wz6 逐字节零回归 |
+| 15 | [15_vert_dash_rule.md](15_vert_dash_rule.md) | **竖排破折号 = 整格矢量竖线**（taskD）：每字一条满格高 rule，相邻相接 -> 一条连续竖线；文本层保留原 `—`（3 Tr 不可见）；西文侧排不动 | §1.0a4 L291-357（`DASH_CHARS` L299/`DASH_RULE_W` L300/`DASH_RULE_MODE` L301/`_dash_rule_on` L303/`_put_tex(rule_h=)` L314）、`col_puts` 传 step L3787；测试 `test_vert_dash_rule.py` | p57 最大空隙 **0.00pt**、总高 **2×step**、线心差 **0.19pt**；wz6 md5 `ae9d2f52` 零回归；493 测试全绿 |
 
 ## 特殊行与影印页（§1.995，taskR / taskR2）实现锚点
 
@@ -207,3 +208,17 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 > taskU 的引號判别只走**无版框伪槽格页**（`m['g']['virtual']`），有版框书（wz6）不在影响面内
 > （实测 `vert.tex` md5 逐字节相同）；`_trim_marks` ④ 同理（该函数只被 `page_puts` 调用）。
 > 目录页的补救路径改动默认关，开启会丢字（见 13 §4）。行号以函数名为准。
+
+## taskD（2026-10-22）新增锚点：竖排破折号 = 整格矢量竖线
+
+| 分部 | 内容 | 锚点（`src/pipelines/build_vert.py`，当前行号） |
+|---|---|---|
+| 15_vert_dash_rule §2 | 破折号常量与开关判据（`nf` 默认只无版框页 / `all` / `0`） | `DASH_CHARS` L299、`DASH_RULE_W` L300、`DASH_RULE_MODE` L301、`_dash_rule_on` L303 |
+| 15_vert_dash_rule §2 | 出字口：`rule_h` -> 满格 rule（lift 对齐格区间 + 线心=列心）+ 原字 `3 Tr` 不可见 | `_put_tex` L314（`rule_h` 参数；rule 分支在函数末尾） |
+| 15_vert_dash_rule §3 | 逐列传本列 step（`step > 0 else ink_h`） | `col_puts` L3669（`_rule_h` 在字号保护之后、`y0` 之前） |
+| 15_vert_dash_rule §1 | 旧 U+FE31 方案已删除（`VERT_DASH_MAP` / `VERT_VERT_DASH`）；`_esc_ch` 恢复纯转义 | `_esc_ch` L3602 |
+| 15_vert_dash_rule 验收 | 测量脚本（不进库） | `tmp_vert/taskD/verify_dash.py` |
+
+> taskD 的 rule 只在 `_dash_rule_on(m)` 为真时启用；默认 `nf` = 仅 `m['g']['virtual']` 页，
+> 有版框书（wz6）不受影响（实测 `vert.tex` md5 逐字节相同）。
+> 西文侧排走 `_latin_put`，不经过 `_put_tex`；`_esc_ch` 也不再改字形。

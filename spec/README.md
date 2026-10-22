@@ -26,8 +26,9 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
-| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图）；验证脚本 `src/test/verify_vert.py` |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线）；验证脚本 `src/test/verify_vert.py` |
 | [docs/vert_wz7_layout3_report.md](../docs/vert_wz7_layout3_report.md) | 竖排 wz7 300 页版面元素报告（taskR 实现西文行/标题署名/影印页贴图 + taskR2 西文行紧凑化口径：拉丁 TFM 字体、破折号按 run 实测长、bp↔TeX pt 换算、逐片基线；含四项复核的实测对账与影印页普查分离度） |
+| [docs/vert_dash_rule_report.md](../docs/vert_dash_rule_report.md) | 竖排破折号整格矢量竖线报告（taskD：选项 A 每字满一格 rule 无缝拼接 + 3 Tr 保留文本层；p57 空隙 0.00pt / 2×step / 线心差 0.19pt；p29 西文侧排与 wz6 逐字节零回归；含仍存假破折号数据审计建议） |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
 | [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留 R1-R4） |
