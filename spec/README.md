@@ -29,6 +29,7 @@
 | [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线）；验证脚本 `src/test/verify_vert.py` |
 | [docs/vert_wz7_layout3_report.md](../docs/vert_wz7_layout3_report.md) | 竖排 wz7 300 页版面元素报告（taskR 实现西文行/标题署名/影印页贴图 + taskR2 西文行紧凑化口径：拉丁 TFM 字体、破折号按 run 实测长、bp↔TeX pt 换算、逐片基线；含四项复核的实测对账与影印页普查分离度） |
 | [docs/vert_dash_rule_report.md](../docs/vert_dash_rule_report.md) | 竖排破折号源图实测竖线报告（taskD / R2：相邻两 `—` = 同一墨块 -> 一条 rule，线长/线位/线心/线宽全实测 + FG 原点偏移修正；p57 1.255 step（源 1.259）/ Δ≤0.25pt / 空隙 0.00pt；p29 逐字节不变；wz6 默认零回归 + `all` 模式逐书实测 1.85-1.98；含 p57 产物侧间隙不可满足的反证与假破折号数据审计建议） |
+| [docs/vert_taskE_census_report.md](../docs/vert_taskE_census_report.md) | 全书普查「OCR 漏识的占整格元素」（taskE：连通域 + y 聚簇 + 首/末格形状 + OCR 边字对账；全书 dash **1 处**（p1683 3.0×28.0）、ring **36 处/15 页**（p1682-1721 句末圈号）、other 0；反例 p1742 異體字表 / p29 西文页 / p100/p400/p1000 = 0；工具 `src/tools/census_missed_cells.py`，交付 JSON `docs/vert_taskE_census.json`；未改渲染端） |
 | [docs/pipeline_audit.md](../docs/pipeline_audit.md) | 三管线+两校准代码审计（7 点） |
 | [docs/coupling_analysis.md](../docs/coupling_analysis.md) | 暗中耦合分析（依赖图+状态地图+契约+风险因果链） |
 | [docs/vert_governance_report.md](../docs/vert_governance_report.md) | 竖排纳入治理门禁报告（竖排契约逐条源码核对含行号 + CI 结论 + 实测基线 + 遗留 R1-R4） |
