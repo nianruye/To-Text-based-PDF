@@ -49,9 +49,26 @@ for k in sl:
 
 print('列尾是数字的列: %d 处 / %d 页' % (len(cands), len(set(c['page'] for c in cands))))
 
-def ring_at(c):
+# 本页真实步进：取 n>=8 的长列的「框高/字数」中位。
+#   短列（如 '。12' 3 字）的框高/字数 不是步进（p1684 行14: 13.4 vs 真实 18.5），
+#   按它开窗口会把 18.7pt 的圆环裁掉。
+def _page_step(k):
+    st = []
+    for t, p in zip(sl.get(k, []), co.get(k, []) or []):
+        t = str(t).replace('\n', '')
+        if len(t) < 8 or not p:
+            continue
+        ys = [q[1] / 2.0 for q in p]
+        st.append((max(ys) - min(ys)) / len(t))
+    if not st:
+        return None
+    st.sort()
+    return st[len(st) // 2]
+
+
+def ring_at(c, page_step=None):
     """量列尾最后一格的圆环特征"""
-    step = (c['y1'] - c['y0']) / max(1, c['n'])
+    step = page_step or ((c['y1'] - c['y0']) / max(1, c['n']))
     pg = src[c['page'] - 1]
     ya = c['y1'] - step
     clip = fitz.Rect(max(0, c['x0'] - 1), ya, min(pg.rect.width, c['x1'] + 1), c['y1'] + 1)
@@ -95,8 +112,12 @@ def ring_at(c):
     return best[1] if best else None
 
 hits = []
+_pstep_cache = {}
 for c in cands:
-    r = ring_at(c)
+    _k = str(c['page'] - 1)
+    if _k not in _pstep_cache:
+        _pstep_cache[_k] = _page_step(_k)
+    r = ring_at(c, _pstep_cache[_k])
     if r:
         hits.append(dict(c, **r))
 print()
