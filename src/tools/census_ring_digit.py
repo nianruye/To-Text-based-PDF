@@ -42,6 +42,9 @@ for k in sl:
         num = m.group()
         if len(num) > 2:
             continue
+        # 纯 0（'0'/'00'）= OCR 把「〇」读成数字，是页码/卷次，不是圈码
+        if num.strip('0\uff10') == '':
+            continue
         xs = [q[0] / 2.0 for q in boxes[i]]
         ys = [q[1] / 2.0 for q in boxes[i]]
         cands.append(dict(page=pi, row=i, text=t, num=num, n=len(t),
@@ -104,8 +107,10 @@ def ring_at(c, page_step=None):
         #   整类排除了（用户实测 p1684 x222/x155/x122 三处源书有圈，中心填充 0.5-0.6）。
         #   改为只看「有没有洞 + 填充不过高 + 尺寸是一整格」。
         side_pt = ww * 72.0 / 600.0
-        score = ((hole >= 0.10) and (sub.mean() <= 0.78) and (0.6 <= ar <= 1.7)
-                 and (14.0 <= side_pt <= 23.0))
+        # ctr 的**下界**才是区分量（不是上界）：圈里装着数字 -> 中心有墨 ctr>=0.15；
+        #   「〇」写的页码 / 口日等字形 -> 中心全空 ctr=0.00（全书实测 11 处假阳全是这样）
+        score = ((hole >= 0.10) and (ctr >= 0.15) and (sub.mean() <= 0.78)
+                 and (0.6 <= ar <= 1.7) and (14.0 <= side_pt <= 23.0))
         if score and (best is None or hh * ww > best[0]):
             best = (hh * ww, dict(ctr=round(ctr,2), edge=round(edge,2), hole=round(hole,2),
                                   ar=round(ar,2), k=72.0/600.0, hh=round(hh*72.0/600,1)))
