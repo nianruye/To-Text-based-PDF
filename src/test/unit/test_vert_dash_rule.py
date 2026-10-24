@@ -30,7 +30,7 @@ from _loader import load            # noqa: E402
 
 _CONSTS = ['VERT_FORMS', 'VERT_METRICS', 'BR_ON', 'BR_SIZE_DEF', 'BR_SIZE',
            'XSCALE', 'PT2BP', 'PAGE_ORIGIN_BP',
-           'DASH_CHARS', 'DASH_RULE_W_RAW', 'DASH_RULE_W', 'DASH_RULE_MODE',
+           'DASH_CHARS', 'DASH_INS', 'DASH_RULE_W_RAW', 'DASH_RULE_W', 'DASH_RULE_MODE',
            'DASH_LEN_RATIO', 'DASH_SEG_LO', 'DASH_SEG_HI', 'DASH_SEG_OVL',
            'DASH_X_TOL', 'DASH_W_MAX', 'DASH_DBG', 'INK_ASC', 'BOLD_W']
 _FUNCS = ['_br_put', '_esc_ch', '_vb', '_put_tex', '_dash_rule_on',

@@ -42,6 +42,17 @@ RE_BFRANGE = re.compile(r'<([0-9A-Fa-f]{2,4})>\s*<([0-9A-Fa-f]{2,4})>\s*<([0-9A-
 RE_BFRANGE_ARR = re.compile(r'<([0-9A-Fa-f]{2,4})>\s*<([0-9A-Fa-f]{2,4})>\s*\[([^\]]*)\]')
 
 
+def circled_cp(n):
+    """数字 -> Unicode 圈码码位(1-20 / 21-35 / 36-50); 无标准圈码 -> None。"""
+    if 1 <= n <= 20:
+        return 0x2460 + n - 1
+    if 21 <= n <= 35:
+        return 0x3251 + n - 21
+    if 36 <= n <= 50:
+        return 0x32B1 + n - 36
+    return None
+
+
 def source_chars(lines_json):
     d = json.load(open(lines_json, encoding='utf-8'))
     s = set()
@@ -122,9 +133,21 @@ def main():
     ap.add_argument('lines_json')
     ap.add_argument('-o', '--out')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--fix-json', default='',
+                    help='任务F 灌入清单(docs/vert_taskF_missed_fix.json): 把插入的圈码也纳入 allowed')
     args = ap.parse_args()
 
     allowed = source_chars(args.lines_json)
+    if args.fix_json:
+        _fx = json.load(open(args.fix_json, encoding='utf-8'))
+        _n_add = 0
+        for _it in _fx.get('items', []):
+            if _it.get('class') != 'ring':
+                continue
+            _cp = circled_cp(int(_it.get('number') or 0))
+            if _cp and chr(_cp) not in allowed:
+                allowed.add(chr(_cp)); _n_add += 1
+        print('fix-json: 追加插入的圆圈数字 %d 个' % _n_add)
     ding = sorted(c for c in allowed if ord(c) in DINGBAT_TO_CIRCLED)
     circ = sorted(c for c in allowed if 0x2460 <= ord(c) <= 0x2473)
     print('OCR 源字符集: %d 个字  含圆圈数字 %s  含丁巴特 %s'

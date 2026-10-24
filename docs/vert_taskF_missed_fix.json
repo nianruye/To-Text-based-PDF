@@ -1,0 +1,558 @@
+{
+ "source": "docs/vert_taskE_census.json",
+ "note": "ring 的 number 由源图裁片人工判读（tmp_vert/taskE/rings_table_*.png）；situation 1=数字已在 OCR 文本尾, 2=整格漏识；来源坐标 source_x/source_y 供对账。",
+ "items": [
+  {
+   "page": 1683,
+   "col": [
+    340.5,
+    248.2,
+    361.6,
+    398.9
+   ],
+   "class": "dash",
+   "insert_dash": 2,
+   "text": "孟州充軍。"
+  },
+  {
+   "page": 1682,
+   "col": [
+    333.4,
+    248.2,
+    356.8,
+    537.6
+   ],
+   "class": "ring",
+   "number": 8,
+   "situation": 2,
+   "source_x": 346.5,
+   "source_y": 519.5,
+   "text": "大姐十四歲，陳經濟為十七歲。"
+  },
+  {
+   "page": 1682,
+   "col": [
+    265.1,
+    247.2,
+    288.4,
+    497.6
+   ],
+   "class": "ring",
+   "number": 8,
+   "situation": 2,
+   "source_x": 277.2,
+   "source_y": 480.0,
+   "text": "問玳安；方知已娶孟玉樓。"
+  },
+  {
+   "page": 1682,
+   "col": [
+    229.8,
+    285.1,
+    253.1,
+    921.4
+   ],
+   "class": "ring",
+   "number": 8,
+   "situation": 2,
+   "source_x": 242.5,
+   "source_y": 902.0,
+   "text": "七月二十八日。西門慶生日宴後，王婆強拉西門慶去會焦盼中的潘金蓮。"
+  },
+  {
+   "page": 1682,
+   "col": [
+    196.0,
+    287.2,
+    218.6,
+    731.7
+   ],
+   "class": "ring",
+   "number": 8,
+   "situation": 2,
+   "source_x": 208.2,
+   "source_y": 712.0,
+   "text": "八月初六日。潘金蓮為武大百日燒靈。準備下嫁。"
+  },
+  {
+   "page": 1682,
+   "col": [
+    162.8,
+    286.2,
+    184.7,
+    637.4
+   ],
+   "class": "ring",
+   "number": 9,
+   "situation": 2,
+   "source_x": 173.8,
+   "source_y": 617.5,
+   "text": "八月初八日。娶潘金蓮過門為第五妾。"
+  },
+  {
+   "page": 1683,
+   "col": [
+    441.4,
+    242.8,
+    463.9,
+    533.4
+   ],
+   "class": "ring",
+   "number": 9,
+   "situation": 2,
+   "source_x": 454.0,
+   "source_y": 515.0,
+   "text": "子樓，誤打李外傳。吃上官司。"
+  },
+  {
+   "page": 1683,
+   "col": [
+    340.5,
+    248.2,
+    361.6,
+    398.9
+   ],
+   "class": "ring",
+   "number": 10,
+   "situation": 2,
+   "source_x": 351.2,
+   "source_y": 380.0,
+   "text": "孟州充軍。"
+  },
+  {
+   "page": 1683,
+   "col": [
+    271.4,
+    242.8,
+    293.3,
+    439.0
+   ],
+   "class": "ring",
+   "number": 10,
+   "situation": 2,
+   "source_x": 282.2,
+   "source_y": 420.0,
+   "text": "李瓶兒派人送花來。"
+  },
+  {
+   "page": 1683,
+   "col": [
+    201.7,
+    282.9,
+    223.5,
+    534.4
+   ],
+   "class": "ring",
+   "number": 10,
+   "situation": 2,
+   "source_x": 213.5,
+   "source_y": 516.5,
+   "text": "九月間。西門慶收用春梅。"
+  },
+  {
+   "page": 1684,
+   "col": [
+    539.4,
+    258.0,
+    564.7,
+    720.9
+   ],
+   "class": "ring",
+   "number": 11,
+   "situation": 1,
+   "source_x": 553.5,
+   "source_y": 700.5,
+   "text": "。跟著孫雪娥數數落落，被潘金蓮聽見，鬥嘴鬥氣。11"
+  },
+  {
+   "page": 1684,
+   "col": [
+    441.4,
+    258.0,
+    467.4,
+    778.3
+   ],
+   "class": "ring",
+   "number": 11,
+   "situation": 1,
+   "source_x": 454.5,
+   "source_y": 757.5,
+   "text": "，拏到院中打頭面做衣服定桌席，吹彈歌舞，做三日喜酒。11"
+  },
+  {
+   "page": 1684,
+   "col": [
+    341.9,
+    251.5,
+    366.6,
+    527.9
+   ],
+   "class": "ring",
+   "number": 12,
+   "situation": 1,
+   "source_x": 354.8,
+   "source_y": 507.5,
+   "text": "起來，向漢子檢舉這件醜事。12"
+  },
+  {
+   "page": 1685,
+   "col": [
+    219.2,
+    236.3,
+    246.8,
+    416.2
+   ],
+   "class": "ring",
+   "number": 14,
+   "situation": 1,
+   "source_x": 233.5,
+   "source_y": 396.0,
+   "text": "墙頭上舖苦毡條。14"
+  },
+  {
+   "page": 1686,
+   "col": [
+    82.5,
+    239.6,
+    105.0,
+    643.9
+   ],
+   "class": "ring",
+   "number": 14,
+   "situation": 2,
+   "source_x": 94.2,
+   "source_y": 623.5,
+   "text": "，與潘金蓮現住三間樓房相連，連成一條邊。"
+  },
+  {
+   "page": 1689,
+   "col": [
+    363.1,
+    232.0,
+    390.6,
+    352.3
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 377.8,
+   "source_y": 333.0,
+   "text": "出蔣竹山。19"
+  },
+  {
+   "page": 1689,
+   "col": [
+    263.6,
+    271.0,
+    290.4,
+    546.4
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 276.8,
+   "source_y": 526.0,
+   "text": "八月二十日。娶李瓶兒過門。19"
+  },
+  {
+   "page": 1690,
+   "col": [
+    245.3,
+    232.0,
+    268.6,
+    811.9
+   ],
+   "class": "ring",
+   "number": 20,
+   "situation": 1,
+   "source_x": 257.0,
+   "source_y": 791.5,
+   "text": "女們及嫖客丁二官等人，拴縛在門房內。多虧應伯爵等人勸住了。20"
+  },
+  {
+   "page": 1690,
+   "col": [
+    145.9,
+    236.3,
+    167.8,
+    794.5
+   ],
+   "class": "ring",
+   "number": 21,
+   "situation": 1,
+   "source_x": 157.2,
+   "source_y": 773.5,
+   "text": "。孟玉樓提議由衆姊妹湊分資，辦桌酒席祝賀，共湊三兩一錢。21"
+  },
+  {
+   "page": 1691,
+   "col": [
+    448.4,
+    241.8,
+    475.9,
+    459.6
+   ],
+   "class": "ring",
+   "number": 22,
+   "situation": 1,
+   "source_x": 464.0,
+   "source_y": 439.5,
+   "text": "，大罵賊王八調戲她。22"
+  },
+  {
+   "page": 1692,
+   "col": [
+    470.2,
+    245.0,
+    497.0,
+    345.8
+   ],
+   "class": "ring",
+   "number": 25,
+   "situation": 1,
+   "source_x": 482.5,
+   "source_y": 326.5,
+   "text": "二千兩。25"
+  },
+  {
+   "page": 1692,
+   "col": [
+    136.1,
+    242.8,
+    162.8,
+    516.0
+   ],
+   "class": "ring",
+   "number": 27,
+   "situation": 1,
+   "source_x": 148.5,
+   "source_y": 497.0,
+   "text": "問罪，既夾又打，一氣身亡。27"
+  },
+  {
+   "page": 1693,
+   "col": [
+    630.2,
+    237.4,
+    652.9,
+    393.5
+   ],
+   "class": "ring",
+   "number": 27,
+   "situation": 1,
+   "source_x": 641.5,
+   "source_y": 374.5,
+   "text": "辰日上京拜壽。27"
+  },
+  {
+   "page": 1693,
+   "col": [
+    597.1,
+    274.2,
+    619.7,
+    778.3
+   ],
+   "class": "ring",
+   "number": 27,
+   "situation": 1,
+   "source_x": 608.2,
+   "source_y": 758.5,
+   "text": "五月二十八日。來保與吳主管押送蔡太師生辰擔去東京。27"
+  },
+  {
+   "page": 1693,
+   "col": [
+    333.4,
+    275.4,
+    356.0,
+    817.4
+   ],
+   "class": "ring",
+   "number": 27,
+   "situation": 1,
+   "source_x": 344.2,
+   "source_y": 797.5,
+   "text": "六月初一日。西門慶在花園翡翠軒捲棚下，與妻妾婢女淫樂。27"
+  },
+  {
+   "page": 1695,
+   "col": [
+    621.1,
+    243.9,
+    642.2,
+    533.4
+   ],
+   "class": "ring",
+   "number": 31,
+   "situation": 1,
+   "source_x": 631.8,
+   "source_y": 515.5,
+   "text": "念薦來十四歲小廝，取名棋童。31"
+  },
+  {
+   "page": 1695,
+   "col": [
+    588.6,
+    285.1,
+    610.5,
+    785.9
+   ],
+   "class": "ring",
+   "number": 31,
+   "situation": 1,
+   "source_x": 598.8,
+   "source_y": 767.0,
+   "text": "六月下旬。夏提刑送來十二名排軍答應；同僚具公禮賀。31"
+  },
+  {
+   "page": 1695,
+   "col": [
+    523.1,
+    245.0,
+    543.5,
+    362.1
+   ],
+   "class": "ring",
+   "number": 31,
+   "situation": 1,
+   "source_x": 533.2,
+   "source_y": 344.5,
+   "text": "日晚始散。31"
+  },
+  {
+   "page": 1695,
+   "col": [
+    456.1,
+    243.9,
+    478.7,
+    846.6
+   ],
+   "class": "ring",
+   "number": 31,
+   "situation": 2,
+   "source_x": 468.2,
+   "source_y": 826.5,
+   "text": "喬大戶家成房子。上房丫頭玉簫，暗送酒菜與琴童。鬧成失壺紛擾。"
+  },
+  {
+   "page": 1696,
+   "col": [
+    554.9,
+    255.8,
+    580.2,
+    431.4
+   ],
+   "class": "ring",
+   "number": 33,
+   "situation": 2,
+   "source_x": 569.5,
+   "source_y": 412.5,
+   "text": "不給，罰唱小曲。"
+  },
+  {
+   "page": 1697,
+   "col": [
+    195.3,
+    252.6,
+    216.4,
+    407.6
+   ],
+   "class": "ring",
+   "number": 37,
+   "situation": 1,
+   "source_x": 206.5,
+   "source_y": 389.5,
+   "text": "十五歲，屬馬。37"
+  },
+  {
+   "page": 1697,
+   "col": [
+    129.0,
+    289.4,
+    151.6,
+    1002.7
+   ],
+   "class": "ring",
+   "number": 37,
+   "situation": 1,
+   "source_x": 140.8,
+   "source_y": 984.0,
+   "text": "九月中旬。（私通王六兒的翌日）兌銀四兩，買丫頭一名給王六兒使喚，名錦兒。37"
+  },
+  {
+   "page": 1699,
+   "col": [
+    446.9,
+    289.4,
+    470.2,
+    834.7
+   ],
+   "class": "ring",
+   "number": 39,
+   "situation": 2,
+   "source_x": 459.8,
+   "source_y": 813.0,
+   "text": "正月初九日晚。爲潘金蓮生日擺酒。酒罷，聽兩位姑子說經。"
+  },
+  {
+   "page": 1699,
+   "col": [
+    153.0,
+    252.6,
+    174.2,
+    562.6
+   ],
+   "class": "ring",
+   "number": 41,
+   "situation": 2,
+   "source_x": 164.0,
+   "source_y": 543.0,
+   "text": "酒觀燈。奶子抱著官哥也跟去了。"
+  },
+  {
+   "page": 1699,
+   "col": [
+    86.7,
+    252.6,
+    108.5,
+    561.5
+   ],
+   "class": "ring",
+   "number": 41,
+   "situation": 2,
+   "source_x": 98.5,
+   "source_y": 543.0,
+   "text": "大姐，各裁三件，春梅多裁兩件。"
+  },
+  {
+   "page": 1721,
+   "col": [
+    154.4,
+    236.3,
+    177.7,
+    836.9
+   ],
+   "class": "ring",
+   "number": 77,
+   "situation": 1,
+   "source_x": 166.8,
+   "source_y": 817.0,
+   "text": "正杭州府趙大尹霆，訂初九日赴會，業已發束。主家備有五席戲子。77"
+  },
+  {
+   "page": 1721,
+   "col": [
+    122.0,
+    275.4,
+    144.5,
+    664.5
+   ],
+   "class": "ring",
+   "number": 77,
+   "situation": 1,
+   "source_x": 133.2,
+   "source_y": 645.5,
+   "text": "十二月七日。潘金蓮管賬刻薄，小廝怨罵。77"
+  }
+ ]
+}

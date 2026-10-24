@@ -300,7 +300,25 @@ def _txtbox_clamp_y(y_pt, F, page_hi):
 #   ③ 读不到墨迹(无源 PDF / 找不到竖直墨段)才退回兜底: 每个字符 1.0 step(旧行为), 并落日志。
 # 文本层保留原字(3 Tr 不可见, 可搜索, verify_vert 的字符量不变)。
 # 注意: 西文侧排(LAT_DASH / _latin_put)不走这里 —— 那里的破折号本来就是横向长横线。
-DASH_CHARS = '—―–'                     # 破折号类(与西文侧排 LAT_DASH 同码位; 侧排不经过 _put_tex)
+DASH_INS = '\ue000'                     # taskF: 灌入的破折号占位(每处 2 个 = 源图 2 格; 不进文本层)
+RING_INS_BASE = 0xE100                  # taskF: 灌入的圈码占位 chr(0xE100+n), n=圈内数字(1..)
+RING_SIZE = float(os.environ.get('VERT_RING_SIZE') or 0.95)   # 圈码字号/正文字号(源图 17pt @ 步进19.3)
+_CIRCLED_CP = {}                        # 数字 -> Unicode 圈码码位(1-20 / 21-35 / 36-50)
+for _n in range(1, 21):
+    _CIRCLED_CP[_n] = 0x2460 + _n - 1
+for _n in range(21, 36):
+    _CIRCLED_CP[_n] = 0x3251 + _n - 21
+for _n in range(36, 51):
+    _CIRCLED_CP[_n] = 0x32B1 + _n - 36
+# taskF 修复数据(默认: 仓库 docs/ 下; 不存在则关闭; 可用 VERT_MISSED_FIX 覆盖, =0 关闭)
+MISSED_FIX = os.environ.get('VERT_MISSED_FIX')
+if MISSED_FIX is None:
+    _mf = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                       'docs', 'vert_taskF_missed_fix.json')
+    MISSED_FIX = _mf if os.path.exists(_mf) else ''
+elif MISSED_FIX in ('0', 'off', 'false', 'False'):
+    MISSED_FIX = ''
+DASH_CHARS = '—―–' + DASH_INS          # 破折号类(插入占位也走同一套成组/实测/画线)
 DASH_RULE_W_RAW = os.environ.get('VERT_DASH_RULE_W') or '0.040'    # 线宽/字号; 'src' = 用源图实测线宽
 DASH_RULE_W = (float(DASH_RULE_W_RAW) if DASH_RULE_W_RAW.replace('.', '', 1).isdigit() else 0.040)
 DASH_RULE_MODE = os.environ.get('VERT_DASH_RULE', 'nf')            # 0=关 / nf=仅无版框页(默认) / all=全部
@@ -432,13 +450,103 @@ def _fg_origin_shift():
     源图墨迹实测的线要落在**源图绝对 y**, 故 put y 减掉它; 正文/书眉沿用既有约定, 不动。"""
     return page_h * (1.0 - 1.0 / PT2BP)
 
-def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None, invisible=False):
+# ---------- 1.0a5) 任务F: 灌入任务E普查的漏识元素(§1.0a4 的 dash 机制 + 圈码字形) ----------
+def _ring_ins_num(ch):
+    """taskF 圈码占位 chr(0xE100+n) -> 圈内数字 n; 非占位 -> None。"""
+    cp = ord(ch)
+    base = int(globals().get('RING_INS_BASE', 0xE100))
+    return cp - base if base < cp <= base + 200 else None
+
+def _ring_put(n, xc, cell_c, F):
+    """句末圈码: 数字 n 画在该格中心 cell_c(页顶向下, pt)。
+    n ≤ 50 用 Unicode 圈码字形(①-⑳ / ㉑-㉟ / ㊱-㊿): 整圆、不做横向压缩;
+    n > 50 无标准圈码 -> 画 ○ 字形 + 小号数字(源书 p1721 的圈 77)。
+    字号 RING_SIZE×F(源书圈 15.5-18pt @ 步进 19.3)。返回 put 片段列表。"""
+    Fr = max(6.0, round(F * float(globals().get('RING_SIZE', 0.90)), 1))
+    cc = globals().get('_CIRCLED_CP', {})
+    if n in cc:
+        ch = chr(cc[n])
+        # 圈码字形墨迹 bbox(Noto: 39,-85,961,845/1000): 墨心在基线上方 0.38em
+        return [_put_tex(ch, xc - Fr / 2.0, page_h - (cell_c + 0.380 * Fr), Fr, xs=1.0)]
+    outs = [_put_tex('○', xc - Fr / 2.0, page_h - (cell_c + 0.380 * Fr), Fr, xs=1.0)]
+    digs = str(n)
+    Fd = max(5.0, round(F * 0.45, 1))
+    adv = 0.5 * Fd
+    x0 = xc - adv * len(digs) / 2.0
+    for i, d in enumerate(digs):
+        outs.append(_put_tex(d, x0 + i * adv, page_h - (cell_c + 0.360 * Fd), Fd, xs=1.0))
+    return outs
+
+def _apply_missed_fix(path):
+    """任务F: 把任务E普查的漏识元素灌进**内存 sl**(不改数据文件; 有版框书/别的书页号越界 -> 跳过)。
+    · dash: 列首插 `insert_dash` 个 DASH_INS(占格, 由 §1.0a4 的 R2 机制测源图墨线并画线; 不进文本层);
+    · ring 情形①(数字已在文本尾): 把尾部数字 1:1 换成 RING_INS 占位(1 格; 渲染时画圈码字形);
+    · ring 情形②(整格漏识): 列尾追加 RING_INS 占位;
+    返回统计 dict。"""
+    try:
+        d = json.load(open(path, encoding='utf8'))
+    except Exception as e:
+        print('[漏识元素] 读取失败(%s) -> 跳过' % e)
+        return None
+    items = d.get('items') or []
+    groups = {}
+    for it in items:
+        groups.setdefault((int(it['page']), tuple(it['col'])), []).append(it)
+    st = {'dash': 0, 'ring1': 0, 'ring2': 0, 'comp': 0, 'skip': 0}
+    for (pg, col), its in sorted(groups.items()):
+        if pg < 1 or pg > len(keys):
+            st['skip'] += len(its)
+            continue
+        k = keys[pg - 1]
+        idx = None
+        for i, (t, p) in enumerate(zip(sl.get(k, []), co.get(k, []))):
+            if not p:
+                continue
+            xs = [q[0] for q in p]; ys = [q[1] for q in p]
+            bx = (min(xs) / 2.0, min(ys) / 2.0, max(xs) / 2.0, max(ys) / 2.0)
+            if all(abs(a - b) <= 0.6 for a, b in zip(bx, col)):
+                idx = i
+                break
+        if idx is None:
+            print('[漏识元素] p%d 列 %s 未匹配 -> 跳过 %d 项' % (pg, list(col), len(its)))
+            st['skip'] += len(its)
+            continue
+        for it in its:
+            if it.get('class') == 'dash':
+                n_ins = max(1, int(it.get('insert_dash') or 2))
+                sl[k][idx] = DASH_INS * n_ins + sl[k][idx]
+                st['dash'] += 1
+                continue
+            if it.get('class') != 'ring':
+                continue
+            n = int(it['number'])
+            sent = chr(int(globals().get('RING_INS_BASE', 0xE100)) + n)
+            cur = sl[k][idx]
+            if int(it.get('situation') or 0) == 1 and cur.endswith(str(n)):
+                sl[k][idx] = cur[:-len(str(n))] + sent
+                st['ring1'] += 1
+            else:
+                if int(it.get('situation') or 0) == 1:
+                    print('[漏识元素] p%d x%.1f 情形①但文本尾不是 %s(%r) -> 按情形②插'
+                          % (pg, it.get('source_x') or 0, n, cur[-8:]))
+                sl[k][idx] = cur + sent
+                st['ring2'] += 1
+            if n > 50:
+                st['comp'] += 1
+    print('[漏识元素] 灌入 %d 处: dash %d / ring① %d / ring② %d(其中 >50 合成圈 %d) / 跳过 %d'
+          % (st['dash'] + st['ring1'] + st['ring2'], st['dash'], st['ring1'], st['ring2'],
+             st['comp'], st['skip']))
+    return st
+
+def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None, invisible=False,
+             no_text=False):
     """单字 \\put 片段(pt, 页左上原点 y 向下)。xs = 横向压缩(默认 XSCALE)。
     xs<1 时用自带 q/<K> 0 0 1 0 0 cm ... Q 包住该字(只缩 x 保字高, 状态精确还原不污染后续内容,
     见上方 §1.0a 根因说明); 传入的 x_pt 是缩放后字盒左缘的目标页坐标, 内部按 PAGE_ORIGIN_BP 反解。
     括号走 §1.0c 的竖排形态替换(字号/位置一并校正), 其余字不受影响。
     rule_h(可选, bp): 破折号**兜底**路径 —— 每字画一条 1.0×rule_h 的竖线(旧 R1 行为), 见 §1.0a4。
-    invisible(可选): 只出不可见文本层(3 Tr), 不画线 —— 源图实测路径用(线由 _dash_rule_tex 单独画)。"""
+    invisible(可选): 只出不可见文本层(3 Tr), 不画线 —— 源图实测路径用(线由 _dash_rule_tex 单独画)。
+    no_text(可选): 只画矢量线、**不进文本层** —— 任务F 灌入的破折号占位(DASH_INS)用。"""
     xs = XSCALE if xs is None else xs
     x0_pt = x_pt                                   # 兜底 rule 线心定位用(压缩前的字盒左缘)
     ch, F, x_pt, y_pt = _br_put(ch, x_pt, y_pt, F, xs)
@@ -451,17 +559,20 @@ def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None, invisible=Fal
         x_pt = min(max(x_pt, 0.5), page_w - F - 0.5)
     # 用 globals().get: ast 抽取式单测的合成命名空间没有这几个模块级名, 裸引用会 NameError
     dash = bool(rule_h) and ch in globals().get('DASH_CHARS', '—―–')
-    body = _vb(r'\fontsize{%spt}{%spt}\selectfont %s' % (round(F, 1), round(F, 1), _esc_ch(ch)))
-    if abs(xs - 1.0) > 1e-6:
-        ks = ('%.4f' % xs).rstrip('0').rstrip('.')
-        x_pt = (x_pt - PAGE_ORIGIN_BP) / float(ks) + PAGE_ORIGIN_BP   # 反解: 变换绕页 x=72bp
-        body = (r'\special{pdf:literal direct q %s 0 0 1 0 0 cm}%s'
-                r'\special{pdf:literal direct Q}') % (ks, body)
-    if dash or invisible:
-        # 3 Tr = 不可见文本渲染模式: 文本层保留原字(可搜索 / 字符量不变), 画面由矢量线承担
-        body = (r'\special{pdf:literal direct q 3 Tr}' + body
-                + r'\special{pdf:literal direct Q}')
-    put = r'\put(%.1f,%.1f){%s}' % (x_pt * PT2BP, y_pt * PT2BP, body)
+    if no_text:
+        body = ''
+    else:
+        body = _vb(r'\fontsize{%spt}{%spt}\selectfont %s' % (round(F, 1), round(F, 1), _esc_ch(ch)))
+        if abs(xs - 1.0) > 1e-6:
+            ks = ('%.4f' % xs).rstrip('0').rstrip('.')
+            x_pt = (x_pt - PAGE_ORIGIN_BP) / float(ks) + PAGE_ORIGIN_BP   # 反解: 变换绕页 x=72bp
+            body = (r'\special{pdf:literal direct q %s 0 0 1 0 0 cm}%s'
+                    r'\special{pdf:literal direct Q}') % (ks, body)
+        if dash or invisible:
+            # 3 Tr = 不可见文本渲染模式: 文本层保留原字(可搜索 / 字符量不变), 画面由矢量线承担
+            body = (r'\special{pdf:literal direct q 3 Tr}' + body
+                    + r'\special{pdf:literal direct Q}')
+    put = r'\put(%.1f,%.1f){%s}' % (x_pt * PT2BP, y_pt * PT2BP, body) if body else ''
     if dash and not invisible:
         # 兜底竖线(R1 行为): 高度 = 本格 step; 基线在格顶下 INK_ASC*F 处, 故 rule 底端 = 基线下
         #   (step - INK_ASC*F) -> 负 lift。相邻两格首尾相接(高度恰为一格), 中间无缝。
@@ -785,6 +896,9 @@ if _br_fix:
         len(_br_fix), ', '.join('p%d行%d「%s」' % f for f in _br_fix)))
 else:
     print('[禁则归位] 未检出(无行首闭括号待归位)')
+
+# §1.0a5 任务F: 灌入任务E普查的 37 处漏识元素(dash 2 格占位 + 句末圈码占位)
+_MISSED_ST = _apply_missed_fix(MISSED_FIX) if MISSED_FIX else None
 
 all_rows = {k: col_stats(k) for k in keys}
 
@@ -3966,6 +4080,11 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
         k += gap_at.get(ci, 0)                               # 该字符前的空格格(taskJ-B): 只推进不落墨
         if ci == n - 1 and _qsf is not None and _qsf['action'] == 'replace':
             ch = '」'                                        # 1:1 码位替换(字数/格数不动; 渲染为 ﹂)
+        _rn = _ring_ins_num(ch)
+        if _rn is not None:                                  # taskF: 灌入的句末圈码(占 1 格)
+            out += _ring_put(_rn, xc, top + (k + 0.5) * step, F)
+            k += 1
+            continue
         if ch in PUNCT_HANG and k > 0:                       # 标点: 贴前一字格右下区(单独字号)
             tx = sl['x0'] + PUNCT_DX * pitch if sl else xc - pitch / 2.0 + PUNCT_DX * pitch
             # 锚点 = **前一字格顶**(PUNCT_DY 的标定语义, 见 §1.956): 循环变量 k = **下一个空闲
@@ -3984,9 +4103,11 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
             if _seg is not None:
                 if ci == _ci0:                # 每组只在首字画一条源图实测竖线
                     out.append(_dash_rule_tex(_seg, F))
-                out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), invisible=True))
+                out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), invisible=True,
+                                    no_text=(ch == DASH_INS)))
             else:                             # 未标定 -> 兜底: 每字 1.0 step(R1 行为)
-                out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), rule_h=_rule_h))
+                out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), rule_h=_rule_h,
+                                    no_text=(ch == DASH_INS)))
             k += 1
             continue
         out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), rule_h=_rule_h))
