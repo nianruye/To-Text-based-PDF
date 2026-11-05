@@ -9,6 +9,7 @@
 | spec | 说明 |
 |---|---|
 | [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约：**横排**（契约 1-6 = argv / env / JSON / GMPG / DPI / 命名）+ **竖排**（「竖排管线（build_vert.py）」章节 = V1-V9 argv/env/JSON/GMPG-N.A./坐标页幅/产物/差异对照/验收/锚点/实测基线）+ 验收标准 + 实现锚点 + 兼容影响矩阵（含竖排行）+ CI 结论 |
+| [governance/PUNCTUATION.md](governance/PUNCTUATION.md) | 标点符号用法与禁则（GB/T 15834—2011 可执行规则表，**v2**）：配对集合（17 类 + 2 半角变体 = 工具 19 条；含竖排形态与条款归属）/ 行首·行末禁则条款号 / **破折号（——，行首合法 §4.10.3.9/4.10.3.10）与连接号（§5.1.6）分离** / 破折号·省略号不跨行 / 行末全角标点压缩 / 竖排继承 / 多段引文（§4.8.3.5）合法性与「源图墨迹优先」两条边界；审计口径（**F1 源位置闸门**、**F3 carry 对偶延续验证**）+ 归因（A 源书自身/B 产物引入/C OCR 漏识/C_fixed/K/K_weak/K_invalid/O/D）+ 门禁建议。工具 `src/tools/punct_audit.py`（分类器 `tmp_vert/battle2/punct_classify.py` 随证据目录交付），报告 `docs/battle2_punct_audit.md`（v2） |
 
 ### planned（已规划，待实现）
 
@@ -36,9 +37,12 @@
 | [docs/vert_fix18_20_27_report.md](../docs/vert_fix18_20_27_report.md) | 竖排收尾修复报告（#18 退出码分级 + #20 临时目录按产物名分离 + #27 数字实测核对；含验收实测与渲染零变化对照） |
 | [docs/vert_width_gap_report.md](../docs/vert_width_gap_report.md) | 竖排字宽压缩收尾报告（taskJ2：`\scalebox` btrans/etrans 数值逆矩阵泄漏根因与 q/cm/Q 精确还原修法 + 列内空隙 DP 检出全书落地 + 独立复核口径失效分析） |
 | [docs/vert_calib_report.md](../docs/vert_calib_report.md) | 竖排参数自标定报告（taskM：wz6 硬编码常数 -> 建排前自动标定 + 对账表 + 产物不回退证据 + **换书剩余人工依赖清单**） |
+| [docs/battle1_horizontal.md](../docs/battle1_horizontal.md) | 横排 local-bug 清零报告（battle1：#1-#9 逐项实测核销 —— #1/#2/#5/#6/#7/#8 在 HEAD `bed0d25` 已修/已安全，#3/#4/#9 本轮收口；516->557 测试（本任务 +41；全量 562）；四书 geom + wz2 classic 改动前后重跑：逐页文本/行 bbox 0 差异、verify_geom JSON 逐字节相同、hard split 0 / missing 0） |
+| [docs/battle1_vertical_ring.md](../docs/battle1_vertical_ring.md) | 竖排两位数圈码判据重标定报告（battle1 P0-a：hole 必要条件证伪 -> 主块尺寸窗+四边墨闸门；184->352 处 / 段外 0 误报；p1704/1705/1706 圈码 49/50/51/52 渲染 + 文本层 ㊾/㊿ 码位；wz7 verify_vert PASS、wz6 md5 逐字节相同、562 测试） |
+| [docs/battle2_punct_audit.md](../docs/battle2_punct_audit.md) | 双管线标点禁则/配对审计报告（battle2：GB/T 15834—2011 规则表 + `punct_audit.py`；横排四书重跑 + 竖排 wz7 v30；A/B/C 三类归因 + p620 缺 」的 OCR 漏识定位 + 门禁建议） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
 | [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
-| [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（12 函数契约） |
+| [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（14 函数契约；battle1 更正 #1/#2 旧契约、补 is_heading_by_md、刷新行号锚点） |
 | [src/test/invariants/INVARIANTS_SPEC.md](../src/test/invariants/INVARIANTS_SPEC.md) | 特征不变量 spec（13 不变量） |
 | [architecture_audit.md](architecture_audit.md) | 架构审计（7 点 + 竖排能力缺口，基于 Step 1-6 + 9 bug 修复后代码） |
 
