@@ -34,3 +34,6 @@ output_archive/
 source_pdf/
 0.35_p*.png
 0.45_p*.png
+
+# AgentTeams 团队运行状态（本地会话产物，不入库）
+.agent-teams/
