@@ -136,11 +136,10 @@ def parse_markdown_structure(md_path):
 def is_heading_by_md(text, headings_set):
     """Check if text matches a markdown heading (fuzzy match)."""
     clean = re.sub(r'\$\s*\^\{[^}]+\}\s*\$', '', text).strip()
-    # Normalize: remove spaces, normalize quotes
+    # Normalize: remove spaces only（引号不归一：原两行 identity replace 已删，#3，行为不变）
     norm = re.sub(r'\s+', '', clean)
     for h_text, level in headings_set:
         h_norm = re.sub(r'\s+', '', h_text)
-        h_norm = h_norm.replace('“', '“').replace('”', '”')
         if norm == h_norm:
             return level
         if len(norm) > 8 and len(h_norm) > 8:

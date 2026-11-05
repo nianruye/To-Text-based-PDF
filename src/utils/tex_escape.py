@@ -2,10 +2,16 @@
 # -*- coding: utf-8 -*-
 """LaTeX 转义共享模块。保留三管线转义差异（不统一），按 mode 分发。
 
-差异（unit 测试 src/test/unit/test_pure_funcs.py 锁定 classic；geom/v13 待补）：
+差异（unit 测试 src/test/unit/test_pure_funcs.py + test_audit_features.py 锁定）：
 - v13   escape_tex  : 保留 \\ { }（\\->\\textbackslash{}, {->\\{, }->\\}），转义符单反斜杠 \\%
+                      反斜杠先换占位符、最后还原 \\textbackslash{}，防其 {} 被 {/} 规则二次转义（issue #2 已修）
 - geom  _esc_chars  : 删**单**反斜杠 + { }，转义符单反斜杠 r'\\%'，无省略号归一化
-- classic _esc_chars: 删**双**反斜杠 \\\\ + { }（单反斜杠保留），转义符双反斜杠 r'\\\\%'（疑似bug，保留现状），有省略号归一化
+- classic _esc_chars: 删**双**反斜杠 \\\\ + { }（单反斜杠保留），转义符单反斜杠 r'\\%'（issue #1 已修：
+                      原 r'\\\\%' 会输出 LaTeX 换行 \\\\，把后续文字推到下一行），有省略号归一化
+
+已知分叉（issue #11，需 spec 拍板，本轮不动）：geom 删单反斜杠 / classic 删双保留单。
+因此输入本身已含 `\\%`（单反斜杠 + %）时，classic 的 % 规则会再转义一次得到 `\\\\%`；
+OCR 正文无此形态（v13 因先占位不受影响）。
 """
 _CIRC = {'①':'\\textcircled{1}','②':'\\textcircled{2}','③':'\\textcircled{3}','④':'\\textcircled{4}','⑤':'\\textcircled{5}','⑥':'\\textcircled{6}','⑦':'\\textcircled{7}','⑧':'\\textcircled{8}','⑨':'\\textcircled{9}','⑩':'\\textcircled{10}'}
 

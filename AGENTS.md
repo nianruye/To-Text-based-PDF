@@ -93,15 +93,15 @@
 
 | # | issue | 文件:行号 | 状态 |
 |---|---|---|---|
-| 1 | classic `_esc_chars` 转义符双反斜杠 `r'\\%'`（LaTeX `\\`=换行，应为 `r'\%'`） | `tex_escape.py` _CLASSIC_PAIRS（原 build_classic.py L200） | 已锁定（unit 测试锁现状，待修时测试转红再转绿） |
-| 2 | `escape_tex` 二次转义花括号（`\textbackslash{}` 的 `{}` 被后续 `{`/`}` 规则二次转义） | build_pdf_v13.py L42-44 | 已锁定（unit 测试） |
-| 3 | v13 `is_heading_by_md` 引号 replace identity（L139-141 无意义代码） | build_pdf_v13.py L139-141 | 待修 |
-| 4 | `test_pitch_rate` 死参（coords_path/lines_path/src_pdf 未传入 run_all） | test_cases.py L73 | 待修 |
-| 5 | `line_font` 引用未定义 `FONT_HD`（NameError，疑死代码） | build_geom.py L254 / classic L256 | 待修（先验证是否被调用） |
-| 6 | classic `POS_EST_LOG` 裸 `os.environ[]` 取值（未设则 KeyError） | build_classic.py L1125 | 待修 |
-| 7 | `fit_common` 临时目录泄漏（`tempfile.mkdtemp` 未 `rmtree`） | fit_common.py L66 | 待修 |
-| 8 | `DPI=200` 死代码（fit_common 定义未引用） | fit_common.py L14 | 待修 |
-| 9 | classic/fit_common docstring 未改名（仍自称 `build_geom.py` / `fit_positional.py`） | build_classic.py L4 / fit_common.py L4 | 待修 |
+| 1 | classic `_esc_chars` 转义符双反斜杠 `r'\\%'`（LaTeX `\\`=换行，应为 `r'\%'`） | `tex_escape.py` `_CLASSIC_PAIRS` L14（原 build_classic.py L200） | **已修**（源码已是 `('%',r'\%')` 单反斜杠；本轮核对并更正 PURE_FUNC_SPEC + 加强测试 `assert r'\\%' not in out`；battle1） |
+| 2 | `escape_tex` 二次转义花括号（`\textbackslash{}` 的 `{}` 被后续 `{`/`}` 规则二次转义） | build_pdf_v13.py `escape_tex` L41-48 | **已修**（反斜杠 `\x00` 占位、末尾还原；本轮补文档与 `\{\}` 反例测试；battle1） |
+| 3 | v13 `is_heading_by_md` 引号 replace identity（无意义代码） | build_pdf_v13.py `is_heading_by_md` L136-150 | **已修**（删除两行 identity replace；155 条语料前后输出 0 差异 + 2 万条 fuzz 0 差异；`TestIsHeadingByMd` 锁定；battle1） |
+| 4 | `test_pitch_rate` 死参（coords_path/lines_path/src_pdf 未传入 run_all） | test_cases.py `test_pitch_rate` | **已核**（HEAD 已是 `test_pitch_rate(pdf)`，无死参；顺带删未用 `import os` + 更正 docstring；battle1） |
+| 5 | `line_font` 引用未定义 `FONT_HD`（NameError，疑死代码） | build_geom.py / build_classic.py（现无此符号） | **已删**（两文件已无 `line_font`/`FONT_HD`；`ruff check --select F821 src/` 全过；battle1） |
+| 6 | classic `POS_EST_LOG` 裸 `os.environ[]` 取值（未设则 KeyError） | build_classic.py L1009-1011 | **已修**（原 `.get` 守卫已安全；本轮改局部变量单次 `.get`，语义不变；geom L1343 同模式已核；battle1） |
+| 7 | `fit_common` 临时目录泄漏（`tempfile.mkdtemp` 未 `rmtree`） | fit_common.py `main` L70-95 | **已修**（`try/finally` 覆盖异常/SystemExit；`test_fit_common_cleanup.py` 异常路径红→绿；battle1） |
+| 8 | `DPI=200` 死代码（fit_common 定义未引用） | —（build_geom L24 / classic L23 的 DPI 是活代码） | **已核**（fit_common 已无 DPI 定义；两 build 的 `DPI=200` 立即传入 `calibrate()`；battle1） |
+| 9 | classic/fit_common docstring 未改名（仍自称 `build_geom.py` / `fit_positional.py`） | build_classic.py L4-11 / fit_common.py L3-9 | **已修**（classic 入口改为 `fit_positional_classic.py` 两趟校准；fit_common 自我命名并注明 #17 由来；battle1） |
 | 19 | 竖排页码行合并页丢失（OCR 把「书眉+页码」合成 h≥300 的框 -> `special_rows` 按长行丢弃，p3 无页码渲染） | build_vert.py L125-141 | 待修（见 spec/vertical/03_marginalia.md 已知遗留） |
 
 ### 设计变更（design-change）

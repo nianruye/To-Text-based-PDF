@@ -5,7 +5,8 @@ build_classic.py - 古籍排版还原（从 build_geom fork）。PaddleOCR spott
 按 bbox 行高/位置/内容分类:标题(高)、正文(中)、脚注(矮)、页眉(顶部)、页码(底部数字)。
 各类不同字号;页码走 \setcounter 页脚、页眉走顶部小字;正文逐行固定 + 按缩进分段(首行缩进2em)。
 字号/版心/行距从满行几何推导。不需 MinerU。
-用法: python3 build_geom.py [spotting_lines] [spotting_coords] [out.pdf]
+入口: /usr/bin/python3 src/calibration/fit_positional_classic.py <spotting_lines> <spotting_coords> <out.pdf> [src.pdf]
+      （两趟校准薄壳；直接跑本脚本只做单趟）
 环境: PAGENUM_GLOBAL_TABLE / PAGENUM_OFFSET (页码继承)
 """
 import json, sys, statistics, subprocess, os, shutil, re, opencc
@@ -1006,8 +1007,9 @@ for key in sorted(sl.keys(), key=int):
             page_tex = '{\\linespread{' + ('%.3f' % ls_final) + '}\\selectfont ' + page_tex + '}'   # 原行为:仅溢出页收紧
     pages_tex.append(page_tex)
 
-if os.environ.get('POS_EST_LOG'):
-    json.dump(_pos_est, open(os.environ['POS_EST_LOG'], 'w'))   # 导出各源页位置化估高,供 fit_positional 两趟校准
+_pos_est_log = os.environ.get('POS_EST_LOG')   # #6: 单次 .get 取值（未设置时不再二次下标；语义不变）
+if _pos_est_log:
+    json.dump(_pos_est, open(_pos_est_log, 'w'))   # 导出各源页位置化估高,供 fit_positional 两趟校准
 
 latex = build_latex('classic', PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex)
 tex_path = '/tmp/seg2_line.tex'

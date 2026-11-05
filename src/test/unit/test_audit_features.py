@@ -77,6 +77,28 @@ class TestEscapeTexV13Extras:
         assert v13['escape_tex']('a\\b') == r'a\textbackslash{}b'
 
 
+# #1/#2 同类项：三模式对 % # _ & 的转义都必须是**单反斜杠**（LaTeX 中 \\ 是换行）
+class TestEscapeSingleBackslashAllModes:
+    """#1 回归（全模式）：转义符单反斜杠，禁止 `\\\\%` 这类双反斜杠输出。"""
+
+    @pytest.mark.parametrize("mode", ['v13', 'geom', 'classic'])
+    @pytest.mark.parametrize("ch", ['%', '#', '_', '&'])
+    def test_single_backslash(self, mode, ch):
+        out = escape_latex(ch, mode)
+        assert out == '\\' + ch, f'{mode} 模式 {ch!r} 转义={out!r}，应为单反斜杠'
+        assert '\\\\' not in out
+
+    @pytest.mark.parametrize("mode", ['v13', 'geom', 'classic'])
+    def test_no_percent_double_backslash(self, mode):
+        assert '\\\\%' not in escape_latex('100% 与 50%', mode)
+
+    def test_v13_backslash_not_double_escaped(self, v13):
+        # #2 回归：任意含反斜杠输入都不得出现 `\{\}`（二次转义痕迹）
+        for s in ['a\\b', '\\', 'a\\{b}', '\\\\']:
+            out = v13['escape_tex'](s)
+            assert r'\{\}' not in out, f'escape_tex({s!r})={out!r} 含二次转义'
+
+
 # #3 _head_level classic 模式（有附录判定）
 class TestHeadLevelClassic:
     """classic _head_level 有附录判定（geom 无）。"""
