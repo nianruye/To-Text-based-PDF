@@ -522,13 +522,19 @@ def _apply_missed_fix(path):
             n = int(it['number'])
             sent = chr(int(globals().get('RING_INS_BASE', 0xE100)) + n)
             cur = sl[k][idx]
-            if int(it.get('situation') or 0) == 1 and cur.endswith(str(n)):
-                sl[k][idx] = cur[:-len(str(n))] + sent
+            # t18：情形①的「1:1 替换」以**文本尾的 OCR 数字**为准，不再要求它 == 修正后的 n。
+            #   圈内数字被纠正（如 81->61）时，OCR 文本尾仍是 81；若按 n 匹配会走「情形②插」，
+            #   旧数字留在文本层（v32 首版实测 p1712/p1729/p1740 出现「８１○６１」双份 +19 字）。
+            _tail = None
+            if int(it.get('situation') or 0) == 1:
+                _tail = re.search(r'[0-9０１２３４５６７８９]{1,2}$', cur)
+            if _tail is not None:
+                sl[k][idx] = cur[:_tail.start()] + sent
                 st['ring1'] += 1
             else:
                 if int(it.get('situation') or 0) == 1:
-                    print('[漏识元素] p%d x%.1f 情形①但文本尾不是 %s(%r) -> 按情形②插'
-                          % (pg, it.get('source_x') or 0, n, cur[-8:]))
+                    print('[漏识元素] p%d x%.1f 情形①但文本尾无数字(%r) -> 按情形②插'
+                          % (pg, it.get('source_x') or 0, cur[-8:]))
                 sl[k][idx] = cur + sent
                 st['ring2'] += 1
             if n > 50:
