@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""fit_common.py - 位置还原两趟校准驱动（共享，build_geom/build_classic 参数化）。
+"""fit_common.py - 位置还原两趟校准驱动（横排 geom/classic 共用，build_name 参数化）。
 
-bit-exact 复制原 fit_positional.py / fit_positional_classic.py（两文件仅 _build 路径不同）。
+本模块由原 fit_positional.py / fit_positional_classic.py 的重复实现合并而来（issue #17）；
+两个入口仍保留为 3 行薄壳（src/calibration/fit_positional.py / fit_positional_classic.py），
 main(build_name) 决定调 build_geom.py 还是 build_classic.py，其余逻辑不变。
 POS_FILL 默认 0.95 不变。
 """
@@ -72,24 +73,26 @@ def main(build_name):
     ratio_tbl = os.path.join(tmp, 'ratio.json')
     p1 = os.path.join(tmp, 'pass1.pdf')
 
-    print('[pass1] 渲染 + 导出估高...')
-    render(p1, est_log=est_log, fill=99, build_name=build_name)   # FILL 极大 -> pass1 几乎不压缩,量自然高度
-    est = json.load(open(est_log))
-    actual = measure_heights(p1)
+    try:
+        print('[pass1] 渲染 + 导出估高...')
+        render(p1, est_log=est_log, fill=99, build_name=build_name)   # FILL 极大 -> pass1 几乎不压缩,量自然高度
+        est = json.load(open(est_log))
+        actual = measure_heights(p1)
 
-    # ratio = 实测/估高;仅对有效页(两者>0)。缺失页 ratio=1。
-    ratio = {}
-    diffs = []
-    for k, e in est.items():
-        a = actual.get(k, 0.0)
-        if e > 0 and a > 0:
-            ratio[k] = round(a / e, 3); diffs.append(a / e)
-    json.dump(ratio, open(ratio_tbl, 'w'))
-    if diffs:
-        print(f'[校准] {len(diffs)} 页 ratio: 中位{statistics.median(diffs):.3f} '
-              f'[{min(diffs):.2f},{max(diffs):.2f}]  (实测/估高;>1=估低,<1=估高)')
+        # ratio = 实测/估高;仅对有效页(两者>0)。缺失页 ratio=1。
+        ratio = {}
+        diffs = []
+        for k, e in est.items():
+            a = actual.get(k, 0.0)
+            if e > 0 and a > 0:
+                ratio[k] = round(a / e, 3); diffs.append(a / e)
+        json.dump(ratio, open(ratio_tbl, 'w'))
+        if diffs:
+            print(f'[校准] {len(diffs)} 页 ratio: 中位{statistics.median(diffs):.3f} '
+                  f'[{min(diffs):.2f},{max(diffs):.2f}]  (实测/估高;>1=估低,<1=估高)')
 
-    print('[pass2] 带 ratio 表重渲...')
-    render(OUT, ratio_table=ratio_tbl, fill=os.environ.get('POS_FILL', '0.95'), build_name=build_name)   # 0.95:估高已校准,留 5% 余量->0 溢出且空白最小
-    print(f'[完成] {OUT}')
-    shutil.rmtree(tmp, ignore_errors=True)  # 清理临时目录
+        print('[pass2] 带 ratio 表重渲...')
+        render(OUT, ratio_table=ratio_tbl, fill=os.environ.get('POS_FILL', '0.95'), build_name=build_name)   # 0.95:估高已校准,留 5% 余量->0 溢出且空白最小
+        print(f'[完成] {OUT}')
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)  # 清理临时目录(#7:成功/异常/SystemExit 均清理)

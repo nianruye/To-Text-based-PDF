@@ -3,18 +3,6 @@
  "note": "ring 的 number 由源图裁片人工判读（tmp_vert/taskE/rings_table_*.png）；situation 1=数字已在 OCR 文本尾, 2=整格漏识；来源坐标 source_x/source_y 供对账。",
  "items": [
   {
-   "page": 1683,
-   "col": [
-    340.5,
-    248.2,
-    361.6,
-    398.9
-   ],
-   "class": "dash",
-   "insert_dash": 2,
-   "text": "孟州充軍。"
-  },
-  {
    "page": 1682,
    "col": [
     333.4,
@@ -112,6 +100,18 @@
     361.6,
     398.9
    ],
+   "class": "dash",
+   "insert_dash": 2,
+   "text": "孟州充軍。"
+  },
+  {
+   "page": 1683,
+   "col": [
+    340.5,
+    248.2,
+    361.6,
+    398.9
+   ],
    "class": "ring",
    "number": 10,
    "situation": 2,
@@ -195,6 +195,146 @@
    "text": "起來，向漢子檢舉這件醜事。12"
   },
   {
+   "page": 1684,
+   "col": [
+    207.9,
+    252.6,
+    235.4,
+    645.0
+   ],
+   "class": "ring",
+   "number": 12,
+   "situation": 1,
+   "source_x": 222.1,
+   "source_y": 633.9,
+   "text": "春梅從中打了圓場，遮掩過了。12",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.32,
+    "hole": 0.191,
+    "edge": 0.59,
+    "ctr": 0.612,
+    "fill": 0.612,
+    "ar": 1.103,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246B"
+  },
+  {
+   "page": 1684,
+   "col": [
+    141.7,
+    255.8,
+    167.8,
+    295.9
+   ],
+   "class": "ring",
+   "number": 12,
+   "situation": 1,
+   "source_x": 155.3,
+   "source_y": 285.0,
+   "text": "。12",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.56,
+    "hole": 0.226,
+    "edge": 0.547,
+    "ctr": 0.492,
+    "fill": 0.584,
+    "ar": 1.087,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246B"
+  },
+  {
+   "page": 1684,
+   "col": [
+    107.8,
+    290.5,
+    134.7,
+    681.9
+   ],
+   "class": "ring",
+   "number": 12,
+   "situation": 1,
+   "source_x": 122.3,
+   "source_y": 670.8,
+   "text": "金蓮精神不暢，請劉理星魘勝。12",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.32,
+    "hole": 0.206,
+    "edge": 0.565,
+    "ctr": 0.537,
+    "fill": 0.594,
+    "ar": 1.103,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246B"
+  },
+  {
+   "page": 1685,
+   "col": [
+    586.5,
+    237.4,
+    616.1,
+    687.2
+   ],
+   "class": "ring",
+   "number": 13,
+   "situation": 1,
+   "source_x": 600.1,
+   "source_y": 676.0,
+   "text": "西門慶就安心設計圖謀這婦人。13",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.2,
+    "hole": 0.233,
+    "edge": 0.56,
+    "ctr": 0.453,
+    "fill": 0.584,
+    "ar": 1.111,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246C"
+  },
+  {
+   "page": 1685,
+   "col": [
+    353.9,
+    238.5,
+    380.0,
+    550.6
+   ],
+   "class": "ring",
+   "number": 13,
+   "situation": 1,
+   "source_x": 366.8,
+   "source_y": 539.8,
+   "text": "這年，李瓶兒二十三歲，屬羊。13",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 17.04,
+    "hole": 0.204,
+    "edge": 0.615,
+    "ctr": 0.499,
+    "fill": 0.59,
+    "ar": 1.056,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246C"
+  },
+  {
    "page": 1685,
    "col": [
     219.2,
@@ -210,6 +350,62 @@
    "text": "墙頭上舖苦毡條。14"
   },
   {
+   "page": 1685,
+   "col": [
+    119.2,
+    237.4,
+    146.7,
+    513.8
+   ],
+   "class": "ring",
+   "number": 14,
+   "situation": 1,
+   "source_x": 134.3,
+   "source_y": 503.0,
+   "text": "三人，别項銀兩，不准追了。14",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 17.28,
+    "hole": 0.229,
+    "edge": 0.596,
+    "ctr": 0.562,
+    "fill": 0.556,
+    "ar": 1.042,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246D"
+  },
+  {
+   "page": 1686,
+   "col": [
+    552.7,
+    239.6,
+    572.5,
+    276.4
+   ],
+   "class": "ring",
+   "number": 14,
+   "situation": 1,
+   "source_x": 563.3,
+   "source_y": 266.7,
+   "text": "14",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 17.28,
+    "hole": 0.261,
+    "edge": 0.567,
+    "ctr": 0.497,
+    "fill": 0.513,
+    "ar": 1.042,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246D"
+  },
+  {
    "page": 1686,
    "col": [
     82.5,
@@ -223,6 +419,342 @@
    "source_x": 94.2,
    "source_y": 623.5,
    "text": "，與潘金蓮現住三間樓房相連，連成一條邊。"
+  },
+  {
+   "page": 1687,
+   "col": [
+    635.9,
+    250.4,
+    659.2,
+    428.2
+   ],
+   "class": "ring",
+   "number": 15,
+   "situation": 1,
+   "source_x": 647.0,
+   "source_y": 417.5,
+   "text": "燈人，指指說說。15",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.16,
+    "hole": 0.227,
+    "edge": 0.601,
+    "ctr": 0.532,
+    "fill": 0.591,
+    "ar": 1.007,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246E"
+  },
+  {
+   "page": 1687,
+   "col": [
+    400.4,
+    248.2,
+    429.4,
+    940.9
+   ],
+   "class": "ring",
+   "number": 16,
+   "situation": 1,
+   "source_x": 414.4,
+   "source_y": 929.6,
+   "text": "去的住處，蓋在潘金蓮一連邊。16",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 15.96,
+    "hole": 0.276,
+    "edge": 0.432,
+    "ctr": 0.588,
+    "fill": 0.535,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246F"
+  },
+  {
+   "page": 1687,
+   "col": [
+    334.1,
+    247.2,
+    362.4,
+    699.2
+   ],
+   "class": "ring",
+   "number": 16,
+   "situation": 1,
+   "source_x": 347.7,
+   "source_y": 687.3,
+   "text": "過來。金蓮表示正好有了伴兒。16",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 14.64,
+    "hole": 0.093,
+    "edge": 0.44,
+    "ctr": 0.661,
+    "fill": 0.583,
+    "ar": 1.18,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246F"
+  },
+  {
+   "page": 1687,
+   "col": [
+    266.5,
+    249.3,
+    294.7,
+    446.6
+   ],
+   "class": "ring",
+   "number": 16,
+   "situation": 1,
+   "source_x": 280.6,
+   "source_y": 435.7,
+   "text": "西門慶湊起蓋房子。16",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.68,
+    "hole": 0.247,
+    "edge": 0.541,
+    "ctr": 0.619,
+    "fill": 0.544,
+    "ar": 1.079,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246F"
+  },
+  {
+   "page": 1687,
+   "col": [
+    233.3,
+    286.2,
+    260.9,
+    775.0
+   ],
+   "class": "ring",
+   "number": 16,
+   "situation": 1,
+   "source_x": 246.4,
+   "source_y": 763.8,
+   "text": "始興工動土，整建花家的房子。16",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.08,
+    "hole": 0.262,
+    "edge": 0.435,
+    "ctr": 0.694,
+    "fill": 0.543,
+    "ar": 1.075,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246F"
+  },
+  {
+   "page": 1687,
+   "col": [
+    199.5,
+    286.2,
+    227.7,
+    965.9
+   ],
+   "class": "ring",
+   "number": 16,
+   "situation": 1,
+   "source_x": 213.0,
+   "source_y": 954.5,
+   "text": "。西門慶應允房屋完工時迎娶。16",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.72,
+    "hole": 0.083,
+    "edge": 0.485,
+    "ctr": 0.653,
+    "fill": 0.576,
+    "ar": 1.145,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246F"
+  },
+  {
+   "page": 1687,
+   "col": [
+    167.1,
+    287.2,
+    193.9,
+    737.1
+   ],
+   "class": "ring",
+   "number": 16,
+   "situation": 1,
+   "source_x": 180.4,
+   "source_y": 726.1,
+   "text": "兒請西門慶來家解粽（過節）。16",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.44,
+    "hole": 0.255,
+    "edge": 0.506,
+    "ctr": 0.581,
+    "fill": 0.557,
+    "ar": 1.051,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+246F"
+  },
+  {
+   "page": 1689,
+   "col": [
+    631.0,
+    273.1,
+    655.0,
+    890.0
+   ],
+   "class": "ring",
+   "number": 18,
+   "situation": 1,
+   "source_x": 643.6,
+   "source_y": 880.0,
+   "text": "然一見，心蕩目搖，魂魄已失。18",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 17.76,
+    "hole": 0.226,
+    "edge": 0.58,
+    "ctr": 0.556,
+    "fill": 0.549,
+    "ar": 1.014,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2471"
+  },
+  {
+   "page": 1689,
+   "col": [
+    597.1,
+    272.1,
+    621.1,
+    890.0
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 610.2,
+   "source_y": 879.7,
+   "text": "裝修油漆完備，前後焕然一新。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 17.04,
+    "hole": 0.243,
+    "edge": 0.501,
+    "ctr": 0.534,
+    "fill": 0.564,
+    "ar": 1.007,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
+  },
+  {
+   "page": 1689,
+   "col": [
+    563.3,
+    273.1,
+    588.0,
+    740.4
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 576.8,
+   "source_y": 729.5,
+   "text": "日，在新買莊院設酒叫唱慶生。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.84,
+    "hole": 0.211,
+    "edge": 0.421,
+    "ctr": 0.583,
+    "fill": 0.539,
+    "ar": 1.136,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
+  },
+  {
+   "page": 1689,
+   "col": [
+    530.9,
+    272.1,
+    555.5,
+    872.6
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 544.2,
+   "source_y": 861.6,
+   "text": "，陳經濟與潘金蓮撲蝴蝶遊戲。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 15.6,
+    "hole": 0.248,
+    "edge": 0.51,
+    "ctr": 0.493,
+    "fill": 0.584,
+    "ar": 1.1,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
+  },
+  {
+   "page": 1689,
+   "col": [
+    463.9,
+    230.9,
+    491.4,
+    949.6
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 478.2,
+   "source_y": 938.3,
+   "text": "二人，著他們兩個去對蔣竹山。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.84,
+    "h": 15.12,
+    "hole": 0.07,
+    "edge": 0.469,
+    "ctr": 0.653,
+    "fill": 0.551,
+    "ar": 1.246,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
   },
   {
    "page": 1689,
@@ -242,6 +774,34 @@
   {
    "page": 1689,
    "col": [
+    296.8,
+    229.8,
+    324.3,
+    872.6
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 310.6,
+   "source_y": 861.6,
+   "text": "運到西門慶家，都堆在花樓上。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.6,
+    "hole": 0.068,
+    "edge": 0.464,
+    "ctr": 0.572,
+    "fill": 0.581,
+    "ar": 1.154,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
+  },
+  {
+   "page": 1689,
+   "col": [
     263.6,
     271.0,
     290.4,
@@ -253,6 +813,174 @@
    "source_x": 276.8,
    "source_y": 526.0,
    "text": "八月二十日。娶李瓶兒過門。19"
+  },
+  {
+   "page": 1689,
+   "col": [
+    230.6,
+    271.0,
+    257.3,
+    604.9
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 243.5,
+   "source_y": 594.2,
+   "text": "二十二日夜。李瓶兒上吊尋死。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.32,
+    "hole": 0.241,
+    "edge": 0.51,
+    "ctr": 0.562,
+    "fill": 0.577,
+    "ar": 1.059,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
+  },
+  {
+   "page": 1689,
+   "col": [
+    197.4,
+    272.1,
+    223.5,
+    623.3
+   ],
+   "class": "ring",
+   "number": 19,
+   "situation": 1,
+   "source_x": 210.4,
+   "source_y": 612.8,
+   "text": "十三日晚。西門慶鞭打李瓶兒。19",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.56,
+    "hole": 0.249,
+    "edge": 0.533,
+    "ctr": 0.58,
+    "fill": 0.573,
+    "ar": 1.043,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2472"
+  },
+  {
+   "page": 1689,
+   "col": [
+    164.2,
+    271.0,
+    191.1,
+    910.5
+   ],
+   "class": "ring",
+   "number": 20,
+   "situation": 1,
+   "source_x": 178.2,
+   "source_y": 899.7,
+   "text": "議論西門慶鞭打李瓶兒的情況。20",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 15.84,
+    "hole": 0.166,
+    "edge": 0.559,
+    "ctr": 0.855,
+    "fill": 0.66,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2473"
+  },
+  {
+   "page": 1689,
+   "col": [
+    131.8,
+    271.0,
+    158.6,
+    720.9
+   ],
+   "class": "ring",
+   "number": 20,
+   "situation": 1,
+   "source_x": 145.6,
+   "source_y": 709.6,
+   "text": "玉樓規勸吳月娘與西門慶和好。20",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.12,
+    "hole": 0.133,
+    "edge": 0.552,
+    "ctr": 0.781,
+    "fill": 0.646,
+    "ar": 1.19,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2473"
+  },
+  {
+   "page": 1690,
+   "col": [
+    578.1,
+    230.9,
+    602.8,
+    948.5
+   ],
+   "class": "ring",
+   "number": 20,
+   "situation": 1,
+   "source_x": 590.7,
+   "source_y": 936.4,
+   "text": "到衆人趨奉李瓶兒，甚是不快。20",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 14.4,
+    "hole": 0.176,
+    "edge": 0.567,
+    "ctr": 0.7,
+    "fill": 0.61,
+    "ar": 1.2,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2473"
+  },
+  {
+   "page": 1690,
+   "col": [
+    479.4,
+    230.9,
+    502.6,
+    794.5
+   ],
+   "class": "ring",
+   "number": 20,
+   "situation": 1,
+   "source_x": 490.6,
+   "source_y": 783.3,
+   "text": "筝，迎春學弦子，蘭香學胡琴。20",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.08,
+    "hole": 0.201,
+    "edge": 0.571,
+    "ctr": 0.692,
+    "fill": 0.605,
+    "ar": 1.119,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2473"
   },
   {
    "page": 1690,
@@ -287,6 +1015,34 @@
   {
    "page": 1691,
    "col": [
+    549.2,
+    236.3,
+    576.7,
+    860.7
+   ],
+   "class": "ring",
+   "number": 22,
+   "situation": 1,
+   "source_x": 563.3,
+   "source_y": 849.3,
+   "text": "買辦生辰擔去了，要半年期程。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.96,
+    "hole": 0.191,
+    "edge": 0.583,
+    "ctr": 0.626,
+    "fill": 0.613,
+    "ar": 1.128,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252"
+  },
+  {
+   "page": 1691,
+   "col": [
     448.4,
     241.8,
     475.9,
@@ -298,6 +1054,174 @@
    "source_x": 464.0,
    "source_y": 439.5,
    "text": "，大罵賊王八調戲她。22"
+  },
+  {
+   "page": 1691,
+   "col": [
+    348.2,
+    276.4,
+    375.8,
+    975.6
+   ],
+   "class": "ring",
+   "number": 23,
+   "situation": 1,
+   "source_x": 361.2,
+   "source_y": 964.2,
+   "text": "輸赢，買豬頭要來旺媳婦熟燒。23",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 15.96,
+    "hole": 0.203,
+    "edge": 0.57,
+    "ctr": 0.655,
+    "fill": 0.61,
+    "ar": 1.075,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3253"
+  },
+  {
+   "page": 1691,
+   "col": [
+    216.4,
+    240.7,
+    244.7,
+    380.5
+   ],
+   "class": "ring",
+   "number": 23,
+   "situation": 1,
+   "source_x": 231.4,
+   "source_y": 369.2,
+   "text": "，懊恨歸房。23",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.2,
+    "hole": 0.245,
+    "edge": 0.506,
+    "ctr": 0.522,
+    "fill": 0.568,
+    "ar": 1.067,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3253"
+  },
+  {
+   "page": 1691,
+   "col": [
+    150.2,
+    235.2,
+    178.3,
+    492.1
+   ],
+   "class": "ring",
+   "number": 23,
+   "situation": 1,
+   "source_x": 164.0,
+   "source_y": 480.9,
+   "text": "在金蓮房中把小意兒貼戀。23",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.2,
+    "hole": 0.221,
+    "edge": 0.492,
+    "ctr": 0.504,
+    "fill": 0.587,
+    "ar": 1.067,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3253"
+  },
+  {
+   "page": 1691,
+   "col": [
+    117.0,
+    271.0,
+    145.2,
+    1003.8
+   ],
+   "class": "ring",
+   "number": 24,
+   "situation": 1,
+   "source_x": 130.2,
+   "source_y": 992.6,
+   "text": "濟調情，來旺媳婦套穿金蓮鞋。24",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 16.2,
+    "hole": 0.231,
+    "edge": 0.494,
+    "ctr": 0.824,
+    "fill": 0.606,
+    "ar": 1.059,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3254"
+  },
+  {
+   "page": 1692,
+   "col": [
+    602.8,
+    250.4,
+    626.8,
+    403.2
+   ],
+   "class": "ring",
+   "number": 24,
+   "situation": 1,
+   "source_x": 615.1,
+   "source_y": 392.5,
+   "text": "，罵來旺媳婦。24",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.2,
+    "hole": 0.234,
+    "edge": 0.505,
+    "ctr": 0.759,
+    "fill": 0.579,
+    "ar": 1.111,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3254"
+  },
+  {
+   "page": 1692,
+   "col": [
+    534.4,
+    245.0,
+    561.9,
+    961.5
+   ],
+   "class": "ring",
+   "number": 25,
+   "situation": 1,
+   "source_x": 546.4,
+   "source_y": 949.9,
+   "text": "婦私通主人事。來旺追問妻子。25",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 14.52,
+    "hole": 0.111,
+    "edge": 0.623,
+    "ctr": 0.716,
+    "fill": 0.692,
+    "ar": 1.19,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3255"
   },
   {
    "page": 1692,
@@ -313,6 +1237,174 @@
    "source_x": 482.5,
    "source_y": 326.5,
    "text": "二千兩。25"
+  },
+  {
+   "page": 1692,
+   "col": [
+    434.3,
+    280.8,
+    462.5,
+    845.5
+   ],
+   "class": "ring",
+   "number": 25,
+   "situation": 1,
+   "source_x": 447.8,
+   "source_y": 834.1,
+   "text": "白刀進紅刀子出；連同潘金蓮。25",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.0,
+    "hole": 0.089,
+    "edge": 0.585,
+    "ctr": 0.678,
+    "fill": 0.639,
+    "ar": 1.2,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3255"
+  },
+  {
+   "page": 1692,
+   "col": [
+    400.4,
+    280.8,
+    430.1,
+    959.4
+   ],
+   "class": "ring",
+   "number": 25,
+   "situation": 1,
+   "source_x": 413.7,
+   "source_y": 948.0,
+   "text": "派來旺押蔡太師生辰擔上東京。25",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 15.12,
+    "hole": 0.081,
+    "edge": 0.681,
+    "ctr": 0.838,
+    "fill": 0.715,
+    "ar": 1.143,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3255"
+  },
+  {
+   "page": 1692,
+   "col": [
+    370.1,
+    281.9,
+    396.2,
+    694.9
+   ],
+   "class": "ring",
+   "number": 26,
+   "situation": 1,
+   "source_x": 382.7,
+   "source_y": 683.4,
+   "text": "金蓮調唆，中止派來旺去東京。26",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 14.88,
+    "hole": 0.1,
+    "edge": 0.598,
+    "ctr": 0.87,
+    "fill": 0.667,
+    "ar": 1.21,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3256"
+  },
+  {
+   "page": 1692,
+   "col": [
+    336.3,
+    284.0,
+    363.1,
+    789.1
+   ],
+   "class": "ring",
+   "number": 26,
+   "situation": 1,
+   "source_x": 348.0,
+   "source_y": 777.8,
+   "text": "保與吳主管押送生辰擔去東京。26",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.0,
+    "hole": 0.091,
+    "edge": 0.589,
+    "ctr": 0.898,
+    "fill": 0.684,
+    "ar": 1.2,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3256"
+  },
+  {
+   "page": 1692,
+   "col": [
+    270.7,
+    242.8,
+    297.5,
+    498.6
+   ],
+   "class": "ring",
+   "number": 26,
+   "situation": 1,
+   "source_x": 282.8,
+   "source_y": 488.2,
+   "text": "提刑所獄。判遞原籍徐州。26",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.8,
+    "hole": 0.166,
+    "edge": 0.617,
+    "ctr": 0.817,
+    "fill": 0.616,
+    "ar": 1.071,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3256"
+  },
+  {
+   "page": 1692,
+   "col": [
+    203.1,
+    247.2,
+    229.1,
+    402.1
+   ],
+   "class": "ring",
+   "number": 26,
+   "situation": 1,
+   "source_x": 216.4,
+   "source_y": 391.6,
+   "text": "。亡年廿五歲。26",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.56,
+    "hole": 0.183,
+    "edge": 0.603,
+    "ctr": 0.84,
+    "fill": 0.635,
+    "ar": 1.043,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3256"
   },
   {
    "page": 1692,
@@ -375,6 +1467,62 @@
    "text": "六月初一日。西門慶在花園翡翠軒捲棚下，與妻妾婢女淫樂。27"
   },
   {
+   "page": 1693,
+   "col": [
+    233.3,
+    236.3,
+    255.9,
+    353.4
+   ],
+   "class": "ring",
+   "number": 28,
+   "situation": 1,
+   "source_x": 244.9,
+   "source_y": 344.0,
+   "text": "疼子罵主。28",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.28,
+    "hole": 0.201,
+    "edge": 0.515,
+    "ctr": 0.707,
+    "fill": 0.587,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3258"
+  },
+  {
+   "page": 1693,
+   "col": [
+    200.2,
+    275.4,
+    223.5,
+    856.4
+   ],
+   "class": "ring",
+   "number": 29,
+   "situation": 1,
+   "source_x": 211.6,
+   "source_y": 845.0,
+   "text": "昭一家三口到獅子街看守房屋。29",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 15.72,
+    "hole": 0.176,
+    "edge": 0.606,
+    "ctr": 0.676,
+    "fill": 0.612,
+    "ar": 1.145,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3259"
+  },
+  {
    "page": 1695,
    "col": [
     621.1,
@@ -435,6 +1583,204 @@
    "text": "喬大戶家成房子。上房丫頭玉簫，暗送酒菜與琴童。鬧成失壺紛擾。"
   },
   {
+   "page": 1695,
+   "col": [
+    425.1,
+    284.0,
+    446.2,
+    633.0
+   ],
+   "class": "ring",
+   "number": 31,
+   "situation": 1,
+   "source_x": 433.9,
+   "source_y": 622.9,
+   "text": "十二日。請官家吃官哥滿月酒。31",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.28,
+    "hole": 0.228,
+    "edge": 0.6,
+    "ctr": 0.461,
+    "fill": 0.54,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325B"
+  },
+  {
+   "page": 1695,
+   "col": [
+    358.1,
+    284.0,
+    379.3,
+    632.0
+   ],
+   "class": "ring",
+   "number": 32,
+   "situation": 1,
+   "source_x": 367.9,
+   "source_y": 622.2,
+   "text": "旬。李桂姐拜認吳月娘作乾娘。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.28,
+    "hole": 0.182,
+    "edge": 0.564,
+    "ctr": 0.694,
+    "fill": 0.593,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1695,
+   "col": [
+    325.0,
+    284.0,
+    347.6,
+    977.8
+   ],
+   "class": "ring",
+   "number": 32,
+   "situation": 1,
+   "source_x": 336.8,
+   "source_y": 967.5,
+   "text": "此官哥驚哭不停，漾奶睡不穩。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 16.92,
+    "hole": 0.204,
+    "edge": 0.578,
+    "ctr": 0.734,
+    "fill": 0.604,
+    "ar": 0.972,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1695,
+   "col": [
+    258.1,
+    250.4,
+    281.3,
+    882.4
+   ],
+   "class": "ring",
+   "number": 33,
+   "situation": 1,
+   "source_x": 270.4,
+   "source_y": 872.1,
+   "text": "伯爵介紹夥計韓道國協助來保。33",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.92,
+    "hole": 0.191,
+    "edge": 0.592,
+    "ctr": 0.677,
+    "fill": 0.612,
+    "ar": 1.021,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325D"
+  },
+  {
+   "page": 1695,
+   "col": [
+    192.4,
+    243.9,
+    212.2,
+    323.1
+   ],
+   "class": "ring",
+   "number": 33,
+   "situation": 1,
+   "source_x": 202.2,
+   "source_y": 314.0,
+   "text": "曲兒。33",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 17.28,
+    "hole": 0.245,
+    "edge": 0.492,
+    "ctr": 0.584,
+    "fill": 0.513,
+    "ar": 0.993,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325D"
+  },
+  {
+   "page": 1695,
+   "col": [
+    158.6,
+    284.0,
+    180.5,
+    729.5
+   ],
+   "class": "ring",
+   "number": 33,
+   "situation": 1,
+   "source_x": 169.6,
+   "source_y": 719.7,
+   "text": "瓶兒推西門慶去金蓮房中歇宿。33",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 17.28,
+    "hole": 0.194,
+    "edge": 0.583,
+    "ctr": 0.643,
+    "fill": 0.554,
+    "ar": 1.042,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325D"
+  },
+  {
+   "page": 1695,
+   "col": [
+    92.3,
+    242.8,
+    114.2,
+    824.9
+   ],
+   "class": "ring",
+   "number": 33,
+   "situation": 1,
+   "source_x": 103.5,
+   "source_y": 814.2,
+   "text": "所，門面七間，到底五層。）)33",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 16.08,
+    "hole": 0.238,
+    "edge": 0.559,
+    "ctr": 0.679,
+    "fill": 0.606,
+    "ar": 1.022,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325D"
+  },
+  {
    "page": 1696,
    "col": [
     554.9,
@@ -448,6 +1794,343 @@
    "source_x": 569.5,
    "source_y": 412.5,
    "text": "不給，罰唱小曲。"
+  },
+  {
+   "page": 1696,
+   "col": [
+    422.3,
+    250.4,
+    449.8,
+    354.4
+   ],
+   "class": "ring",
+   "number": 33,
+   "situation": 1,
+   "source_x": 436.2,
+   "source_y": 343.2,
+   "text": "早送官。33",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 15.84,
+    "hole": 0.223,
+    "edge": 0.495,
+    "ctr": 0.73,
+    "fill": 0.603,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325D"
+  },
+  {
+   "page": 1696,
+   "col": [
+    388.4,
+    291.6,
+    415.9,
+    930.0
+   ],
+   "class": "ring",
+   "number": 34,
+   "situation": 1,
+   "source_x": 403.2,
+   "source_y": 918.2,
+   "text": "他說人情，不使婦人送官丢醜。34",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 14.76,
+    "hole": 0.15,
+    "edge": 0.443,
+    "ctr": 0.835,
+    "fill": 0.616,
+    "ar": 1.163,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325E"
+  },
+  {
+   "page": 1696,
+   "col": [
+    321.5,
+    255.8,
+    347.6,
+    299.2
+   ],
+   "class": "ring",
+   "number": 34,
+   "situation": 1,
+   "source_x": 336.1,
+   "source_y": 287.0,
+   "text": "。34",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 14.04,
+    "hole": 0.151,
+    "edge": 0.505,
+    "ctr": 0.867,
+    "fill": 0.602,
+    "ar": 1.282,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325E"
+  },
+  {
+   "page": 1696,
+   "col": [
+    256.6,
+    250.4,
+    283.4,
+    949.6
+   ],
+   "class": "ring",
+   "number": 34,
+   "situation": 1,
+   "source_x": 269.6,
+   "source_y": 937.8,
+   "text": "李瓶兒攬事說情。西門慶私書童。4",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 14.76,
+    "hole": 0.13,
+    "edge": 0.438,
+    "ctr": 0.915,
+    "fill": 0.607,
+    "ar": 1.171,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2463",
+   "ring_fix": "battle4:t19"
+  },
+  {
+   "page": 1696,
+   "col": [
+    189.7,
+    251.5,
+    216.4,
+    508.4
+   ],
+   "class": "ring",
+   "number": 34,
+   "situation": 1,
+   "source_x": 202.9,
+   "source_y": 497.0,
+   "text": "童受賄託李瓶兒求請說事。34",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 15.72,
+    "hole": 0.114,
+    "edge": 0.531,
+    "ctr": 0.85,
+    "fill": 0.63,
+    "ar": 1.099,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325E"
+  },
+  {
+   "page": 1696,
+   "col": [
+    122.7,
+    251.5,
+    150.2,
+    909.5
+   ],
+   "class": "ring",
+   "number": 35,
+   "situation": 1,
+   "source_x": 137.4,
+   "source_y": 898.6,
+   "text": "打平安。畫童在旁也陪了一拶。35",
+   "how": "ring_digit",
+   "measure": {
+    "w": 18.0,
+    "h": 16.56,
+    "hole": 0.191,
+    "edge": 0.565,
+    "ctr": 0.752,
+    "fill": 0.59,
+    "ar": 1.087,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325F"
+  },
+  {
+   "page": 1696,
+   "col": [
+    57.8,
+    251.5,
+    84.6,
+    642.8
+   ],
+   "class": "ring",
+   "number": 35,
+   "situation": 1,
+   "source_x": 71.0,
+   "source_y": 631.7,
+   "text": "慶宴留韓道國。書童扮旦唱曲。35",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.32,
+    "hole": 0.188,
+    "edge": 0.597,
+    "ctr": 0.802,
+    "fill": 0.64,
+    "ar": 1.059,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325F"
+  },
+  {
+   "page": 1697,
+   "col": [
+    593.6,
+    287.2,
+    616.1,
+    851.0
+   ],
+   "class": "ring",
+   "number": 35,
+   "situation": 1,
+   "source_x": 605.0,
+   "source_y": 840.3,
+   "text": "。建議購下向皇親庄子一部分。35",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.2,
+    "hole": 0.197,
+    "edge": 0.588,
+    "ctr": 0.801,
+    "fill": 0.612,
+    "ar": 1.067,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325F"
+  },
+  {
+   "page": 1697,
+   "col": [
+    526.6,
+    249.3,
+    549.2,
+    503.0
+   ],
+   "class": "ring",
+   "number": 35,
+   "situation": 1,
+   "source_x": 538.2,
+   "source_y": 493.2,
+   "text": "李瓶兒轎去了。月娘快快。35",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 17.28,
+    "hole": 0.219,
+    "edge": 0.529,
+    "ctr": 0.704,
+    "fill": 0.563,
+    "ar": 0.993,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325F"
+  },
+  {
+   "page": 1697,
+   "col": [
+    460.4,
+    250.4,
+    481.5,
+    328.4
+   ],
+   "class": "ring",
+   "number": 35,
+   "situation": 1,
+   "source_x": 471.1,
+   "source_y": 319.2,
+   "text": "粉說。35",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 17.16,
+    "hole": 0.237,
+    "edge": 0.551,
+    "ctr": 0.692,
+    "fill": 0.571,
+    "ar": 0.965,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325F"
+  },
+  {
+   "page": 1697,
+   "col": [
+    394.8,
+    250.4,
+    417.4,
+    984.2
+   ],
+   "class": "ring",
+   "number": 36,
+   "situation": 1,
+   "source_x": 406.2,
+   "source_y": 973.7,
+   "text": "籍省親，道經清河，希留一飯。36",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 16.44,
+    "hole": 0.187,
+    "edge": 0.59,
+    "ctr": 0.821,
+    "fill": 0.623,
+    "ar": 1.044,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B1"
+  },
+  {
+   "page": 1697,
+   "col": [
+    262.2,
+    255.8,
+    284.1,
+    522.5
+   ],
+   "class": "ring",
+   "number": 36,
+   "situation": 1,
+   "source_x": 273.4,
+   "source_y": 513.5,
+   "text": "一端，合香三百，白金卅兩。36",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.16,
+    "hole": 0.189,
+    "edge": 0.576,
+    "ctr": 0.874,
+    "fill": 0.591,
+    "ar": 1.007,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B1"
   },
   {
    "page": 1697,
@@ -467,6 +2150,34 @@
   {
    "page": 1697,
    "col": [
+    162.2,
+    289.4,
+    184.7,
+    983.2
+   ],
+   "class": "ring",
+   "number": 37,
+   "situation": 1,
+   "source_x": 174.5,
+   "source_y": 972.8,
+   "text": "。這年，王六兒廿九歲，屬蛇。37",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.8,
+    "hole": 0.228,
+    "edge": 0.627,
+    "ctr": 0.611,
+    "fill": 0.58,
+    "ar": 1.029,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B2"
+  },
+  {
+   "page": 1697,
+   "col": [
     129.0,
     289.4,
     151.6,
@@ -478,6 +2189,260 @@
    "source_x": 140.8,
    "source_y": 984.0,
    "text": "九月中旬。（私通王六兒的翌日）兌銀四兩，買丫頭一名給王六兒使喚，名錦兒。37"
+  },
+  {
+   "page": 1697,
+   "col": [
+    63.5,
+    254.8,
+    83.9,
+    350.1
+   ],
+   "class": "ring",
+   "number": 38,
+   "situation": 1,
+   "source_x": 74.0,
+   "source_y": 341.7,
+   "text": "天來取。38",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.28,
+    "hole": 0.205,
+    "edge": 0.565,
+    "ctr": 0.789,
+    "fill": 0.585,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B3"
+  },
+  {
+   "page": 1698,
+   "col": [
+    586.5,
+    284.0,
+    612.6,
+    996.2
+   ],
+   "class": "ring",
+   "number": 38,
+   "situation": 1,
+   "source_x": 601.2,
+   "source_y": 985.1,
+   "text": "軍刑緝捕到提刑所，夾打制服。88",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 16.2,
+    "hole": 0.182,
+    "edge": 0.593,
+    "ctr": 0.807,
+    "fill": 0.627,
+    "ar": 1.059,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1698,
+   "col": [
+    519.6,
+    245.0,
+    542.9,
+    420.6
+   ],
+   "class": "ring",
+   "number": 38,
+   "situation": 1,
+   "source_x": 532.2,
+   "source_y": 410.0,
+   "text": "與翟謙親家相稱。38",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 17.28,
+    "hole": 0.205,
+    "edge": 0.523,
+    "ctr": 0.81,
+    "fill": 0.57,
+    "ar": 0.993,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B3"
+  },
+  {
+   "page": 1698,
+   "col": [
+    486.4,
+    282.9,
+    512.5,
+    806.5
+   ],
+   "class": "ring",
+   "number": 38,
+   "situation": 1,
+   "source_x": 500.0,
+   "source_y": 795.7,
+   "text": "，宴請西門慶，答謝送馬之情。38",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.92,
+    "hole": 0.171,
+    "edge": 0.561,
+    "ctr": 0.873,
+    "fill": 0.615,
+    "ar": 1.021,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B3"
+  },
+  {
+   "page": 1698,
+   "col": [
+    317.2,
+    243.9,
+    343.4,
+    458.6
+   ],
+   "class": "ring",
+   "number": 38,
+   "situation": 1,
+   "source_x": 331.2,
+   "source_y": 447.7,
+   "text": "去和諧，夜宿金蓮處。38",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 16.68,
+    "hole": 0.232,
+    "edge": 0.537,
+    "ctr": 0.779,
+    "fill": 0.582,
+    "ar": 1.029,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B3"
+  },
+  {
+   "page": 1698,
+   "col": [
+    251.7,
+    243.9,
+    277.1,
+    920.3
+   ],
+   "class": "ring",
+   "number": 39,
+   "situation": 1,
+   "source_x": 265.5,
+   "source_y": 909.7,
+   "text": "中上宿，敎老婆陪西門慶玩耍。99",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 17.16,
+    "hole": 0.218,
+    "edge": 0.504,
+    "ctr": 0.707,
+    "fill": 0.585,
+    "ar": 0.958,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1698,
+   "col": [
+    184.0,
+    243.9,
+    210.8,
+    653.6
+   ],
+   "class": "ring",
+   "number": 39,
+   "situation": 1,
+   "source_x": 198.4,
+   "source_y": 642.8,
+   "text": "官哥寄在三寶座下，討個外名。39",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 16.68,
+    "hole": 0.191,
+    "edge": 0.605,
+    "ctr": 0.786,
+    "fill": 0.619,
+    "ar": 1.036,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B4"
+  },
+  {
+   "page": 1698,
+   "col": [
+    81.8,
+    282.9,
+    110.0,
+    611.4
+   ],
+   "class": "ring",
+   "number": 39,
+   "situation": 1,
+   "source_x": 98.0,
+   "source_y": 601.7,
+   "text": "八日。向吳道官送官哥寄名禮。39",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 18.0,
+    "hole": 0.191,
+    "edge": 0.55,
+    "ctr": 0.758,
+    "fill": 0.553,
+    "ar": 0.96,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B4"
+  },
+  {
+   "page": 1699,
+   "col": [
+    614.0,
+    254.8,
+    632.4,
+    273.1
+   ],
+   "class": "ring",
+   "number": 39,
+   "situation": 1,
+   "source_x": 623.7,
+   "source_y": 263.7,
+   "text": "39",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 17.28,
+    "hole": 0.242,
+    "edge": 0.486,
+    "ctr": 0.779,
+    "fill": 0.546,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B4"
   },
   {
    "page": 1699,
@@ -525,6 +2490,4364 @@
    "text": "大姐，各裁三件，春梅多裁兩件。"
   },
   {
+   "page": 1700,
+   "col": [
+    362.4,
+    247.2,
+    383.5,
+    287.2
+   ],
+   "class": "ring",
+   "number": 42,
+   "situation": 1,
+   "source_x": 373.2,
+   "source_y": 275.8,
+   "text": "。42",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.123,
+    "edge": 0.651,
+    "ctr": 0.823,
+    "fill": 0.674,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B7"
+  },
+  {
+   "page": 1701,
+   "col": [
+    624.6,
+    287.2,
+    647.2,
+    752.3
+   ],
+   "class": "ring",
+   "number": 43,
+   "situation": 1,
+   "source_x": 635.3,
+   "source_y": 741.4,
+   "text": "祝壽，院妓彈箏歌唱驚駭官哥。43",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.067,
+    "edge": 0.667,
+    "ctr": 0.905,
+    "fill": 0.703,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B8"
+  },
+  {
+   "page": 1701,
+   "col": [
+    558.4,
+    250.4,
+    580.9,
+    462.9
+   ],
+   "class": "ring",
+   "number": 43,
+   "situation": 1,
+   "source_x": 568.9,
+   "source_y": 453.5,
+   "text": "妃娘娘是她親姪女兒。43",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.095,
+    "edge": 0.688,
+    "ctr": 0.843,
+    "fill": 0.692,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B8"
+  },
+  {
+   "page": 1701,
+   "col": [
+    491.4,
+    248.2,
+    516.8,
+    714.4
+   ],
+   "class": "ring",
+   "number": 44,
+   "situation": 1,
+   "source_x": 502.6,
+   "source_y": 703.4,
+   "text": "夏花兒，交代明日叫媒人領賣。44",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.083,
+    "edge": 0.705,
+    "ctr": 0.945,
+    "fill": 0.74,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32B9"
+  },
+  {
+   "page": 1701,
+   "col": [
+    393.4,
+    246.1,
+    419.4,
+    366.4
+   ],
+   "class": "ring",
+   "number": 45,
+   "situation": 1,
+   "source_x": 406.9,
+   "source_y": 355.3,
+   "text": "門慶應允。45",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.48,
+    "hole": 0.075,
+    "edge": 0.708,
+    "ctr": 0.921,
+    "fill": 0.725,
+    "ar": 1.016,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BA"
+  },
+  {
+   "page": 1701,
+   "col": [
+    358.1,
+    282.9,
+    386.4,
+    999.5
+   ],
+   "class": "ring",
+   "number": 45,
+   "situation": 1,
+   "source_x": 370.9,
+   "source_y": 987.6,
+   "text": "石屏風兩架鋼鑼銅鼓。當卅兩。45",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.04,
+    "hole": 0.048,
+    "edge": 0.769,
+    "ctr": 0.983,
+    "fill": 0.804,
+    "ar": 1.12,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BA"
+  },
+  {
+   "page": 1701,
+   "col": [
+    326.4,
+    284.0,
+    353.2,
+    694.9
+   ],
+   "class": "ring",
+   "number": 45,
+   "situation": 1,
+   "source_x": 338.4,
+   "source_y": 683.8,
+   "text": "李桂姐央求西門慶留下夏花兒。45",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.6,
+    "hole": 0.033,
+    "edge": 0.678,
+    "ctr": 0.996,
+    "fill": 0.739,
+    "ar": 1.062,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BA"
+  },
+  {
+   "page": 1701,
+   "col": [
+    265.1,
+    250.4,
+    284.1,
+    286.2
+   ],
+   "class": "ring",
+   "number": 45,
+   "situation": 1,
+   "source_x": 275.0,
+   "source_y": 279.2,
+   "text": "45",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.118,
+    "edge": 0.667,
+    "ctr": 0.89,
+    "fill": 0.684,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BA"
+  },
+  {
+   "page": 1701,
+   "col": [
+    227.7,
+    282.9,
+    254.5,
+    694.9
+   ],
+   "class": "ring",
+   "number": 45,
+   "situation": 1,
+   "source_x": 240.0,
+   "source_y": 683.4,
+   "text": "月娘等婦女去吳大妗子家赴宴。45",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 14.88,
+    "hole": 0.04,
+    "edge": 0.683,
+    "ctr": 0.976,
+    "fill": 0.756,
+    "ar": 1.113,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BA"
+  },
+  {
+   "page": 1701,
+   "col": [
+    164.9,
+    249.3,
+    186.1,
+    273.1
+   ],
+   "class": "ring",
+   "number": 46,
+   "situation": 1,
+   "source_x": 175.2,
+   "source_y": 260.6,
+   "text": "46",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 12.72,
+    "hole": 0.074,
+    "edge": 0.721,
+    "ctr": 1.0,
+    "fill": 0.761,
+    "ar": 1.236,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BB"
+  },
+  {
+   "page": 1701,
+   "col": [
+    95.9,
+    243.9,
+    123.3,
+    326.3
+   ],
+   "class": "ring",
+   "number": 46,
+   "situation": 1,
+   "source_x": 108.5,
+   "source_y": 315.0,
+   "text": "慶節。46",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.12,
+    "hole": 0.093,
+    "edge": 0.691,
+    "ctr": 0.951,
+    "fill": 0.71,
+    "ar": 1.04,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BB"
+  },
+  {
+   "page": 1702,
+   "col": [
+    538.6,
+    261.2,
+    560.5,
+    680.8
+   ],
+   "class": "ring",
+   "number": 46,
+   "situation": 1,
+   "source_x": 550.5,
+   "source_y": 671.0,
+   "text": "的那件。潘金蓮嫌它是黃狗皮。46",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.84,
+    "hole": 0.097,
+    "edge": 0.607,
+    "ctr": 0.984,
+    "fill": 0.671,
+    "ar": 1.038,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BB"
+  },
+  {
+   "page": 1702,
+   "col": [
+    505.5,
+    292.7,
+    528.0,
+    965.9
+   ],
+   "class": "ring",
+   "number": 46,
+   "situation": 1,
+   "source_x": 517.5,
+   "source_y": 956.1,
+   "text": "口，強被請內小坐。彈唱飲酒。46",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.092,
+    "edge": 0.659,
+    "ctr": 0.98,
+    "fill": 0.661,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BB"
+  },
+  {
+   "page": 1702,
+   "col": [
+    441.4,
+    261.2,
+    457.6,
+    293.8
+   ],
+   "class": "ring",
+   "number": 46,
+   "situation": 1,
+   "source_x": 448.9,
+   "source_y": 285.5,
+   "text": "46",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.125,
+    "edge": 0.587,
+    "ctr": 0.958,
+    "fill": 0.631,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BB"
+  },
+  {
+   "page": 1702,
+   "col": [
+    405.4,
+    292.7,
+    426.5,
+    680.8
+   ],
+   "class": "ring",
+   "number": 46,
+   "situation": 1,
+   "source_x": 417.1,
+   "source_y": 671.8,
+   "text": "。月娘、玉樓、瓶兒卜龜兒卦。46",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.11,
+    "edge": 0.555,
+    "ctr": 0.989,
+    "fill": 0.639,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BB"
+  },
+  {
+   "page": 1702,
+   "col": [
+    272.1,
+    255.8,
+    292.6,
+    506.2
+   ],
+   "class": "ring",
+   "number": 47,
+   "situation": 1,
+   "source_x": 282.5,
+   "source_y": 497.8,
+   "text": "百兩。開放了苗青回揚州。47",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.175,
+    "edge": 0.557,
+    "ctr": 0.576,
+    "fill": 0.594,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BC"
+  },
+  {
+   "page": 1702,
+   "col": [
+    205.2,
+    261.2,
+    225.6,
+    390.2
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 216.5,
+   "source_y": 382.1,
+   "text": "。有意破案。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.104,
+    "edge": 0.616,
+    "ctr": 0.91,
+    "fill": 0.676,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1702,
+   "col": [
+    171.3,
+    294.9,
+    193.9,
+    985.4
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 183.8,
+   "source_y": 975.4,
+   "text": "房，爲子捐入武學。一時暄赫。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.101,
+    "edge": 0.702,
+    "ctr": 0.925,
+    "fill": 0.715,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1702,
+   "col": [
+    105.0,
+    254.8,
+    126.2,
+    506.2
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 116.7,
+   "source_y": 497.4,
+   "text": "祝墳庄新蓋山子捲棚房屋。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.0,
+    "hole": 0.134,
+    "edge": 0.631,
+    "ctr": 0.848,
+    "fill": 0.663,
+    "ar": 1.056,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1702,
+   "col": [
+    71.9,
+    294.9,
+    93.0,
+    622.2
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 83.7,
+   "source_y": 612.9,
+   "text": "初六日。鑼鼓喧闐，官哥受驚。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.0,
+    "hole": 0.094,
+    "edge": 0.65,
+    "ctr": 0.988,
+    "fill": 0.692,
+    "ar": 1.056,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1703,
+   "col": [
+    626.0,
+    240.7,
+    650.0,
+    472.6
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 638.7,
+   "source_y": 462.5,
+   "text": "鄙不職，一刻不可居任。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.28,
+    "h": 15.72,
+    "hole": 0.076,
+    "edge": 0.629,
+    "ctr": 0.976,
+    "fill": 0.669,
+    "ar": 1.099,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1703,
+   "col": [
+    557.6,
+    238.5,
+    584.5,
+    472.6
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 572.0,
+   "source_y": 462.8,
+   "text": "星夜攜書趕往東京辦事。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.44,
+    "hole": 0.089,
+    "edge": 0.635,
+    "ctr": 0.959,
+    "fill": 0.676,
+    "ar": 0.956,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1703,
+   "col": [
+    492.1,
+    238.5,
+    518.9,
+    821.6
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 505.2,
+   "source_y": 810.0,
+   "text": "尙書，待曾御史本到壓下不呈。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.24,
+    "hole": 0.065,
+    "edge": 0.691,
+    "ctr": 0.924,
+    "fill": 0.738,
+    "ar": 1.031,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1703,
+   "col": [
+    427.2,
+    241.8,
+    448.4,
+    264.5
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 439.2,
+   "source_y": 253.2,
+   "text": "48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.108,
+    "edge": 0.659,
+    "ctr": 0.892,
+    "fill": 0.673,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1703,
+   "col": [
+    126.2,
+    241.8,
+    153.7,
+    688.4
+   ],
+   "class": "ring",
+   "number": 48,
+   "situation": 1,
+   "source_x": 139.2,
+   "source_y": 676.5,
+   "text": "吏部考察，黜爲陝西慶州知州。48",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.075,
+    "edge": 0.756,
+    "ctr": 1.0,
+    "fill": 0.75,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BD"
+  },
+  {
+   "page": 1704,
+   "col": [
+    466.7,
+    248.2,
+    489.2,
+    307.9
+   ],
+   "class": "ring",
+   "number": 49,
+   "situation": 1,
+   "source_x": 477.1,
+   "source_y": 298.2,
+   "text": "號。49",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.074,
+    "edge": 0.673,
+    "ctr": 0.993,
+    "fill": 0.693,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BE"
+  },
+  {
+   "page": 1704,
+   "col": [
+    365.2,
+    248.2,
+    387.8,
+    423.9
+   ],
+   "class": "ring",
+   "number": 49,
+   "situation": 1,
+   "source_x": 376.5,
+   "source_y": 414.4,
+   "text": "妓。留伴董嬌兒。49",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.075,
+    "edge": 0.658,
+    "ctr": 0.986,
+    "fill": 0.708,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BE"
+  },
+  {
+   "page": 1704,
+   "col": [
+    298.2,
+    287.2,
+    321.5,
+    973.5
+   ],
+   "class": "ring",
+   "number": 49,
+   "situation": 1,
+   "source_x": 309.1,
+   "source_y": 962.7,
+   "text": "餞行。臨行要求關顧苗青一案。49",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.042,
+    "edge": 0.739,
+    "ctr": 0.996,
+    "fill": 0.748,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BE"
+  },
+  {
+   "page": 1704,
+   "col": [
+    200.9,
+    252.6,
+    217.2,
+    288.4
+   ],
+   "class": "ring",
+   "number": 49,
+   "situation": 1,
+   "source_x": 209.7,
+   "source_y": 279.5,
+   "text": "49",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.092,
+    "edge": 0.561,
+    "ctr": 1.0,
+    "fill": 0.666,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BE"
+  },
+  {
+   "page": 1704,
+   "col": [
+    163.6,
+    287.2,
+    186.8,
+    752.3
+   ],
+   "class": "ring",
+   "number": 50,
+   "situation": 1,
+   "source_x": 174.1,
+   "source_y": 741.2,
+   "text": "嬌兒生日。西門慶試藥王六兒。50",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 16.2,
+    "hole": 0.042,
+    "edge": 0.654,
+    "ctr": 0.966,
+    "fill": 0.706,
+    "ar": 1.022,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BF"
+  },
+  {
+   "page": 1704,
+   "col": [
+    131.2,
+    287.2,
+    153.7,
+    576.7
+   ],
+   "class": "ring",
+   "number": 50,
+   "situation": 1,
+   "source_x": 141.8,
+   "source_y": 567.9,
+   "text": "四月十七日晚。玳安戲弄書童。50",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 16.44,
+    "hole": 0.071,
+    "edge": 0.574,
+    "ctr": 0.944,
+    "fill": 0.66,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BF"
+  },
+  {
+   "page": 1704,
+   "col": [
+    94.5,
+    287.2,
+    119.2,
+    998.4
+   ],
+   "class": "ring",
+   "number": 50,
+   "situation": 1,
+   "source_x": 106.6,
+   "source_y": 987.2,
+   "text": "不得出來，相偕去蝴蝶巷遊蕩。50",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 16.2,
+    "hole": 0.051,
+    "edge": 0.663,
+    "ctr": 0.975,
+    "fill": 0.713,
+    "ar": 1.015,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BF"
+  },
+  {
+   "page": 1705,
+   "col": [
+    626.0,
+    254.8,
+    642.2,
+    288.4
+   ],
+   "class": "ring",
+   "number": 50,
+   "situation": 1,
+   "source_x": 635.0,
+   "source_y": 279.4,
+   "text": "50",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.088,
+    "edge": 0.638,
+    "ctr": 0.901,
+    "fill": 0.676,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+32BF"
+  },
+  {
+   "page": 1705,
+   "col": [
+    128.3,
+    248.2,
+    148.8,
+    306.8
+   ],
+   "class": "ring",
+   "number": 51,
+   "situation": 1,
+   "source_x": 138.5,
+   "source_y": 297.1,
+   "text": "青。51",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.56,
+    "hole": 0.116,
+    "edge": 0.603,
+    "ctr": 0.698,
+    "fill": 0.652,
+    "ar": 0.949,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    592.2,
+    253.7,
+    614.0,
+    601.6
+   ],
+   "class": "ring",
+   "number": 51,
+   "situation": 1,
+   "source_x": 604.2,
+   "source_y": 593.0,
+   "text": "慶廿一日去劉老太監庄上一敍。51",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.14,
+    "edge": 0.672,
+    "ctr": 0.633,
+    "fill": 0.66,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    558.4,
+    293.8,
+    580.9,
+    814.1
+   ],
+   "class": "ring",
+   "number": 51,
+   "situation": 1,
+   "source_x": 570.5,
+   "source_y": 803.7,
+   "text": "姑子們講說佛法，演頌金剛科。51",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.123,
+    "edge": 0.635,
+    "ctr": 0.66,
+    "fill": 0.655,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    492.1,
+    259.1,
+    512.5,
+    352.3
+   ],
+   "class": "ring",
+   "number": 51,
+   "situation": 1,
+   "source_x": 502.2,
+   "source_y": 342.5,
+   "text": "一部。)51",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.147,
+    "edge": 0.611,
+    "ctr": 0.611,
+    "fill": 0.629,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    457.6,
+    291.6,
+    480.8,
+    946.4
+   ],
+   "class": "ring",
+   "number": 51,
+   "situation": 1,
+   "source_x": 470.7,
+   "source_y": 936.5,
+   "text": "汗巾兒，李瓶兒出銀一兩九錢。51",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.144,
+    "edge": 0.637,
+    "ctr": 0.674,
+    "fill": 0.647,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    425.1,
+    293.8,
+    446.9,
+    738.2
+   ],
+   "class": "ring",
+   "number": 51,
+   "situation": 1,
+   "source_x": 435.8,
+   "source_y": 728.0,
+   "text": "欠銀應允後天歸還二百五十兩。51",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.84,
+    "hole": 0.112,
+    "edge": 0.646,
+    "ctr": 0.74,
+    "fill": 0.649,
+    "ar": 1.038,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    390.6,
+    292.7,
+    412.4,
+    600.5
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 402.4,
+   "source_y": 591.5,
+   "text": "月廿日晚。西門慶住金蓮後庭。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.09,
+    "edge": 0.685,
+    "ctr": 0.927,
+    "fill": 0.698,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    358.1,
+    293.8,
+    380.0,
+    926.8
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 369.4,
+   "source_y": 917.0,
+   "text": "日在磚廠劉太監處宴請西門慶。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.067,
+    "edge": 0.697,
+    "ctr": 0.92,
+    "fill": 0.717,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    325.0,
+    293.8,
+    346.1,
+    641.8
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 336.1,
+   "source_y": 631.2,
+   "text": "一日。李桂姐仍在西門家隱藏。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.108,
+    "edge": 0.587,
+    "ctr": 0.865,
+    "fill": 0.705,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    291.1,
+    292.7,
+    313.0,
+    813.0
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 302.8,
+   "source_y": 802.3,
+   "text": "爵告知李智黃四後日來取借銀。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.6,
+    "hole": 0.084,
+    "edge": 0.619,
+    "ctr": 0.881,
+    "fill": 0.691,
+    "ar": 1.015,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    223.5,
+    254.8,
+    243.9,
+    351.2
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 234.8,
+   "source_y": 342.5,
+   "text": "杷果。)52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.068,
+    "edge": 0.695,
+    "ctr": 0.893,
+    "fill": 0.706,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    189.7,
+    293.8,
+    212.2,
+    926.8
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 202.2,
+   "source_y": 917.0,
+   "text": "哥怪哭不止。哭得閉不過氣來。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.075,
+    "edge": 0.67,
+    "ctr": 0.873,
+    "fill": 0.71,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    156.5,
+    293.8,
+    178.3,
+    718.7
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 168.5,
+   "source_y": 708.4,
+   "text": "伯爵山子洞中向苟合野狗潑水。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.091,
+    "edge": 0.657,
+    "ctr": 0.887,
+    "fill": 0.682,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    126.9,
+    292.7,
+    148.8,
+    736.0
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 139.5,
+   "source_y": 726.5,
+   "text": "慶去劉太監處赴安黃二主事宴。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.084,
+    "edge": 0.63,
+    "ctr": 0.864,
+    "fill": 0.682,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    93.8,
+    293.8,
+    116.3,
+    737.1
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 106.2,
+   "source_y": 727.3,
+   "text": "濟在徐家討來欠銀二百五十兩。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.08,
+    "edge": 0.663,
+    "ctr": 0.917,
+    "fill": 0.701,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1706,
+   "col": [
+    60.6,
+    293.8,
+    82.5,
+    738.2
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 72.4,
+   "source_y": 727.6,
+   "text": "濟買回汗巾來。希求金蓮有謝。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.12,
+    "hole": 0.092,
+    "edge": 0.632,
+    "ctr": 0.874,
+    "fill": 0.72,
+    "ar": 1.04,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    630.2,
+    282.9,
+    654.2,
+    897.5
+   ],
+   "class": "ring",
+   "number": 52,
+   "situation": 1,
+   "source_x": 643.2,
+   "source_y": 888.5,
+   "text": "蓮心繫經濟，黑貓驚駭了官哥。52",
+   "how": "ring_digit",
+   "measure": {
+    "w": 17.16,
+    "h": 15.72,
+    "hole": 0.031,
+    "edge": 0.733,
+    "ctr": 0.957,
+    "fill": 0.73,
+    "ar": 1.092,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    563.3,
+    245.0,
+    585.1,
+    705.7
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 575.7,
+   "source_y": 696.5,
+   "text": "泣。愈發看重薛姑子的成胎藥。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.081,
+    "edge": 0.634,
+    "ctr": 0.863,
+    "fill": 0.697,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    531.5,
+    282.9,
+    552.7,
+    766.4
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 542.7,
+   "source_y": 755.7,
+   "text": "陳經濟潘金蓮捲棚後初次得手。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.037,
+    "edge": 0.719,
+    "ctr": 0.927,
+    "fill": 0.744,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    465.3,
+    245.0,
+    487.1,
+    844.5
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 474.1,
+   "source_y": 833.0,
+   "text": "大事。推金蓮房去。約以明日。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 14.4,
+    "hole": 0.084,
+    "edge": 0.751,
+    "ctr": 0.873,
+    "fill": 0.774,
+    "ar": 1.042,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    430.8,
+    282.9,
+    452.6,
+    917.0
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 441.4,
+   "source_y": 908.0,
+   "text": "香唸經，祝禱上天，頓酒吃藥。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.043,
+    "edge": 0.736,
+    "ctr": 0.948,
+    "fill": 0.739,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    330.6,
+    243.9,
+    351.8,
+    513.8
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 341.7,
+   "source_y": 505.2,
+   "text": "黃四，應伯爵忙去拿中人錢。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.074,
+    "edge": 0.601,
+    "ctr": 0.895,
+    "fill": 0.699,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    296.8,
+    282.9,
+    317.9,
+    610.3
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 308.6,
+   "source_y": 601.2,
+   "text": "廿三日晚。西門慶試藥吳月娘。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.063,
+    "edge": 0.701,
+    "ctr": 0.885,
+    "fill": 0.717,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    199.5,
+    246.1,
+    215.8,
+    263.4
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 207.8,
+   "source_y": 254.7,
+   "text": "53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.121,
+    "edge": 0.543,
+    "ctr": 0.75,
+    "fill": 0.663,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    164.2,
+    282.9,
+    186.1,
+    651.5
+   ],
+   "class": "ring",
+   "number": 53,
+   "situation": 1,
+   "source_x": 175.2,
+   "source_y": 641.8,
+   "text": "日。西門慶去城隍廟燒香求籤。53",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.053,
+    "edge": 0.682,
+    "ctr": 0.924,
+    "fill": 0.735,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1707,
+   "col": [
+    97.3,
+    249.3,
+    119.8,
+    805.4
+   ],
+   "class": "ring",
+   "number": 54,
+   "situation": 1,
+   "source_x": 109.2,
+   "source_y": 795.4,
+   "text": "，李瓶兒身子不好，催速回家。54",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.085,
+    "edge": 0.725,
+    "ctr": 0.854,
+    "fill": 0.723,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1708,
+   "col": [
+    578.1,
+    288.4,
+    604.2,
+    848.8
+   ],
+   "class": "ring",
+   "number": 54,
+   "situation": 1,
+   "source_x": 591.8,
+   "source_y": 837.1,
+   "text": "腰腹作痛。請任太醫診治下藥。64",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.12,
+    "hole": 0.077,
+    "edge": 0.747,
+    "ctr": 0.905,
+    "fill": 0.732,
+    "ar": 1.087,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1708,
+   "col": [
+    377.2,
+    250.4,
+    399.8,
+    291.6
+   ],
+   "class": "ring",
+   "number": 55,
+   "situation": 1,
+   "source_x": 389.3,
+   "source_y": 281.4,
+   "text": "55",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 16.56,
+    "hole": 0.03,
+    "edge": 0.691,
+    "ctr": 0.989,
+    "fill": 0.722,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1708,
+   "col": [
+    341.9,
+    287.2,
+    368.0,
+    755.5
+   ],
+   "class": "ring",
+   "number": 55,
+   "situation": 1,
+   "source_x": 356.3,
+   "source_y": 743.6,
+   "text": "西門慶抵東京，住翟管家府上。65",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 14.64,
+    "hole": 0.033,
+    "edge": 0.707,
+    "ctr": 0.992,
+    "fill": 0.78,
+    "ar": 1.131,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1708,
+   "col": [
+    274.2,
+    250.4,
+    302.4,
+    407.6
+   ],
+   "class": "ring",
+   "number": 55,
+   "situation": 1,
+   "source_x": 288.4,
+   "source_y": 396.0,
+   "text": "，太師家赴宴。65",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.24,
+    "hole": 0.042,
+    "edge": 0.801,
+    "ctr": 0.98,
+    "fill": 0.792,
+    "ar": 1.031,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1708,
+   "col": [
+    210.8,
+    250.4,
+    231.9,
+    291.6
+   ],
+   "class": "ring",
+   "number": 55,
+   "situation": 1,
+   "source_x": 222.5,
+   "source_y": 281.4,
+   "text": "55",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.56,
+    "hole": 0.046,
+    "edge": 0.65,
+    "ctr": 0.938,
+    "fill": 0.722,
+    "ar": 0.949,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1708,
+   "col": [
+    141.0,
+    247.2,
+    168.5,
+    521.4
+   ],
+   "class": "ring",
+   "number": 56,
+   "situation": 1,
+   "source_x": 155.4,
+   "source_y": 510.5,
+   "text": "留了八九日，始行告别返家。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.044,
+    "edge": 0.731,
+    "ctr": 0.96,
+    "fill": 0.736,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1708,
+   "col": [
+    75.5,
+    249.3,
+    97.3,
+    273.1
+   ],
+   "class": "ring",
+   "number": 56,
+   "situation": 1,
+   "source_x": 87.8,
+   "source_y": 261.6,
+   "text": "55",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.48,
+    "hole": 0.037,
+    "edge": 0.774,
+    "ctr": 0.976,
+    "fill": 0.761,
+    "ar": 1.062,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1709,
+   "col": [
+    622.5,
+    253.7,
+    644.4,
+    447.7
+   ],
+   "class": "ring",
+   "number": 56,
+   "situation": 1,
+   "source_x": 633.4,
+   "source_y": 438.5,
+   "text": "遏行雲，歌成白雲。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.046,
+    "edge": 0.754,
+    "ctr": 0.963,
+    "fill": 0.764,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1709,
+   "col": [
+    492.1,
+    255.8,
+    509.7,
+    274.2
+   ],
+   "class": "ring",
+   "number": 56,
+   "situation": 1,
+   "source_x": 500.7,
+   "source_y": 265.9,
+   "text": "58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.066,
+    "edge": 0.658,
+    "ctr": 1.0,
+    "fill": 0.735,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1709,
+   "col": [
+    356.8,
+    293.8,
+    378.6,
+    967.0
+   ],
+   "class": "ring",
+   "number": 56,
+   "situation": 1,
+   "source_x": 367.9,
+   "source_y": 956.8,
+   "text": "書事務人，應伯爵推薦水秀才。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.048,
+    "edge": 0.68,
+    "ctr": 0.985,
+    "fill": 0.76,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1709,
+   "col": [
+    322.9,
+    293.8,
+    345.4,
+    985.4
+   ],
+   "class": "ring",
+   "number": 57,
+   "situation": 1,
+   "source_x": 333.8,
+   "source_y": 975.4,
+   "text": "捐銀三十兩，印陀羅經五千卷。57",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.083,
+    "edge": 0.701,
+    "ctr": 0.761,
+    "fill": 0.688,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1709,
+   "col": [
+    290.4,
+    293.8,
+    312.3,
+    601.6
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 300.4,
+   "source_y": 592.9,
+   "text": "月廿七日。西門慶宿孫雪娥處。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.046,
+    "edge": 0.633,
+    "ctr": 0.978,
+    "fill": 0.75,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1709,
+   "col": [
+    222.8,
+    254.8,
+    244.7,
+    389.1
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 234.8,
+   "source_y": 380.0,
+   "text": "照鈔關納稅。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.84,
+    "hole": 0.048,
+    "edge": 0.714,
+    "ctr": 0.987,
+    "fill": 0.725,
+    "ar": 1.038,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1709,
+   "col": [
+    189.7,
+    293.8,
+    211.5,
+    700.2
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 200.6,
+   "source_y": 689.7,
+   "text": "新僱甘潤幫助韓道國發賣貨物。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.032,
+    "edge": 0.758,
+    "ctr": 1.0,
+    "fill": 0.777,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1709,
+   "col": [
+    89.5,
+    292.7,
+    112.1,
+    795.6
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 101.0,
+   "source_y": 785.0,
+   "text": "，派節級攜書下與關上錢主事。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.053,
+    "edge": 0.704,
+    "ctr": 0.959,
+    "fill": 0.741,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    590.1,
+    289.4,
+    610.5,
+    596.2
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 600.4,
+   "source_y": 587.8,
+   "text": "月廿八日。西門慶僱用溫秀才。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.082,
+    "edge": 0.62,
+    "ctr": 0.934,
+    "fill": 0.703,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    556.2,
+    289.4,
+    577.4,
+    597.3
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 567.4,
+   "source_y": 588.4,
+   "text": "月廿八日。潘金蓮奚落孫雪娥。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.065,
+    "edge": 0.671,
+    "ctr": 0.966,
+    "fill": 0.709,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    489.2,
+    255.8,
+    510.4,
+    614.6
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 500.4,
+   "source_y": 606.5,
+   "text": "菊。驚吵得李瓶兒母子不得安。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.077,
+    "edge": 0.648,
+    "ctr": 0.939,
+    "fill": 0.668,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    388.4,
+    255.8,
+    409.6,
+    385.9
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 399.5,
+   "source_y": 376.2,
+   "text": "一共交去。）)58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.072,
+    "edge": 0.671,
+    "ctr": 0.963,
+    "fill": 0.717,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    356.0,
+    289.4,
+    378.6,
+    980.0
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 369.5,
+   "source_y": 969.5,
+   "text": "作緞子舖。打開一溜三間門面。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.075,
+    "edge": 0.669,
+    "ctr": 0.917,
+    "fill": 0.694,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    322.9,
+    288.4,
+    344.1,
+    655.8
+   ],
+   "class": "ring",
+   "number": 58,
+   "situation": 1,
+   "source_x": 333.5,
+   "source_y": 646.2,
+   "text": "日。西門慶婦女憐卹磨鏡老人。58",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.066,
+    "edge": 0.697,
+    "ctr": 0.944,
+    "fill": 0.724,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    221.3,
+    250.4,
+    241.8,
+    365.3
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 232.9,
+   "source_y": 356.7,
+   "text": "喝過來了。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.063,
+    "edge": 0.702,
+    "ctr": 0.916,
+    "fill": 0.731,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    188.9,
+    289.4,
+    209.4,
+    577.8
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 199.9,
+   "source_y": 568.9,
+   "text": "八月初旬。西門慶試藥鄭愛月。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.085,
+    "edge": 0.609,
+    "ctr": 0.83,
+    "fill": 0.677,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    91.7,
+    288.4,
+    113.5,
+    754.5
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 103.9,
+   "source_y": 743.4,
+   "text": "百卷陀羅經卷完工，賁四挑來。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.12,
+    "hole": 0.076,
+    "edge": 0.662,
+    "ctr": 0.91,
+    "fill": 0.742,
+    "ar": 1.04,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1710,
+   "col": [
+    58.5,
+    288.4,
+    81.1,
+    829.2
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 70.9,
+   "source_y": 818.8,
+   "text": "。官哥病情無起色，灌藥也吐。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.063,
+    "edge": 0.674,
+    "ctr": 0.952,
+    "fill": 0.704,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    634.5,
+    292.7,
+    656.4,
+    873.7
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 644.7,
+   "source_y": 863.0,
+   "text": "抱在懷中，夜夢花子虛討財物。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.056,
+    "edge": 0.657,
+    "ctr": 0.951,
+    "fill": 0.724,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    569.6,
+    253.7,
+    590.1,
+    407.6
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 579.9,
+   "source_y": 399.4,
+   "text": "拏銀子隨去看。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.045,
+    "edge": 0.707,
+    "ctr": 0.996,
+    "fill": 0.769,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    535.8,
+    291.6,
+    557.6,
+    718.7
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 547.2,
+   "source_y": 708.2,
+   "text": "，官哥卒。在世一年零兩個月。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.32,
+    "hole": 0.074,
+    "edge": 0.611,
+    "ctr": 0.927,
+    "fill": 0.673,
+    "ar": 0.963,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    435.0,
+    292.7,
+    456.9,
+    680.8
+   ],
+   "class": "ring",
+   "number": 59,
+   "situation": 1,
+   "source_x": 445.2,
+   "source_y": 670.2,
+   "text": "。官哥安葬。李瓶兒傷心氣破。59",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.061,
+    "edge": 0.631,
+    "ctr": 0.965,
+    "fill": 0.71,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    401.9,
+    291.6,
+    423.0,
+    581.0
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 412.2,
+   "source_y": 571.9,
+   "text": "八月廿七日。潘金蓮幸災樂禍。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.081,
+    "edge": 0.601,
+    "ctr": 0.918,
+    "fill": 0.689,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    368.0,
+    292.7,
+    389.9,
+    871.5
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 377.3,
+   "source_y": 861.5,
+   "text": "丫頭翠兒放在孫雪娥房中使喚。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.065,
+    "edge": 0.703,
+    "ctr": 0.989,
+    "fill": 0.748,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    334.9,
+    291.6,
+    356.8,
+    795.6
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 344.7,
+   "source_y": 785.1,
+   "text": "子虛抱著官哥，要接她去同住。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.061,
+    "edge": 0.698,
+    "ctr": 0.94,
+    "fill": 0.719,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    267.9,
+    254.8,
+    289.1,
+    347.9
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 278.7,
+   "source_y": 340.7,
+   "text": "謝主事。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.56,
+    "hole": 0.065,
+    "edge": 0.635,
+    "ctr": 0.97,
+    "fill": 0.692,
+    "ar": 0.957,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    233.3,
+    291.6,
+    256.6,
+    1006.0
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 244.2,
+   "source_y": 994.3,
+   "text": "十五桌。鼓樂戲唱，熱鬧喧嘩。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.04,
+    "hole": 0.059,
+    "edge": 0.811,
+    "ctr": 0.934,
+    "fill": 0.797,
+    "ar": 1.12,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    200.9,
+    291.6,
+    223.5,
+    1006.0
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 210.9,
+   "source_y": 994.3,
+   "text": "五十兩，等下遭關出來再找完。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 14.04,
+    "hole": 0.047,
+    "edge": 0.683,
+    "ctr": 0.94,
+    "fill": 0.742,
+    "ar": 1.171,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1711,
+   "col": [
+    134.7,
+    254.8,
+    156.5,
+    523.5
+   ],
+   "class": "ring",
+   "number": 60,
+   "situation": 1,
+   "source_x": 145.2,
+   "source_y": 514.6,
+   "text": "作本，準備開個小小雜貨店。60",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.56,
+    "hole": 0.076,
+    "edge": 0.595,
+    "ctr": 0.96,
+    "fill": 0.683,
+    "ar": 0.949,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    590.8,
+    250.4,
+    613.4,
+    520.3
+   ],
+   "class": "ring",
+   "number": 61,
+   "situation": 1,
+   "source_x": 603.0,
+   "source_y": 510.8,
+   "text": "家中去唱。韓道國舖中安歇。81",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 16.44,
+    "hole": 0.084,
+    "edge": 0.631,
+    "ctr": 0.793,
+    "fill": 0.661,
+    "ar": 1.007,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1712,
+   "col": [
+    557.0,
+    287.2,
+    579.5,
+    848.8
+   ],
+   "class": "ring",
+   "number": 61,
+   "situation": 1,
+   "source_x": 569.0,
+   "source_y": 837.4,
+   "text": "接侍漢子。推漢子去潘六兒處。10",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.52,
+    "hole": 0.136,
+    "edge": 0.695,
+    "ctr": 0.7,
+    "fill": 0.706,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2469",
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1712,
+   "col": [
+    524.5,
+    287.2,
+    546.4,
+    617.9
+   ],
+   "class": "ring",
+   "number": 61,
+   "situation": 1,
+   "source_x": 534.8,
+   "source_y": 607.2,
+   "text": "初六日。潘金蓮處再試胡僧藥。61",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.109,
+    "edge": 0.651,
+    "ctr": 0.764,
+    "fill": 0.676,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    490.7,
+    287.2,
+    512.5,
+    675.4
+   ],
+   "class": "ring",
+   "number": 61,
+   "situation": 1,
+   "source_x": 501.5,
+   "source_y": 665.0,
+   "text": "。慶重陽賞菊，接申二姐獻唱。61",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.104,
+    "edge": 0.66,
+    "ctr": 0.735,
+    "fill": 0.687,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    425.1,
+    250.4,
+    445.6,
+    310.0
+   ],
+   "class": "ring",
+   "number": 61,
+   "situation": 1,
+   "source_x": 435.0,
+   "source_y": 299.1,
+   "text": "工。61",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.48,
+    "hole": 0.11,
+    "edge": 0.687,
+    "ctr": 0.704,
+    "fill": 0.665,
+    "ar": 1.07,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    358.1,
+    249.3,
+    379.3,
+    365.3
+   ],
+   "class": "ring",
+   "number": 61,
+   "situation": 1,
+   "source_x": 368.3,
+   "source_y": 355.2,
+   "text": "老人診治。61",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.101,
+    "edge": 0.646,
+    "ctr": 0.832,
+    "fill": 0.658,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    290.4,
+    250.4,
+    312.3,
+    443.4
+   ],
+   "class": "ring",
+   "number": 62,
+   "situation": 1,
+   "source_x": 301.2,
+   "source_y": 433.6,
+   "text": "觀潘道士祭法驅邪。62",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.56,
+    "hole": 0.072,
+    "edge": 0.551,
+    "ctr": 0.908,
+    "fill": 0.679,
+    "ar": 0.949,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    156.5,
+    288.4,
+    179.1,
+    959.4
+   ],
+   "class": "ring",
+   "number": 62,
+   "situation": 1,
+   "source_x": 167.3,
+   "source_y": 949.2,
+   "text": "重一副桃花洞，三百廿兩成交。62",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.083,
+    "edge": 0.651,
+    "ctr": 0.888,
+    "fill": 0.707,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    123.3,
+    288.4,
+    145.9,
+    940.9
+   ],
+   "class": "ring",
+   "number": 62,
+   "situation": 1,
+   "source_x": 133.9,
+   "source_y": 930.5,
+   "text": "辦後事，一切從簡，萬別浪費。62",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.068,
+    "edge": 0.719,
+    "ctr": 0.914,
+    "fill": 0.72,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1712,
+   "col": [
+    90.2,
+    288.4,
+    112.1,
+    577.8
+   ],
+   "class": "ring",
+   "number": 62,
+   "situation": 1,
+   "source_x": 100.6,
+   "source_y": 568.2,
+   "text": "九月十六日。李瓶兒死前勸夫。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.053,
+    "edge": 0.705,
+    "ctr": 0.941,
+    "fill": 0.765,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1712,
+   "col": [
+    57.1,
+    288.4,
+    79.7,
+    809.8
+   ],
+   "class": "ring",
+   "number": 62,
+   "situation": 1,
+   "source_x": 67.2,
+   "source_y": 798.4,
+   "text": "年二十七歲。西門慶動情悲哭。62",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.52,
+    "hole": 0.055,
+    "edge": 0.751,
+    "ctr": 0.95,
+    "fill": 0.775,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1713,
+   "col": [
+    371.6,
+    251.5,
+    389.1,
+    287.2
+   ],
+   "class": "ring",
+   "number": 63,
+   "situation": 1,
+   "source_x": 380.8,
+   "source_y": 277.2,
+   "text": "。63",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.101,
+    "edge": 0.613,
+    "ctr": 0.792,
+    "fill": 0.67,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1713,
+   "col": [
+    270.7,
+    248.2,
+    292.6,
+    634.1
+   ],
+   "class": "ring",
+   "number": 64,
+   "situation": 1,
+   "source_x": 282.1,
+   "source_y": 624.5,
+   "text": "計二十兩，逃回蘇州原籍去了。64",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.08,
+    "edge": 0.631,
+    "ctr": 0.923,
+    "fill": 0.677,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1714,
+   "col": [
+    446.2,
+    284.0,
+    468.1,
+    594.0
+   ],
+   "class": "ring",
+   "number": 65,
+   "situation": 1,
+   "source_x": 457.6,
+   "source_y": 584.8,
+   "text": "月十一日。作安葬起靈前準備。55",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.066,
+    "edge": 0.633,
+    "ctr": 0.936,
+    "fill": 0.689,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1714,
+   "col": [
+    412.4,
+    284.0,
+    435.7,
+    919.2
+   ],
+   "class": "ring",
+   "number": 65,
+   "situation": 1,
+   "source_x": 424.2,
+   "source_y": 908.8,
+   "text": "，留作迎接六黃太尉過此宴飲。65",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.072,
+    "edge": 0.642,
+    "ctr": 0.944,
+    "fill": 0.727,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1714,
+   "col": [
+    311.6,
+    284.0,
+    334.9,
+    730.6
+   ],
+   "class": "ring",
+   "number": 65,
+   "situation": 1,
+   "source_x": 322.5,
+   "source_y": 719.8,
+   "text": "地傳女長姐將下嫁夏提刑作妾。55",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.046,
+    "edge": 0.696,
+    "ctr": 0.982,
+    "fill": 0.729,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1714,
+   "col": [
+    278.5,
+    284.0,
+    301.1,
+    826.0
+   ],
+   "class": "ring",
+   "number": 66,
+   "situation": 1,
+   "source_x": 288.8,
+   "source_y": 815.0,
+   "text": "，招來僧唸經。且作水陸齋場。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.055,
+    "edge": 0.679,
+    "ctr": 0.977,
+    "fill": 0.702,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1714,
+   "col": [
+    210.8,
+    246.1,
+    232.7,
+    478.1
+   ],
+   "class": "ring",
+   "number": 66,
+   "situation": 1,
+   "source_x": 222.5,
+   "source_y": 468.5,
+   "text": "督上月廿九日庚死獄中。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.049,
+    "edge": 0.713,
+    "ctr": 0.966,
+    "fill": 0.741,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1714,
+   "col": [
+    178.3,
+    284.0,
+    200.9,
+    746.9
+   ],
+   "class": "ring",
+   "number": 67,
+   "situation": 1,
+   "source_x": 191.0,
+   "source_y": 735.5,
+   "text": "。準備銀兩，南方辦貨。天大雪。7",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.113,
+    "edge": 0.637,
+    "ctr": 0.659,
+    "fill": 0.682,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2466",
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1714,
+   "col": [
+    45.1,
+    249.3,
+    62.0,
+    266.6
+   ],
+   "class": "ring",
+   "number": 67,
+   "situation": 1,
+   "source_x": 53.7,
+   "source_y": 257.3,
+   "text": "67",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.56,
+    "hole": 0.13,
+    "edge": 0.633,
+    "ctr": 0.612,
+    "fill": 0.638,
+    "ar": 0.957,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    656.4,
+    278.6,
+    677.5,
+    589.7
+   ],
+   "class": "ring",
+   "number": 67,
+   "situation": 1,
+   "source_x": 667.9,
+   "source_y": 579.2,
+   "text": "月廿七日。西門慶夢見李瓶兒。67",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.2,
+    "hole": 0.11,
+    "edge": 0.639,
+    "ctr": 0.67,
+    "fill": 0.662,
+    "ar": 0.97,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    627.5,
+    277.5,
+    650.0,
+    765.3
+   ],
+   "class": "ring",
+   "number": 67,
+   "situation": 1,
+   "source_x": 639.0,
+   "source_y": 753.3,
+   "text": "春花生子，西門慶助銀五十兩。67",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 13.2,
+    "hole": 0.092,
+    "edge": 0.739,
+    "ctr": 0.794,
+    "fill": 0.766,
+    "ar": 1.255,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    561.9,
+    239.6,
+    583.8,
+    489.9
+   ],
+   "class": "ring",
+   "number": 67,
+   "situation": 1,
+   "source_x": 572.7,
+   "source_y": 480.1,
+   "text": "兩燒紙錢，打了杖罪無事。67",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.44,
+    "hole": 0.089,
+    "edge": 0.651,
+    "ctr": 0.743,
+    "fill": 0.679,
+    "ar": 0.964,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    528.0,
+    278.6,
+    550.6,
+    801.1
+   ],
+   "class": "ring",
+   "number": 67,
+   "situation": 1,
+   "source_x": 539.3,
+   "source_y": 790.3,
+   "text": "孟二辭行，要去川廣販買香蠟。67",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.6,
+    "hole": 0.108,
+    "edge": 0.58,
+    "ctr": 0.712,
+    "fill": 0.652,
+    "ar": 1.062,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    494.9,
+    277.5,
+    517.5,
+    704.6
+   ],
+   "class": "ring",
+   "number": 68,
+   "situation": 1,
+   "source_x": 505.6,
+   "source_y": 693.4,
+   "text": "四領舅子孫文相攜禮謝西門慶。68",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 14.64,
+    "hole": 0.044,
+    "edge": 0.774,
+    "ctr": 0.981,
+    "fill": 0.759,
+    "ar": 1.123,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    462.5,
+    276.4,
+    485.1,
+    640.6
+   ],
+   "class": "ring",
+   "number": 68,
+   "situation": 1,
+   "source_x": 472.2,
+   "source_y": 630.4,
+   "text": "日。潘金蓮託薛姑子配坐胎藥。68",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.042,
+    "edge": 0.68,
+    "ctr": 0.963,
+    "fill": 0.746,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    429.4,
+    276.4,
+    451.9,
+    839.0
+   ],
+   "class": "ring",
+   "number": 68,
+   "situation": 1,
+   "source_x": 439.9,
+   "source_y": 828.0,
+   "text": "設道場，誦經爲李瓶兒作斷七。68",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.24,
+    "hole": 0.038,
+    "edge": 0.715,
+    "ctr": 0.98,
+    "fill": 0.769,
+    "ar": 1.031,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    395.5,
+    275.4,
+    418.8,
+    730.6
+   ],
+   "class": "ring",
+   "number": 68,
+   "situation": 1,
+   "source_x": 406.2,
+   "source_y": 719.8,
+   "text": "來拜。榮升工部監管河工辭行。68",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.6,
+    "hole": 0.038,
+    "edge": 0.695,
+    "ctr": 1.0,
+    "fill": 0.777,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    328.6,
+    238.5,
+    351.8,
+    697.0
+   ],
+   "class": "ring",
+   "number": 68,
+   "situation": 1,
+   "source_x": 339.5,
+   "source_y": 685.8,
+   "text": "九日。西門慶派玳安去尋文嫂。68",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.64,
+    "hole": 0.052,
+    "edge": 0.736,
+    "ctr": 0.981,
+    "fill": 0.77,
+    "ar": 1.074,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    261.6,
+    243.9,
+    284.1,
+    452.1
+   ],
+   "class": "ring",
+   "number": 69,
+   "situation": 1,
+   "source_x": 272.7,
+   "source_y": 442.6,
+   "text": "一見情鍾，成其美事。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.56,
+    "hole": 0.058,
+    "edge": 0.576,
+    "ctr": 0.961,
+    "fill": 0.694,
+    "ar": 0.957,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    194.6,
+    238.5,
+    217.8,
+    971.2
+   ],
+   "class": "ring",
+   "number": 69,
+   "situation": 1,
+   "source_x": 205.9,
+   "source_y": 960.5,
+   "text": "念，捉去小張閒五個光棍夾打。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.6,
+    "hole": 0.06,
+    "edge": 0.697,
+    "ctr": 0.937,
+    "fill": 0.744,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    162.2,
+    277.5,
+    185.4,
+    913.8
+   ],
+   "class": "ring",
+   "number": 69,
+   "situation": 1,
+   "source_x": 173.3,
+   "source_y": 903.3,
+   "text": "打聽京中發下令軍的考察本示。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 16.08,
+    "hole": 0.049,
+    "edge": 0.699,
+    "ctr": 0.969,
+    "fill": 0.756,
+    "ar": 0.933,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1715,
+   "col": [
+    100.8,
+    239.6,
+    122.7,
+    608.1
+   ],
+   "class": "ring",
+   "number": 69,
+   "situation": 1,
+   "source_x": 111.9,
+   "source_y": 598.2,
+   "text": "施放。（自此與李桂姐斷絕）。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.052,
+    "edge": 0.667,
+    "ctr": 0.992,
+    "fill": 0.766,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    572.5,
+    281.9,
+    595.0,
+    995.1
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 583.1,
+   "source_y": 983.4,
+   "text": "千戶，夏提刑調指揮司管鹵薄。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.165,
+    "edge": 0.669,
+    "ctr": 0.76,
+    "fill": 0.647,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    506.9,
+    243.9,
+    528.8,
+    494.3
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 516.9,
+   "source_y": 484.9,
+   "text": "趕冬至令節見朝引奏謝恩。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.164,
+    "edge": 0.572,
+    "ctr": 0.894,
+    "fill": 0.643,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    473.1,
+    281.9,
+    494.9,
+    710.0
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 483.5,
+   "source_y": 699.1,
+   "text": "西門慶等人由清河起程赴東京。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.44,
+    "hole": 0.14,
+    "edge": 0.567,
+    "ctr": 0.83,
+    "fill": 0.615,
+    "ar": 0.956,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    439.9,
+    281.9,
+    462.5,
+    995.1
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 448.9,
+   "source_y": 984.5,
+   "text": "門慶與夏提刑住在崔中書府第。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.137,
+    "edge": 0.642,
+    "ctr": 0.885,
+    "fill": 0.675,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    372.9,
+    242.8,
+    394.8,
+    552.9
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 382.9,
+   "source_y": 542.7,
+   "text": "主祭未歸。差黃四鴻臚寺報名。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.146,
+    "edge": 0.66,
+    "ctr": 0.848,
+    "fill": 0.659,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    240.4,
+    246.1,
+    262.2,
+    417.4
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 249.4,
+   "source_y": 407.8,
+   "text": "一千五百兩出手。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.123,
+    "edge": 0.691,
+    "ctr": 0.948,
+    "fill": 0.68,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    172.7,
+    241.8,
+    194.6,
+    593.0
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 183.2,
+   "source_y": 581.3,
+   "text": "衆領筍付。當晚宿崔中書府第。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.12,
+    "hole": 0.151,
+    "edge": 0.707,
+    "ctr": 0.898,
+    "fill": 0.684,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1716,
+   "col": [
+    72.6,
+    240.7,
+    95.2,
+    532.2
+   ],
+   "class": "ring",
+   "number": 70,
+   "situation": 1,
+   "source_x": 83.7,
+   "source_y": 521.8,
+   "text": "當晚住何千戶家。夜夢李瓶兒。70",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.193,
+    "edge": 0.66,
+    "ctr": 0.643,
+    "fill": 0.584,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1719,
+   "col": [
+    301.8,
+    249.3,
+    320.1,
+    268.9
+   ],
+   "class": "ring",
+   "number": 72,
+   "situation": 1,
+   "source_x": 311.3,
+   "source_y": 258.5,
+   "text": "72",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.103,
+    "edge": 0.666,
+    "ctr": 0.873,
+    "fill": 0.668,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    466.0,
+    251.5,
+    487.9,
+    557.2
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 475.1,
+   "source_y": 549.5,
+   "text": "關說，希望舉劾有好成績升轉。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.136,
+    "edge": 0.643,
+    "ctr": 0.873,
+    "fill": 0.64,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    432.9,
+    289.4,
+    454.8,
+    637.4
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 442.2,
+   "source_y": 628.2,
+   "text": "廿八日。春梅恃寵厲罵申二姐。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.143,
+    "edge": 0.628,
+    "ctr": 0.814,
+    "fill": 0.634,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    365.2,
+    251.5,
+    386.4,
+    406.5
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 375.4,
+   "source_y": 397.2,
+   "text": "封（二百兩）。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.119,
+    "edge": 0.667,
+    "ctr": 0.88,
+    "fill": 0.665,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    298.2,
+    251.5,
+    319.4,
+    347.9
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 309.1,
+   "source_y": 338.7,
+   "text": "嬌施嗔。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.124,
+    "edge": 0.698,
+    "ctr": 0.879,
+    "fill": 0.683,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    263.6,
+    289.4,
+    286.2,
+    754.5
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 274.9,
+   "source_y": 743.8,
+   "text": "梅罵申二姐事，月娘金蓮頂嘴。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.124,
+    "edge": 0.669,
+    "ctr": 0.83,
+    "fill": 0.652,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    230.6,
+    289.4,
+    253.1,
+    754.5
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 241.2,
+   "source_y": 743.1,
+   "text": "慶宿上房，潘金蓮誤了壬子日。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.126,
+    "edge": 0.65,
+    "ctr": 0.838,
+    "fill": 0.647,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    197.4,
+    289.4,
+    219.9,
+    717.6
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 207.5,
+   "source_y": 705.5,
+   "text": "。吳月娘病，請任醫官下藥安胎。7",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.28,
+    "hole": 0.097,
+    "edge": 0.688,
+    "ctr": 0.942,
+    "fill": 0.722,
+    "ar": 1.101,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2466",
+   "ring_fix": "battle4:t19"
+  },
+  {
+   "page": 1720,
+   "col": [
+    163.6,
+    288.4,
+    186.1,
+    774.0
+   ],
+   "class": "ring",
+   "number": 75,
+   "situation": 1,
+   "source_x": 173.7,
+   "source_y": 762.5,
+   "text": "慫恿潘金蓮陪禮，解慍吳月娘。75",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.6,
+    "hole": 0.108,
+    "edge": 0.633,
+    "ctr": 0.895,
+    "fill": 0.667,
+    "ar": 1.015,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1720,
+   "col": [
+    97.3,
+    250.4,
+    119.2,
+    442.2
+   ],
+   "class": "ring",
+   "number": 78,
+   "situation": 1,
+   "source_x": 107.3,
+   "source_y": 433.1,
+   "text": "妻兄吳鎧及李知縣。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.72,
+    "hole": 0.077,
+    "edge": 0.709,
+    "ctr": 0.979,
+    "fill": 0.701,
+    "ar": 1.053,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1721,
+   "col": [
+    617.6,
+    274.2,
+    640.1,
+    759.9
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 629.7,
+   "source_y": 747.9,
+   "text": "入銀錢眼目，改由潘金蓮經管。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 13.44,
+    "hole": 0.128,
+    "edge": 0.644,
+    "ctr": 0.907,
+    "fill": 0.683,
+    "ar": 1.179,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    585.1,
+    274.2,
+    608.4,
+    984.2
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 597.9,
+   "source_y": 974.0,
+   "text": "開年改了重和元年；該閏正月。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.141,
+    "edge": 0.614,
+    "ctr": 0.846,
+    "fill": 0.667,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    453.3,
+    276.4,
+    474.4,
+    544.1
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 463.9,
+   "source_y": 535.2,
+   "text": "十二月一日。春梅賭氣絕食。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.125,
+    "edge": 0.64,
+    "ctr": 0.941,
+    "fill": 0.655,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    419.4,
+    274.2,
+    442.1,
+    833.6
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 431.2,
+   "source_y": 822.6,
+   "text": "案牽連，王婆央求西門慶說項。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.36,
+    "hole": 0.142,
+    "edge": 0.632,
+    "ctr": 0.877,
+    "fill": 0.665,
+    "ar": 0.977,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    387.1,
+    276.4,
+    409.6,
+    796.8
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 398.7,
+   "source_y": 785.9,
+   "text": "十，另拿弘化寺一名和尚頂缺。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.6,
+    "hole": 0.126,
+    "edge": 0.602,
+    "ctr": 0.84,
+    "fill": 0.638,
+    "ar": 1.015,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    353.9,
+    275.4,
+    377.2,
+    907.3
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 366.5,
+   "source_y": 897.4,
+   "text": "揮同知，具送土儀致謝西門慶。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.127,
+    "edge": 0.624,
+    "ctr": 0.887,
+    "fill": 0.646,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    320.8,
+    276.4,
+    343.4,
+    853.1
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 333.0,
+   "source_y": 843.1,
+   "text": "請假護送長姐赴京。初六起程。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.0,
+    "hole": 0.12,
+    "edge": 0.594,
+    "ctr": 0.9,
+    "fill": 0.645,
+    "ar": 1.104,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    287.6,
+    276.4,
+    310.2,
+    681.9
+   ],
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 298.9,
+   "source_y": 671.0,
+   "text": "溫秀才品行不端，趕出西門府。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.115,
+    "edge": 0.686,
+    "ctr": 0.908,
+    "fill": 0.666,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1721,
+   "col": [
+    222.1,
+    238.5,
+    243.2,
+    315.4
+   ],
+   "class": "ring",
+   "number": 77,
+   "situation": 1,
+   "source_x": 232.5,
+   "source_y": 306.4,
+   "text": "贐禮。77",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.218,
+    "edge": 0.648,
+    "ctr": 0.432,
+    "fill": 0.596,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
    "page": 1721,
    "col": [
     154.4,
@@ -555,2628 +6878,3012 @@
    "text": "十二月七日。潘金蓮管賬刻薄，小廝怨罵。77"
   },
   {
-   "page": 1684,
-   "class": "ring",
-   "number": 12,
-   "situation": 1,
-   "col": [
-    207.9,
-    252.6,
-    235.4,
-    645.0
-   ],
-   "source_x": 235.4,
-   "source_y": 645.0,
-   "text": "經孟玉樓與春梅從中打了圓場，遮掩過了。12",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1684,
-   "class": "ring",
-   "number": 12,
-   "situation": 1,
-   "col": [
-    141.7,
-    255.8,
-    167.8,
-    295.9
-   ],
-   "source_x": 167.8,
-   "source_y": 295.9,
-   "text": "。12",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1684,
-   "class": "ring",
-   "number": 12,
-   "situation": 1,
-   "col": [
-    107.8,
-    290.5,
-    134.7,
-    681.9
-   ],
-   "source_x": 134.7,
-   "source_y": 681.9,
-   "text": "。八月間。潘金蓮精神不暢，請劉理星魘勝。12",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1685,
-   "class": "ring",
-   "number": 13,
-   "situation": 1,
-   "col": [
-    586.5,
-    237.4,
-    616.1,
-    687.2
-   ],
-   "source_x": 616.1,
-   "source_y": 687.2,
-   "text": "兒初會。自此，這西門慶就安心設計圖謀這婦人。13",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1685,
-   "class": "ring",
-   "number": 13,
-   "situation": 1,
-   "col": [
-    353.9,
-    238.5,
-    380.0,
-    550.6
-   ],
-   "source_x": 380.0,
-   "source_y": 550.6,
-   "text": "。這年，李瓶兒二十三歲，屬羊。13",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1685,
-   "class": "ring",
-   "number": 14,
-   "situation": 1,
-   "col": [
-    119.2,
-    237.4,
-    146.7,
-    513.8
-   ],
-   "source_x": 146.7,
-   "source_y": 513.8,
-   "text": "三人，别項銀兩，不准追了。14",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1686,
-   "class": "ring",
-   "number": 14,
-   "situation": 1,
-   "col": [
-    552.7,
-    239.6,
-    572.5,
-    276.4
-   ],
-   "source_x": 572.5,
-   "source_y": 276.4,
-   "text": "14",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1687,
-   "class": "ring",
-   "number": 15,
-   "situation": 1,
-   "col": [
-    635.9,
-    250.4,
-    659.2,
-    428.2
-   ],
-   "source_x": 659.2,
-   "source_y": 428.2,
-   "text": "燈人，指指說說。15",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1687,
-   "class": "ring",
-   "number": 16,
-   "situation": 1,
-   "col": [
-    400.4,
-    248.2,
-    429.4,
-    940.9
-   ],
-   "source_x": 429.4,
-   "source_y": 940.9,
-   "text": "來蓋房子，並要求西門慶娶她，還要求把她嫁過去的住處，蓋在潘金蓮一連邊。16",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1687,
-   "class": "ring",
-   "number": 16,
-   "situation": 1,
-   "col": [
-    266.5,
-    249.3,
-    294.7,
-    446.6
-   ],
-   "source_x": 294.7,
-   "source_y": 446.6,
-   "text": "西門慶湊起蓋房子。16",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1687,
-   "class": "ring",
-   "number": 16,
-   "situation": 1,
-   "col": [
-    233.3,
-    286.2,
-    260.9,
-    775.0
-   ],
-   "source_x": 260.9,
-   "source_y": 775.0,
-   "text": "二月初八日。西門家開始興工動土，整建花家的房子。16",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1687,
-   "class": "ring",
-   "number": 16,
-   "situation": 1,
-   "col": [
-    167.1,
-    287.2,
-    193.9,
-    737.1
-   ],
-   "source_x": 193.9,
-   "source_y": 737.1,
-   "text": "五月端午節。李瓶兒請西門慶來家解粽（過節）。16",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 18,
-   "situation": 1,
-   "col": [
-    631.0,
-    273.1,
-    655.0,
-    890.0
-   ],
-   "source_x": 655.0,
-   "source_y": 890.0,
-   "text": "七月中旬。陳經濟初次見到潘金蓮，猛然一見，心蕩目搖，魂魄已失。18",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 19,
-   "situation": 1,
-   "col": [
-    597.1,
-    272.1,
-    621.1,
-    890.0
-   ],
-   "source_x": 621.1,
-   "source_y": 890.0,
-   "text": "八月初旬。西門家起蓋花園捲棚完工，裝修油漆完備，前後焕然一新。19",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 19,
-   "situation": 1,
-   "col": [
-    563.3,
-    273.1,
-    588.0,
-    740.4
-   ],
-   "source_x": 588.0,
-   "source_y": 740.4,
-   "text": "八月初旬。夏提刑生日，在新買莊院設酒叫唱慶生。19",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 19,
-   "situation": 1,
-   "col": [
-    530.9,
-    272.1,
-    555.5,
-    872.6
-   ],
-   "source_x": 555.5,
-   "source_y": 872.6,
-   "text": "八月初旬。西門家衆婦女遊賞新花園，陳經濟與潘金蓮撲蝴蝶遊戲。19",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 19,
-   "situation": 1,
-   "col": [
-    230.6,
-    271.0,
-    257.3,
-    604.9
-   ],
-   "source_x": 257.3,
-   "source_y": 604.9,
-   "text": "八月二十二日夜。李瓶兒上吊尋死。19",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 19,
-   "situation": 1,
-   "col": [
-    197.4,
-    272.1,
-    223.5,
-    623.3
-   ],
-   "source_x": 223.5,
-   "source_y": 623.3,
-   "text": "八月二十三日晚。西門慶鞭打李瓶兒。19",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 20,
-   "situation": 1,
-   "col": [
-    164.2,
-    271.0,
-    191.1,
-    910.5
-   ],
-   "source_x": 191.1,
-   "source_y": 910.5,
-   "text": "八月二十三日晚。孟玉樓、潘金蓮等人，議論西門慶鞭打李瓶兒的情況。20",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1689,
-   "class": "ring",
-   "number": 20,
-   "situation": 1,
-   "col": [
-    131.8,
-    271.0,
-    158.6,
-    720.9
-   ],
-   "source_x": 158.6,
-   "source_y": 720.9,
-   "text": "八月二十三日。孟玉樓規勸吳月娘與西門慶和好。20",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1690,
-   "class": "ring",
-   "number": 20,
-   "situation": 1,
-   "col": [
-    578.1,
-    230.9,
-    602.8,
-    948.5
-   ],
-   "source_x": 602.8,
-   "source_y": 948.5,
-   "text": "李瓶兒出見衆賓客，凡歌女小廝都有封賞。月娘見到衆人趨奉李瓶兒，甚是不快。20",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1690,
-   "class": "ring",
-   "number": 20,
-   "situation": 1,
-   "col": [
-    479.4,
-    230.9,
-    502.6,
-    794.5
-   ],
-   "source_x": 502.6,
-   "source_y": 794.5,
-   "text": "敎演彈唱。春梅學琵琶，玉簫學筝，迎春學弦子，蘭香學胡琴。20",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1691,
-   "class": "ring",
-   "number": 22,
-   "situation": 1,
-   "col": [
-    549.2,
-    236.3,
-    576.7,
-    860.7
-   ],
-   "source_x": 576.7,
-   "source_y": 860.7,
-   "text": "早在十一月半頭，便派往杭州爲蔡太師買辦生辰擔去了，要半年期程。22",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1691,
-   "class": "ring",
-   "number": 23,
-   "situation": 1,
-   "col": [
-    348.2,
-    276.4,
-    375.8,
-    975.6
-   ],
-   "source_x": 375.8,
-   "source_y": 975.6,
-   "text": "新正佳節。潘金蓮、孟玉樓在李瓶兒房中下棋賭輸赢，買豬頭要來旺媳婦熟燒。23",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1691,
-   "class": "ring",
-   "number": 23,
-   "situation": 1,
-   "col": [
-    216.4,
-    240.7,
-    244.7,
-    380.5
-   ],
-   "source_x": 244.7,
-   "source_y": 380.5,
-   "text": "，懊恨歸房。23",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1691,
-   "class": "ring",
-   "number": 23,
-   "situation": 1,
-   "col": [
-    150.2,
-    235.2,
-    178.3,
-    492.1
-   ],
-   "source_x": 178.3,
-   "source_y": 492.1,
-   "text": "在金蓮房中把小意兒貼戀。23",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1691,
-   "class": "ring",
-   "number": 24,
-   "situation": 1,
-   "col": [
-    117.0,
-    271.0,
-    145.2,
-    1003.8
-   ],
-   "source_x": 145.2,
-   "source_y": 1003.8,
-   "text": "正月十六日。西門慶合家歡度燈節。婦女走百病，金蓮經濟調情，來旺媳婦套穿金蓮鞋。24",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1692,
-   "class": "ring",
-   "number": 24,
-   "situation": 1,
-   "col": [
-    602.8,
-    250.4,
-    626.8,
-    403.2
-   ],
-   "source_x": 626.8,
-   "source_y": 403.2,
-   "text": "，罵來旺媳婦。24",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1692,
-   "class": "ring",
-   "number": 25,
-   "situation": 1,
-   "col": [
-    534.4,
-    245.0,
-    561.9,
-    961.5
-   ],
-   "source_x": 561.9,
-   "source_y": 961.5,
-   "text": "千。來旺從杭州買辦壽禮回來。孫雪娥透露來旺媳婦私通主人事。來旺追問妻子。25",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1692,
-   "class": "ring",
-   "number": 26,
-   "situation": 1,
-   "col": [
-    270.7,
-    242.8,
-    297.5,
-    498.6
-   ],
-   "source_x": 297.5,
-   "source_y": 498.6,
-   "text": "提刑所獄。判遞原籍徐州。26",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1692,
-   "class": "ring",
-   "number": 26,
-   "situation": 1,
-   "col": [
-    203.1,
-    247.2,
-    229.1,
-    402.1
-   ],
-   "source_x": 229.1,
-   "source_y": 402.1,
-   "text": "。亡年廿五歲。26",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1693,
-   "class": "ring",
-   "number": 28,
-   "situation": 1,
-   "col": [
-    233.3,
-    236.3,
-    255.9,
-    353.4
-   ],
-   "source_x": 255.9,
-   "source_y": 353.4,
-   "text": "疼子罵主。28",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1693,
-   "class": "ring",
-   "number": 29,
-   "situation": 1,
-   "col": [
-    200.2,
-    275.4,
-    223.5,
-    856.4
-   ],
-   "source_x": 223.5,
-   "source_y": 856.4,
-   "text": "六月三日。潘金蓮唆使西門慶趕來昭一家三口到獅子街看守房屋。29",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 31,
-   "situation": 1,
-   "col": [
-    425.1,
-    284.0,
-    446.2,
-    633.0
-   ],
-   "source_x": 446.2,
-   "source_y": 633.0,
-   "text": "七月二十二日。請官家吃官哥滿月酒。31",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 22,
-   "situation": 1,
-   "col": [
-    358.1,
-    284.0,
-    379.3,
-    632.0
-   ],
-   "source_x": 379.3,
-   "source_y": 632.0,
-   "text": "七月下旬。李桂姐拜認吳月娘作乾娘。22",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 22,
-   "situation": 1,
-   "col": [
-    325.0,
-    284.0,
-    347.6,
-    977.8
-   ],
-   "source_x": 347.6,
-   "source_y": 977.8,
-   "text": "七月下旬。潘金蓮抱官哥出來，舉得高高的。從此官哥驚哭不停，漾奶睡不穩。22",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 33,
-   "situation": 1,
-   "col": [
-    258.1,
-    250.4,
-    281.3,
-    882.4
-   ],
-   "source_x": 281.3,
-   "source_y": 882.4,
-   "text": "，着來保尋夥計，在獅子街開絨線舖。應伯爵介紹夥計韓道國協助來保。33",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 33,
-   "situation": 1,
-   "col": [
-    192.4,
-    243.9,
-    212.2,
-    323.1
-   ],
-   "source_x": 212.2,
-   "source_y": 323.1,
-   "text": "曲兒。33",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 33,
-   "situation": 1,
-   "col": [
-    158.6,
-    284.0,
-    180.5,
-    729.5
-   ],
-   "source_x": 180.5,
-   "source_y": 729.5,
-   "text": "。八月十五日晚。李瓶兒推西門慶去金蓮房中歇宿。33",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1695,
-   "class": "ring",
-   "number": 33,
-   "situation": 1,
-   "col": [
-    92.3,
-    242.8,
-    114.2,
-    824.9
-   ],
-   "source_x": 114.2,
-   "source_y": 824.9,
-   "text": "了一千二百兩銀子，在東大街新買一所，門面七間，到底五層。）)33",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 33,
-   "situation": 1,
-   "col": [
-    422.3,
-    250.4,
-    449.8,
-    354.4
-   ],
-   "source_x": 449.8,
-   "source_y": 354.4,
-   "text": "早送官。33",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 34,
-   "situation": 1,
-   "col": [
-    388.4,
-    291.6,
-    415.9,
-    930.0
-   ],
-   "source_x": 415.9,
-   "source_y": 930.0,
-   "text": "。八月中旬。韓道國央請應伯爵求西門慶爲他說人情，不使婦人送官丢醜。34",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 34,
-   "situation": 1,
-   "col": [
-    321.5,
-    255.8,
-    347.6,
-    299.2
-   ],
-   "source_x": 347.6,
-   "source_y": 299.2,
-   "text": "。34",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 4,
-   "situation": 1,
-   "col": [
-    256.6,
-    250.4,
-    283.4,
-    949.6
-   ],
-   "source_x": 283.4,
-   "source_y": 949.6,
-   "text": "兄湊銀，央請應伯爵代爲求請開脫。書童轉求李瓶兒攬事說情。西門慶私書童。4",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 34,
-   "situation": 1,
-   "col": [
-    189.7,
-    251.5,
-    216.4,
-    508.4
-   ],
-   "source_x": 216.4,
-   "source_y": 508.4,
-   "text": "童受賄託李瓶兒求請說事。34",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 35,
-   "situation": 1,
-   "col": [
-    122.7,
-    251.5,
-    150.2,
-    909.5
-   ],
-   "source_x": 150.2,
-   "source_y": 909.5,
-   "text": "欺他。西門慶借未能阻住白來搶入內爲由痛打平安。畫童在旁也陪了一拶。35",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1696,
-   "class": "ring",
-   "number": 35,
-   "situation": 1,
-   "col": [
-    57.8,
-    251.5,
-    84.6,
-    642.8
-   ],
-   "source_x": 84.6,
-   "source_y": 642.8,
-   "text": "三日。西門慶宴留韓道國。書童扮旦唱曲。35",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 35,
-   "situation": 1,
-   "col": [
-    593.6,
-    287.2,
-    616.1,
-    851.0
-   ],
-   "source_x": 616.1,
-   "source_y": 851.0,
-   "text": "八月廿四日。賁四報告墳庄工事。建議購下向皇親庄子一部分。35",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 35,
-   "situation": 1,
-   "col": [
-    526.6,
-    249.3,
-    549.2,
-    503.0
-   ],
-   "source_x": 549.2,
-   "source_y": 503.0,
-   "text": "李瓶兒轎去了。月娘快快。35",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 35,
-   "situation": 1,
-   "col": [
-    460.4,
-    250.4,
-    481.5,
-    328.4
-   ],
-   "source_x": 481.5,
-   "source_y": 328.4,
-   "text": "粉說。35",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 36,
-   "situation": 1,
-   "col": [
-    394.8,
-    250.4,
-    417.4,
-    984.2
-   ],
-   "source_x": 417.4,
-   "source_y": 984.2,
-   "text": "色女子事。並告知蔡太師假子新狀元蔡（蘊）一泉回籍省親，道經清河，希留一飯。36",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 36,
-   "situation": 1,
-   "col": [
-    262.2,
-    255.8,
-    284.1,
-    522.5
-   ],
-   "source_x": 284.1,
-   "source_y": 522.5,
-   "text": "一端，合香三百，白金卅兩。36",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 37,
-   "situation": 1,
-   "col": [
-    162.2,
-    289.4,
-    184.7,
-    983.2
-   ],
-   "source_x": 184.7,
-   "source_y": 983.2,
-   "text": "九月十五日前後。西門慶私通韓道國媳婦王六兒。這年，王六兒廿九歲，屬蛇。37",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1697,
-   "class": "ring",
-   "number": 38,
-   "situation": 1,
-   "col": [
-    63.5,
-    254.8,
-    83.9,
-    350.1
-   ],
-   "source_x": 83.9,
-   "source_y": 350.1,
-   "text": "天來取。38",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 88,
-   "situation": 1,
-   "col": [
-    586.5,
-    284.0,
-    612.6,
-    996.2
-   ],
-   "source_x": 612.6,
-   "source_y": 996.2,
-   "text": "九月中旬。韓二搗鬼吃醋，向王六兒撒野。西門慶軍刑緝捕到提刑所，夾打制服。88",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 38,
-   "situation": 1,
-   "col": [
-    519.6,
-    245.0,
-    542.9,
-    420.6
-   ],
-   "source_x": 542.9,
-   "source_y": 420.6,
-   "text": "與翟謙親家相稱。38",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 38,
-   "situation": 1,
-   "col": [
-    486.4,
-    282.9,
-    512.5,
-    806.5
-   ],
-   "source_x": 512.5,
-   "source_y": 806.5,
-   "text": "十月中旬。夏提刑備酒叫唱，宴請西門慶，答謝送馬之情。38",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 38,
-   "situation": 1,
-   "col": [
-    317.2,
-    243.9,
-    343.4,
-    458.6
-   ],
-   "source_x": 343.4,
-   "source_y": 458.6,
-   "text": "去和諧，夜宿金蓮處。38",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 99,
-   "situation": 1,
-   "col": [
-    251.7,
-    243.9,
-    277.1,
-    920.3
-   ],
-   "source_x": 277.1,
-   "source_y": 920.3,
-   "text": "所門面兩間到底四層房屋。從此韓道國只在鋪中上宿，敎老婆陪西門慶玩耍。99",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 39,
-   "situation": 1,
-   "col": [
-    184.0,
-    243.9,
-    210.8,
-    653.6
-   ],
-   "source_x": 210.8,
-   "source_y": 653.6,
-   "text": "醮。並打算把官哥寄在三寶座下，討個外名。39",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1698,
-   "class": "ring",
-   "number": 39,
-   "situation": 1,
-   "col": [
-    81.8,
-    282.9,
-    110.0,
-    611.4
-   ],
-   "source_x": 110.0,
-   "source_y": 611.4,
-   "text": "正月初八日。向吳道官送官哥寄名禮。39",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1699,
-   "class": "ring",
-   "number": 39,
-   "situation": 1,
-   "col": [
-    614.0,
-    254.8,
-    632.4,
-    273.1
-   ],
-   "source_x": 632.4,
-   "source_y": 273.1,
-   "text": "39",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1700,
-   "class": "ring",
-   "number": 42,
-   "situation": 1,
-   "col": [
-    362.4,
-    247.2,
-    383.5,
-    287.2
-   ],
-   "source_x": 383.5,
-   "source_y": 287.2,
-   "text": "。42",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1701,
-   "class": "ring",
-   "number": 45,
-   "situation": 1,
-   "col": [
-    265.1,
-    250.4,
-    284.1,
-    286.2
-   ],
-   "source_x": 284.1,
-   "source_y": 286.2,
-   "text": "45",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1702,
-   "class": "ring",
-   "number": 46,
-   "situation": 1,
-   "col": [
-    441.4,
-    261.2,
-    457.6,
-    293.8
-   ],
-   "source_x": 457.6,
-   "source_y": 293.8,
-   "text": "46",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1702,
-   "class": "ring",
-   "number": 46,
-   "situation": 1,
-   "col": [
-    405.4,
-    292.7,
-    426.5,
-    680.8
-   ],
-   "source_x": 426.5,
-   "source_y": 680.8,
-   "text": "正月十七日。月娘、玉樓、瓶兒卜龜兒卦。46",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1702,
-   "class": "ring",
-   "number": 47,
-   "situation": 1,
-   "col": [
-    272.1,
-    255.8,
-    292.6,
-    506.2
-   ],
-   "source_x": 292.6,
-   "source_y": 506.2,
-   "text": "百兩。開放了苗青回揚州。47",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1702,
-   "class": "ring",
-   "number": 48,
-   "situation": 1,
-   "col": [
-    205.2,
-    261.2,
-    225.6,
-    390.2
-   ],
-   "source_x": 225.6,
-   "source_y": 390.2,
-   "text": "。有意破案。48",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1702,
-   "class": "ring",
-   "number": 48,
-   "situation": 1,
-   "col": [
-    171.3,
-    294.9,
-    193.9,
-    985.4
-   ],
-   "source_x": 193.9,
-   "source_y": 985.4,
-   "text": "二月中旬。韓道國賄得苗青金銀，買婢女，蓋樓房，爲子捐入武學。一時暄赫。48",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1702,
-   "class": "ring",
-   "number": 48,
-   "situation": 1,
-   "col": [
-    105.0,
-    254.8,
-    126.2,
-    506.2
-   ],
-   "source_x": 126.2,
-   "source_y": 506.2,
-   "text": "祝墳庄新蓋山子捲棚房屋。48",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1703,
-   "class": "ring",
-   "number": 48,
-   "situation": 1,
-   "col": [
-    427.2,
-    241.8,
-    448.4,
-    264.5
-   ],
-   "source_x": 448.4,
-   "source_y": 264.5,
-   "text": "48",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1705,
-   "class": "ring",
-   "number": 51,
-   "situation": 1,
-   "col": [
-    128.3,
-    248.2,
-    148.8,
-    306.8
-   ],
-   "source_x": 148.8,
-   "source_y": 306.8,
-   "text": "青。51",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1706,
-   "class": "ring",
-   "number": 51,
-   "situation": 1,
-   "col": [
-    592.2,
-    253.7,
-    614.0,
-    601.6
-   ],
-   "source_x": 614.0,
-   "source_y": 601.6,
-   "text": "邀西門慶廿一日去劉老太監庄上一敍。51",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1706,
-   "class": "ring",
-   "number": 51,
-   "situation": 1,
-   "col": [
-    558.4,
-    293.8,
-    580.9,
-    814.1
-   ],
-   "source_x": 580.9,
-   "source_y": 814.1,
-   "text": "四月廿日。月娘與婦女，聽姑子們講說佛法，演頌金剛科。51",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1706,
-   "class": "ring",
-   "number": 51,
-   "situation": 1,
-   "col": [
-    492.1,
-    259.1,
-    512.5,
-    352.3
-   ],
-   "source_x": 512.5,
-   "source_y": 352.3,
-   "text": "一部。)51",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1706,
-   "class": "ring",
-   "number": 51,
-   "situation": 1,
-   "col": [
-    457.6,
-    291.6,
-    480.8,
-    946.4
-   ],
-   "source_x": 480.8,
-   "source_y": 946.4,
-   "text": "。）四月廿日。李瓶兒、潘金蓮要陳經濟買銷金汗巾兒，李瓶兒出銀一兩九錢。51",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1706,
-   "class": "ring",
-   "number": 51,
-   "situation": 1,
-   "col": [
-    425.1,
-    293.8,
-    446.9,
-    738.2
-   ],
-   "source_x": 446.9,
-   "source_y": 738.2,
-   "text": "四月廿日。徐四家欠銀應允後天歸還二百五十兩。51",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1706,
-   "class": "ring",
-   "number": 52,
-   "situation": 1,
-   "col": [
-    325.0,
-    293.8,
-    346.1,
-    641.8
-   ],
-   "source_x": 346.1,
-   "source_y": 641.8,
-   "text": "四月廿一日。李桂姐仍在西門家隱藏。52",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1707,
-   "class": "ring",
-   "number": 53,
-   "situation": 1,
-   "col": [
-    199.5,
-    246.1,
-    215.8,
-    263.4
-   ],
-   "source_x": 215.8,
-   "source_y": 263.4,
-   "text": "53",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1712,
-   "class": "ring",
-   "number": 10,
-   "situation": 1,
-   "col": [
-    557.0,
-    287.2,
-    579.5,
-    848.8
-   ],
-   "source_x": 579.5,
-   "source_y": 848.8,
-   "text": "九月六日。李瓶兒傷心病體不能接侍漢子。推漢子去潘六兒處。10",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1712,
-   "class": "ring",
-   "number": 61,
-   "situation": 1,
-   "col": [
-    524.5,
-    287.2,
-    546.4,
-    617.9
-   ],
-   "source_x": 546.4,
-   "source_y": 617.9,
-   "text": "九月初六日。潘金蓮處再試胡僧藥。61",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1712,
-   "class": "ring",
-   "number": 61,
-   "situation": 1,
-   "col": [
-    490.7,
-    287.2,
-    512.5,
-    675.4
-   ],
-   "source_x": 512.5,
-   "source_y": 675.4,
-   "text": "九月初九日。慶重陽賞菊，接申二姐獻唱。61",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1712,
-   "class": "ring",
-   "number": 61,
-   "situation": 1,
-   "col": [
-    425.1,
-    250.4,
-    445.6,
-    310.0
-   ],
-   "source_x": 445.6,
-   "source_y": 310.0,
-   "text": "工。61",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1712,
-   "class": "ring",
-   "number": 61,
-   "situation": 1,
-   "col": [
-    358.1,
-    249.3,
-    379.3,
-    365.3
-   ],
-   "source_x": 379.3,
-   "source_y": 365.3,
-   "text": "老人診治。61",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1713,
-   "class": "ring",
-   "number": 63,
-   "situation": 1,
-   "col": [
-    371.6,
-    251.5,
-    389.1,
-    287.2
-   ],
-   "source_x": 389.1,
-   "source_y": 287.2,
-   "text": "。63",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1714,
-   "class": "ring",
-   "number": 7,
-   "situation": 1,
-   "col": [
-    178.3,
-    284.0,
-    200.9,
-    746.9
-   ],
-   "source_x": 200.9,
-   "source_y": 746.9,
-   "text": "十月廿日。拆靈棚。準備銀兩，南方辦貨。天大雪。7",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1714,
-   "class": "ring",
-   "number": 67,
-   "situation": 1,
-   "col": [
-    45.1,
-    249.3,
-    62.0,
-    266.6
-   ],
-   "source_x": 62.0,
-   "source_y": 266.6,
-   "text": "67",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1715,
-   "class": "ring",
-   "number": 67,
-   "situation": 1,
-   "col": [
-    656.4,
-    278.6,
-    677.5,
-    589.7
-   ],
-   "source_x": 677.5,
-   "source_y": 589.7,
-   "text": "十月廿七日。西門慶夢見李瓶兒。67",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1715,
-   "class": "ring",
-   "number": 67,
-   "situation": 1,
-   "col": [
-    528.0,
-    278.6,
-    550.6,
-    801.1
-   ],
-   "source_x": 550.6,
-   "source_y": 801.1,
-   "text": "十月廿七日。孟玉樓攜兄弟孟二辭行，要去川廣販買香蠟。67",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    572.5,
-    281.9,
-    595.0,
-    995.1
-   ],
-   "source_x": 595.0,
-   "source_y": 995.1,
-   "text": "十一月初十日。抄來陞官邸報，西門慶陞任掌刑正千戶，夏提刑調指揮司管鹵薄。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    506.9,
-    243.9,
-    528.8,
-    494.3
-   ],
-   "source_x": 528.8,
-   "source_y": 494.3,
-   "text": "趕冬至令節見朝引奏謝恩。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    473.1,
-    281.9,
-    494.9,
-    710.0
-   ],
-   "source_x": 494.9,
-   "source_y": 710.0,
-   "text": "十一月十二日。西門慶等人由清河起程赴東京。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    439.9,
-    281.9,
-    462.5,
-    995.1
-   ],
-   "source_x": 462.5,
-   "source_y": 995.1,
-   "text": "十一月廿三日抵東京。陪夏提刑見崔中書。當晚西門慶與夏提刑住在崔中書府第。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    372.9,
-    242.8,
-    394.8,
-    552.9
-   ],
-   "source_x": 394.8,
-   "source_y": 552.9,
-   "text": "區主祭未歸。差黃四鴻臚寺報名。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    240.4,
-    246.1,
-    262.2,
-    417.4
-   ],
-   "source_x": 262.2,
-   "source_y": 417.4,
-   "text": "一千五百兩出手。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    172.7,
-    241.8,
-    194.6,
-    593.0
-   ],
-   "source_x": 194.6,
-   "source_y": 593.0,
-   "text": "到堂同衆領筍付。當晚宿崔中書府第。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1716,
-   "class": "ring",
-   "number": 70,
-   "situation": 1,
-   "col": [
-    72.6,
-    240.7,
-    95.2,
-    532.2
-   ],
-   "source_x": 95.2,
-   "source_y": 532.2,
-   "text": "當晚住何千戶家。夜夢李瓶兒。70",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1719,
-   "class": "ring",
-   "number": 72,
-   "situation": 1,
-   "col": [
-    301.8,
-    249.3,
-    320.1,
-    268.9
-   ],
-   "source_x": 320.1,
-   "source_y": 268.9,
-   "text": "72",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    466.0,
-    251.5,
-    487.9,
-    557.2
-   ],
-   "source_x": 487.9,
-   "source_y": 557.2,
-   "text": "處關說，希望舉劾有好成績升轉。75",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    432.9,
-    289.4,
-    454.8,
-    637.4
-   ],
-   "source_x": 454.8,
-   "source_y": 637.4,
-   "text": "十一月廿八日。春梅恃寵厲罵申二姐。75",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    365.2,
-    251.5,
-    386.4,
-    406.5
-   ],
-   "source_x": 386.4,
-   "source_y": 406.5,
-   "text": "封（二百兩）。75",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    298.2,
-    251.5,
-    319.4,
-    347.9
-   ],
-   "source_x": 319.4,
-   "source_y": 347.9,
-   "text": "嬌施嗔。75",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    263.6,
-    289.4,
-    286.2,
-    754.5
-   ],
-   "source_x": 286.2,
-   "source_y": 754.5,
-   "text": "。十一月廿九日。爲春梅罵申二姐事，月娘金蓮頂嘴。75",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    230.6,
-    289.4,
-    253.1,
-    754.5
-   ],
-   "source_x": 253.1,
-   "source_y": 754.5,
-   "text": "十一月廿九日。西門慶宿上房，潘金蓮誤了壬子日。75",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1720,
-   "class": "ring",
-   "number": 75,
-   "situation": 1,
-   "col": [
-    163.6,
-    288.4,
-    186.1,
-    774.0
-   ],
-   "source_x": 186.1,
-   "source_y": 774.0,
-   "text": "十一月三十日。孟玉樓慫恿潘金蓮陪禮，解慍吳月娘。75",
-   "how": "ring_digit"
-  },
-  {
    "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    617.6,
-    274.2,
-    640.1,
-    759.9
-   ],
-   "source_x": 640.1,
-   "source_y": 759.9,
-   "text": "十二月一日。西門家出入銀錢眼目，改由潘金蓮經管。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    585.1,
-    274.2,
-    608.4,
-    984.2
-   ],
-   "source_x": 608.4,
-   "source_y": 984.2,
-   "text": "十二月一日。本縣衙差人送來新暦日二百五十本，開年改了重和元年；該閏正月。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    453.3,
-    276.4,
-    474.4,
-    544.1
-   ],
-   "source_x": 474.4,
-   "source_y": 544.1,
-   "text": "十二月一日。春梅賭氣絕食。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    419.4,
-    274.2,
-    442.1,
-    833.6
-   ],
-   "source_x": 442.1,
-   "source_y": 833.6,
-   "text": "十二月二日。何九兄弟何十受盜案牽連，王婆央求西門慶說項。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    387.1,
-    276.4,
-    409.6,
-    796.8
-   ],
-   "source_x": 409.6,
-   "source_y": 796.8,
-   "text": "十二月三日。西門慶開放何十，另拿弘化寺一名和尚頂缺。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    353.9,
-    275.4,
-    377.2,
-    907.3
-   ],
-   "source_x": 377.2,
-   "source_y": 907.3,
-   "text": "十二月四日。雲裏守新襲山東清河右衛指揮同知，具送土儀致謝西門慶。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    320.8,
-    276.4,
-    343.4,
-    853.1
-   ],
-   "source_x": 343.4,
-   "source_y": 853.1,
-   "text": "十二月五日。賁四攜夏龍溪書信，請假護送長姐赴京。初六起程。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
-   "col": [
-    287.6,
-    276.4,
-    310.2,
-    681.9
-   ],
-   "source_x": 310.2,
-   "source_y": 681.9,
-   "text": "十二月五日。溫秀才品行不端，趕出西門府。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 77,
-   "situation": 1,
-   "col": [
-    222.1,
-    238.5,
-    243.2,
-    315.4
-   ],
-   "source_x": 243.2,
-   "source_y": 315.4,
-   "text": "贐禮。77",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1721,
-   "class": "ring",
-   "number": 77,
-   "situation": 1,
    "col": [
     88.8,
     274.2,
     110.7,
     740.4
    ],
-   "source_x": 110.7,
-   "source_y": 740.4,
-   "text": "十二月初七日。清河夏家房屋騰空。何九送禮致謝。77",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 77,
+   "situation": 1,
+   "source_x": 99.8,
+   "source_y": 729.2,
+   "text": "夏家房屋騰空。何九送禮致謝。77",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.0,
+    "hole": 0.186,
+    "edge": 0.642,
+    "ctr": 0.475,
+    "fill": 0.64,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1723,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
    "col": [
     578.8,
     252.6,
     598.5,
     311.1
    ],
-   "source_x": 598.5,
-   "source_y": 311.1,
+   "class": "ring",
+   "number": 76,
+   "situation": 1,
+   "source_x": 589.1,
+   "source_y": 301.6,
    "text": "事。76",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.44,
+    "hole": 0.113,
+    "edge": 0.537,
+    "ctr": 0.889,
+    "fill": 0.655,
+    "ar": 0.956,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1723,
-   "class": "ring",
-   "number": 78,
-   "situation": 1,
    "col": [
     544.2,
     290.5,
     566.1,
     678.6
    ],
-   "source_x": 566.1,
-   "source_y": 678.6,
-   "text": "。十二月廿七日。西門慶一一打發各家年禮。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 556.1,
+   "source_y": 668.0,
+   "text": "日。西門慶一一打發各家年禮。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.121,
+    "edge": 0.695,
+    "ctr": 0.876,
+    "fill": 0.662,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1723,
    "col": [
     511.9,
     290.5,
     533.0,
     619.0
    ],
-   "source_x": 533.0,
-   "source_y": 619.0,
-   "text": "十二月三十日。大年夜，闔家慶年。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 522.4,
+   "source_y": 610.2,
+   "text": "月三十日。大年夜，闔家慶年。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.116,
+    "edge": 0.687,
+    "ctr": 0.828,
+    "fill": 0.676,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1723,
    "col": [
     378.6,
     252.6,
     399.8,
     560.5
    ],
-   "source_x": 399.8,
-   "source_y": 560.5,
-   "text": "亦有私，西門慶走後，玳安留宿。78",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 78,
+   "situation": 1,
+   "source_x": 388.2,
+   "source_y": 551.8,
+   "text": "有私，西門慶走後，玳安留宿。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.131,
+    "edge": 0.664,
+    "ctr": 0.774,
+    "fill": 0.656,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1723,
-   "class": "ring",
-   "number": 76,
-   "situation": 1,
    "col": [
     345.4,
     290.5,
     367.3,
     813.0
    ],
-   "source_x": 367.3,
-   "source_y": 813.0,
-   "text": "正月初三日。吳大舅來拜，暢談屯田所說制及秤稱斛斗事。76",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 355.9,
+   "source_y": 802.3,
+   "text": "暢談屯田所說制及秤稱斛斗事。76",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.116,
+    "edge": 0.646,
+    "ctr": 0.855,
+    "fill": 0.675,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t19"
+  },
+  {
+   "page": 1723,
    "col": [
     312.3,
     290.5,
     334.1,
     717.6
    ],
-   "source_x": 334.1,
-   "source_y": 717.6,
-   "text": "正月初四日。西門慶等人去雲裏守家吃慶官酒。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 322.9,
+   "source_y": 706.6,
+   "text": "門慶等人去雲裏守家吃慶官酒。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.24,
+    "hole": 0.107,
+    "edge": 0.694,
+    "ctr": 0.85,
+    "fill": 0.7,
+    "ar": 1.031,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1723,
    "col": [
     278.5,
     290.5,
     301.1,
     888.9
    ],
-   "source_x": 301.1,
-   "source_y": 888.9,
-   "text": "正月初六日。西門慶赴林太太約。吳月娘誇美何千戶娘子年輕貌美。78",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 78,
+   "situation": 1,
+   "source_x": 289.9,
+   "source_y": 878.1,
+   "text": "月娘誇美何千戶娘子年輕貌美。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.122,
+    "edge": 0.623,
+    "ctr": 0.874,
+    "fill": 0.672,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1723,
-   "class": "ring",
-   "number": 79,
-   "situation": 1,
    "col": [
     245.3,
     289.4,
     267.2,
     755.5
    ],
-   "source_x": 267.2,
-   "source_y": 755.5,
-   "text": "正月初七日。吳月娘等婦女四人，去雲裏守家宴飲。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 255.8,
+   "source_y": 744.6,
+   "text": "等婦女四人，去雲裏守家宴飲。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.48,
+    "hole": 0.109,
+    "edge": 0.616,
+    "ctr": 0.865,
+    "fill": 0.674,
+    "ar": 1.062,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1723,
    "col": [
     178.3,
     290.5,
     200.2,
     717.6
    ],
-   "source_x": 200.2,
-   "source_y": 717.6,
-   "text": "正月初七日。與吳月娘商各家女眷燈節來觀燈。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 188.8,
+   "source_y": 706.1,
+   "text": "吳月娘商各家女眷燈節來觀燈。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 14.4,
+    "hole": 0.136,
+    "edge": 0.673,
+    "ctr": 0.885,
+    "fill": 0.695,
+    "ar": 1.1,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1723,
    "col": [
     112.1,
     252.6,
     132.6,
     311.1
    ],
-   "source_x": 132.6,
-   "source_y": 311.1,
-   "text": "孝。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1723,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 122.4,
+   "source_y": 302.4,
+   "text": "孝。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 16.56,
+    "hole": 0.123,
+    "edge": 0.579,
+    "ctr": 0.891,
+    "fill": 0.614,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1723,
    "col": [
     78.2,
     290.5,
     100.1,
     794.5
    ],
-   "source_x": 100.1,
-   "source_y": 794.5,
-   "text": "。正月初八日。荊忠升任東南統制兼督漕運總兵官來拜謝。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1724,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 89.0,
+   "source_y": 783.6,
+   "text": "南統制兼督漕運總兵官來拜謝。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.48,
+    "hole": 0.126,
+    "edge": 0.662,
+    "ctr": 0.859,
+    "fill": 0.664,
+    "ar": 1.016,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
+   "col": [
+    595.0,
+    289.4,
+    617.6,
+    694.9
+   ],
+   "class": "ring",
+   "number": 78,
+   "situation": 1,
+   "source_x": 607.5,
+   "source_y": 683.8,
+   "text": "松江貨船到，卸在獅子街房內。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.6,
+    "hole": 0.098,
+    "edge": 0.668,
+    "ctr": 0.94,
+    "fill": 0.672,
+    "ar": 1.054,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1724,
    "col": [
     561.9,
     290.5,
     584.5,
     718.7
    ],
-   "source_x": 584.5,
-   "source_y": 718.7,
-   "text": "正月初十日。賁四由京返家，指揮花匠紮煙火。78",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1724,
    "class": "ring",
    "number": 78,
    "situation": 1,
+   "source_x": 573.4,
+   "source_y": 707.4,
+   "text": "四由京返家，指揮花匠紮煙火。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.127,
+    "edge": 0.706,
+    "ctr": 0.886,
+    "fill": 0.698,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
+   "col": [
+    327.1,
+    252.6,
+    349.7,
+    619.0
+   ],
+   "class": "ring",
+   "number": 78,
+   "situation": 1,
+   "source_x": 338.3,
+   "source_y": 609.4,
+   "text": "千戶娘子藍氏美貌，心搖神盪。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.092,
+    "edge": 0.664,
+    "ctr": 0.953,
+    "fill": 0.715,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
    "col": [
     293.3,
     290.5,
     316.6,
     924.6
    ],
-   "source_x": 316.6,
-   "source_y": 924.6,
-   "text": "正月十二日。晚夕尙未起更，西門慶已感精神不繼。酒席上便齁齁入睡。78",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 78,
+   "situation": 1,
+   "source_x": 305.7,
+   "source_y": 914.8,
+   "text": "精神不繼。酒席上便齁齁入睡。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.108,
+    "edge": 0.714,
+    "ctr": 0.886,
+    "fill": 0.693,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1724,
+   "col": [
+    260.1,
+    290.5,
+    282.7,
+    601.6
+   ],
    "class": "ring",
-   "number": 79,
+   "number": 78,
    "situation": 1,
+   "source_x": 271.6,
+   "source_y": 591.5,
+   "text": "月十二日。西門慶姦淫來爵婦。78",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.72,
+    "hole": 0.089,
+    "edge": 0.714,
+    "ctr": 0.857,
+    "fill": 0.695,
+    "ar": 1.046,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
    "col": [
     226.3,
     290.5,
     248.8,
     717.6
    ],
-   "source_x": 248.8,
-   "source_y": 717.6,
-   "text": "正月十三日。王六兒剪贈青絲裝成同心結拴托。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1724,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 238.2,
+   "source_y": 706.4,
+   "text": "六兒剪贈青絲裝成同心結拴托。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.36,
+    "hole": 0.104,
+    "edge": 0.712,
+    "ctr": 0.897,
+    "fill": 0.714,
+    "ar": 1.023,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
    "col": [
     160.8,
     258.0,
     177.7,
     292.7
    ],
-   "source_x": 177.7,
-   "source_y": 292.7,
-   "text": "。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1724,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 170.2,
+   "source_y": 282.4,
+   "text": "。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.16,
+    "edge": 0.554,
+    "ctr": 0.809,
+    "fill": 0.616,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
    "col": [
     91.7,
     256.9,
     114.9,
     925.8
    ],
-   "source_x": 114.9,
-   "source_y": 925.8,
-   "text": "。下馬後腿軟不能走。潘金蓮又強西門慶再試胡僧藥。淫欲過度。脫陽病倒。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1724,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 104.3,
+   "source_y": 915.5,
+   "text": "胡僧藥。淫欲過度。脫陽病倒。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.114,
+    "edge": 0.703,
+    "ctr": 0.867,
+    "fill": 0.694,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1724,
    "col": [
     58.5,
     289.4,
     81.8,
     852.0
    ],
-   "source_x": 81.8,
-   "source_y": 852.0,
-   "text": "正月十四日。西門慶梳頭暈倒。吳月娘作主取銷十五日宴客事。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1725,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 70.9,
+   "source_y": 840.4,
+   "text": "吳月娘作主取銷十五日宴客事。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.4,
+    "hole": 0.124,
+    "edge": 0.62,
+    "ctr": 0.785,
+    "fill": 0.679,
+    "ar": 1.092,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1725,
    "col": [
     628.1,
     287.2,
     650.0,
     774.0
    ],
-   "source_x": 650.0,
-   "source_y": 774.0,
-   "text": "正月十六日。醫藥無效，遷出金蓮房住入上房月娘處。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1725,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 638.7,
+   "source_y": 762.6,
+   "text": "，遷出金蓮房住入上房月娘處。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.48,
+    "hole": 0.11,
+    "edge": 0.654,
+    "ctr": 0.844,
+    "fill": 0.685,
+    "ar": 1.023,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1725,
    "col": [
     596.5,
     287.2,
     617.6,
     580.0
    ],
-   "source_x": 617.6,
-   "source_y": 580.0,
-   "text": "正月十九日。西門慶交代後事。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1725,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 605.6,
+   "source_y": 569.8,
+   "text": "正月十九日。西門慶交代後事。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.111,
+    "edge": 0.564,
+    "ctr": 0.873,
+    "fill": 0.665,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1725,
    "col": [
     169.2,
     287.2,
     191.1,
     752.3
    ],
-   "source_x": 191.1,
-   "source_y": 752.3,
-   "text": "正月廿一日五更時分。西門慶氣絕。亡年三十三歲。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1725,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 179.7,
+   "source_y": 741.5,
+   "text": "。西門慶氣絕。亡年三十三歲。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.113,
+    "edge": 0.623,
+    "ctr": 0.867,
+    "fill": 0.664,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1725,
    "col": [
     136.8,
     286.2,
     158.6,
     829.2
    ],
-   "source_x": 158.6,
-   "source_y": 829.2,
-   "text": "正月廿一日。吳月娘產子。李嬌兒趁忙亂暗取五錠元寶回屋。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1726,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 146.2,
+   "source_y": 818.0,
+   "text": "嬌兒趁忙亂暗取五錠元寶回屋。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.127,
+    "edge": 0.614,
+    "ctr": 0.891,
+    "fill": 0.666,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1726,
    "col": [
     589.4,
     253.7,
     612.6,
     640.6
    ],
-   "source_x": 612.6,
-   "source_y": 640.6,
-   "text": "鴻帶批文回。李智黃四路上賄賂來爵春鴻。79",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1726,
    "class": "ring",
    "number": 79,
    "situation": 1,
+   "source_x": 601.9,
+   "source_y": 630.4,
+   "text": "。李智黃四路上賄賂來爵春鴻。79",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.149,
+    "edge": 0.606,
+    "ctr": 0.809,
+    "fill": 0.639,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1726,
    "col": [
     489.9,
     252.6,
     511.1,
     407.6
    ],
-   "source_x": 511.1,
-   "source_y": 407.6,
+   "class": "ring",
+   "number": 79,
+   "situation": 1,
+   "source_x": 501.5,
+   "source_y": 398.7,
    "text": "往張二官合夥。79",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.135,
+    "edge": 0.656,
+    "ctr": 0.846,
+    "fill": 0.643,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1727,
-   "class": "ring",
-   "number": 61,
-   "situation": 1,
    "col": [
     626.0,
     281.9,
     648.6,
     749.0
    ],
-   "source_x": 648.6,
-   "source_y": 749.0,
-   "text": "三月初九日。西門慶斷七，吳月娘與婦人上墳燒紙。61",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1727,
    "class": "ring",
    "number": 81,
    "situation": 1,
+   "source_x": 636.5,
+   "source_y": 737.6,
+   "text": "斷七，吳月娘與婦人上墳燒紙。61",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.52,
+    "hole": 0.143,
+    "edge": 0.71,
+    "ctr": 0.697,
+    "fill": 0.684,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t21"
+  },
+  {
+   "page": 1727,
    "col": [
     560.5,
     243.9,
     582.4,
     513.8
    ],
-   "source_x": 582.4,
-   "source_y": 513.8,
-   "text": "來保將玉簫與迎春二人送去。81",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1727,
    "class": "ring",
    "number": 81,
    "situation": 1,
+   "source_x": 570.5,
+   "source_y": 504.2,
+   "text": "來保將玉簫與迎春二人送去。81",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 16.44,
+    "hole": 0.126,
+    "edge": 0.605,
+    "ctr": 0.705,
+    "fill": 0.628,
+    "ar": 0.956,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
    "col": [
     526.6,
     281.9,
     549.2,
     804.4
    ],
-   "source_x": 549.2,
-   "source_y": 804.4,
-   "text": "四月間。來保惠祥夫婦離開西門家，與妻弟劉倉開設布店。81",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 81,
+   "situation": 1,
+   "source_x": 537.5,
+   "source_y": 793.4,
+   "text": "西門家，與妻弟劉倉開設布店。81",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.48,
+    "hole": 0.127,
+    "edge": 0.637,
+    "ctr": 0.687,
+    "fill": 0.685,
+    "ar": 1.016,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
-   "page": 1728,
+   "page": 1727,
+   "col": [
+    494.2,
+    281.9,
+    516.8,
+    785.9
+   ],
+   "class": "ring",
+   "number": 82,
+   "situation": 1,
+   "source_x": 505.1,
+   "source_y": 774.4,
+   "text": "事一男，免洩與陳經濟偷情事。82",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.4,
+    "hole": 0.058,
+    "edge": 0.795,
+    "ctr": 0.928,
+    "fill": 0.765,
+    "ar": 1.092,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
+   "col": [
+    462.5,
+    284.0,
+    484.4,
+    573.5
+   ],
+   "class": "ring",
+   "number": 82,
+   "situation": 1,
+   "source_x": 472.2,
+   "source_y": 563.7,
+   "text": "六月初一日。金蓮娘潘姥姥歿。82",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.098,
+    "edge": 0.649,
+    "ctr": 0.861,
+    "fill": 0.686,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
+   "col": [
+    430.1,
+    282.9,
+    451.9,
+    766.4
+   ],
+   "class": "ring",
+   "number": 82,
+   "situation": 1,
+   "source_x": 439.9,
+   "source_y": 755.3,
+   "text": "經濟隔窗偷情，假作迎窗梳妝。82",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.24,
+    "hole": 0.077,
+    "edge": 0.715,
+    "ctr": 0.889,
+    "fill": 0.718,
+    "ar": 1.031,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
+   "col": [
+    331.4,
+    243.9,
+    353.2,
+    514.9
+   ],
+   "class": "ring",
+   "number": 82,
+   "situation": 1,
+   "source_x": 341.3,
+   "source_y": 505.6,
+   "text": "情，壁上留言，陳經濟賭誓。82",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 16.56,
+    "hole": 0.075,
+    "edge": 0.615,
+    "ctr": 0.903,
+    "fill": 0.695,
+    "ar": 0.906,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
+   "col": [
+    298.2,
+    282.9,
+    320.8,
+    880.2
+   ],
    "class": "ring",
    "number": 83,
    "situation": 1,
+   "source_x": 308.7,
+   "source_y": 869.7,
+   "text": "那裏爲西門慶燒盂蘭會箱庫去。83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.071,
+    "edge": 0.678,
+    "ctr": 0.869,
+    "fill": 0.698,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
+   "col": [
+    231.9,
+    243.9,
+    253.1,
+    359.9
+   ],
+   "class": "ring",
+   "number": 83,
+   "situation": 1,
+   "source_x": 242.7,
+   "source_y": 351.5,
+   "text": "毒打秋菊。83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.079,
+    "edge": 0.686,
+    "ctr": 0.858,
+    "fill": 0.707,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1727,
+   "col": [
+    164.2,
+    242.8,
+    186.8,
+    649.3
+   ],
+   "class": "ring",
+   "number": 83,
+   "situation": 1,
+   "source_x": 174.5,
+   "source_y": 639.1,
+   "text": "話。月娘到來，金蓮勉強遮過。83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.09,
+    "edge": 0.673,
+    "ctr": 0.802,
+    "fill": 0.733,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
+   "col": [
+    597.1,
+    251.5,
+    619.0,
+    598.4
+   ],
+   "class": "ring",
+   "number": 83,
+   "situation": 1,
+   "source_x": 608.8,
+   "source_y": 588.5,
+   "text": "無事不許往外邊，凡事都嚴禁。83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.094,
+    "edge": 0.597,
+    "ctr": 0.823,
+    "fill": 0.691,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
    "col": [
     530.9,
     252.6,
     551.3,
     346.9
    ],
-   "source_x": 551.3,
-   "source_y": 346.9,
-   "text": "菊覷見。83",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1728,
    "class": "ring",
    "number": 83,
    "situation": 1,
+   "source_x": 541.2,
+   "source_y": 338.3,
+   "text": "菊覷見。83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.12,
+    "hole": 0.105,
+    "edge": 0.616,
+    "ctr": 0.791,
+    "fill": 0.707,
+    "ar": 1.04,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
    "col": [
     496.3,
     290.5,
     518.1,
     943.1
    ],
-   "source_x": 518.1,
-   "source_y": 943.1,
-   "text": "。八月十八日，晨。秋菊把昨晚所見，告知月娘。月娘喝退秋菊；大姐犯疑。83",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 83,
+   "situation": 1,
+   "source_x": 507.8,
+   "source_y": 933.5,
+   "text": "娘。月娘喝退秋菊；大姐犯疑。83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.108,
+    "edge": 0.627,
+    "ctr": 0.855,
+    "fill": 0.703,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1728,
-   "class": "ring",
-   "number": 84,
-   "situation": 1,
    "col": [
     463.2,
     289.4,
     484.4,
     580.0
    ],
-   "source_x": 484.4,
-   "source_y": 580.0,
-   "text": "九月十六日。吳月娘泰山燒香。84",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1728,
    "class": "ring",
    "number": 84,
    "situation": 1,
+   "source_x": 472.9,
+   "source_y": 570.5,
+   "text": "九月十六日。吳月娘泰山燒香。84",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.11,
+    "edge": 0.645,
+    "ctr": 0.895,
+    "fill": 0.648,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
    "col": [
     396.2,
     258.0,
     417.4,
     387.0
    ],
-   "source_x": 417.4,
-   "source_y": 387.0,
-   "text": "，,急速下山。84",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1728,
    "class": "ring",
    "number": 84,
    "situation": 1,
+   "source_x": 406.9,
+   "source_y": 378.1,
+   "text": "，,急速下山。84",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.126,
+    "edge": 0.672,
+    "ctr": 0.87,
+    "fill": 0.7,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
    "col": [
     363.1,
     288.4,
     384.9,
     846.6
    ],
-   "source_x": 384.9,
-   "source_y": 846.6,
-   "text": "九月中旬。吳月娘歸途遇雪洞禪師，示以十五年後度孝哥出家。84",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1728,
    "class": "ring",
    "number": 84,
    "situation": 1,
+   "source_x": 373.2,
+   "source_y": 836.4,
+   "text": "師，示以十五年後度孝哥出家。84",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.102,
+    "edge": 0.745,
+    "ctr": 0.822,
+    "fill": 0.703,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
    "col": [
     298.9,
     253.7,
     315.9,
     273.1
    ],
-   "source_x": 315.9,
-   "source_y": 273.1,
+   "class": "ring",
+   "number": 84,
+   "situation": 1,
+   "source_x": 307.6,
+   "source_y": 262.3,
    "text": "84",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.6,
+    "hole": 0.126,
+    "edge": 0.623,
+    "ctr": 0.847,
+    "fill": 0.682,
+    "ar": 0.962,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1728,
+   "col": [
+    262.2,
+    289.4,
+    284.8,
+    923.5
+   ],
    "class": "ring",
    "number": 85,
    "situation": 1,
+   "source_x": 273.4,
+   "source_y": 914.1,
+   "text": "毛坑，掬糞漢挑出，醜事外揚。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.059,
+    "edge": 0.688,
+    "ctr": 0.939,
+    "fill": 0.711,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
    "col": [
     229.8,
     289.4,
     251.7,
     848.8
    ],
-   "source_x": 251.7,
-   "source_y": 848.8,
-   "text": "十月初旬。吳月娘泰山進香返抵家。勞頓驚駭，身體不適數日。85",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 85,
+   "situation": 1,
+   "source_x": 240.0,
+   "source_y": 837.7,
+   "text": "家。勞頓驚駭，身體不適數日。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.56,
+    "h": 15.24,
+    "hole": 0.111,
+    "edge": 0.561,
+    "ctr": 0.925,
+    "fill": 0.623,
+    "ar": 1.087,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
+   "col": [
+    196.7,
+    288.4,
+    219.2,
+    885.6
+   ],
+   "class": "ring",
+   "number": 85,
+   "situation": 1,
+   "source_x": 207.2,
+   "source_y": 875.0,
+   "text": "玉噦罵秋菊說舌，耳刮子打回。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.098,
+    "edge": 0.613,
+    "ctr": 0.949,
+    "fill": 0.696,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
+   "col": [
+    129.7,
+    251.5,
+    151.6,
+    598.4
+   ],
+   "class": "ring",
+   "number": 85,
+   "situation": 1,
+   "source_x": 141.1,
+   "source_y": 589.2,
+   "text": "娘已信而不疑。當場數說金蓮。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.074,
+    "edge": 0.658,
+    "ctr": 0.949,
+    "fill": 0.715,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
+   "col": [
+    96.6,
+    288.4,
+    119.2,
+    866.1
+   ],
+   "class": "ring",
+   "number": 85,
+   "situation": 1,
+   "source_x": 107.7,
+   "source_y": 855.4,
+   "text": "妻齟齬。吳月娘愈發嚴謹門戶。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.082,
+    "edge": 0.561,
+    "ctr": 0.978,
+    "fill": 0.688,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1728,
+   "col": [
+    63.5,
+    288.4,
+    86.0,
+    867.2
+   ],
+   "class": "ring",
+   "number": 85,
+   "situation": 1,
+   "source_x": 73.5,
+   "source_y": 856.7,
+   "text": "經濟。吳月娘要薛嫂領賣春梅。85",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.0,
+    "hole": 0.074,
+    "edge": 0.705,
+    "ctr": 0.991,
+    "fill": 0.761,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1729,
+   "col": [
+    587.2,
+    286.2,
+    610.5,
+    940.9
+   ],
    "class": "ring",
-   "number": 7,
+   "number": 86,
    "situation": 1,
+   "source_x": 597.5,
+   "source_y": 930.2,
+   "text": "娘派來安催薛嫂速替春梅尋主。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.082,
+    "edge": 0.688,
+    "ctr": 0.949,
+    "fill": 0.727,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    552.7,
+    286.2,
+    576.0,
+    598.4
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 564.5,
+   "source_y": 587.3,
+   "text": "十一月中旬。春梅賣進周守備府。6",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.24,
+    "hole": 0.089,
+    "edge": 0.558,
+    "ctr": 0.954,
+    "fill": 0.68,
+    "ar": 1.031,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2465",
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    487.1,
+    247.2,
+    509.7,
+    713.2
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 497.7,
+   "source_y": 702.1,
+   "text": "說西門家收有他家應沒官財物。86",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.12,
+    "hole": 0.067,
+    "edge": 0.652,
+    "ctr": 0.96,
+    "fill": 0.707,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1729,
+   "col": [
+    455.4,
+    286.2,
+    478.7,
+    713.2
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 465.1,
+   "source_y": 702.2,
+   "text": "傅夥計要辭工。吳月娘懇留住。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.0,
+    "hole": 0.077,
+    "edge": 0.696,
+    "ctr": 1.0,
+    "fill": 0.748,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    390.6,
+    247.2,
+    412.4,
+    306.8
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 401.2,
+   "source_y": 296.7,
+   "text": "濟。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.094,
+    "edge": 0.592,
+    "ctr": 0.991,
+    "fill": 0.684,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    358.1,
+    285.1,
+    380.7,
+    711.1
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 367.5,
+   "source_y": 700.3,
+   "text": "婦女毆打陳經濟。逐出西門家。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.074,
+    "edge": 0.654,
+    "ctr": 0.969,
+    "fill": 0.692,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    325.0,
+    285.1,
+    348.2,
+    713.2
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 334.9,
+   "source_y": 702.2,
+   "text": "婆領金蓮離西門家。尋主發賣。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.07,
+    "edge": 0.724,
+    "ctr": 0.941,
+    "fill": 0.734,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    258.1,
+    247.2,
+    280.6,
+    344.7
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 269.7,
+   "source_y": 335.3,
+   "text": "京取銀。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.56,
+    "hole": 0.077,
+    "edge": 0.561,
+    "ctr": 0.976,
+    "fill": 0.664,
+    "ar": 0.957,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
+   "col": [
+    223.5,
+    285.1,
+    246.8,
+    752.3
+   ],
+   "class": "ring",
+   "number": 86,
+   "situation": 1,
+   "source_x": 234.4,
+   "source_y": 740.7,
+   "text": "業已接掌提刑院，要娶潘金蓮。66",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.28,
+    "hole": 0.078,
+    "edge": 0.679,
+    "ctr": 0.983,
+    "fill": 0.745,
+    "ar": 1.101,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1729,
    "col": [
     191.1,
     284.0,
     215.1,
     901.9
    ],
-   "source_x": 215.1,
-   "source_y": 901.9,
-   "text": "十二月上旬。應伯爵路上唆使春鴻改投張二官家。被張二官要得去了。7",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 87,
+   "situation": 1,
+   "source_x": 200.7,
+   "source_y": 890.6,
+   "text": "投張二官家。被張二官要得去了。7",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 14.76,
+    "hole": 0.119,
+    "edge": 0.717,
+    "ctr": 0.656,
+    "fill": 0.711,
+    "ar": 1.073,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2466",
+   "ring_fix": "battle4:t18"
   },
   {
    "page": 1729,
-   "class": "ring",
-   "number": 77,
-   "situation": 1,
    "col": [
     157.2,
     284.0,
     181.2,
     712.2
    ],
-   "source_x": 181.2,
-   "source_y": 712.2,
-   "text": "十二月上旬。雲裏守有女與月娘孝哥割襟成親。77",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 87,
+   "situation": 1,
+   "source_x": 168.9,
+   "source_y": 700.4,
+   "text": "裏守有女與月娘孝哥割襟成親。77",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 13.8,
+    "hole": 0.13,
+    "edge": 0.662,
+    "ctr": 0.69,
+    "fill": 0.689,
+    "ar": 1.191,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
   },
   {
    "page": 1729,
-   "class": "ring",
-   "number": 77,
-   "situation": 1,
    "col": [
     91.7,
     246.1,
     114.2,
     555.0
    ],
-   "source_x": 114.2,
-   "source_y": 555.0,
-   "text": "張勝李安還價八十兩，未能成交。77",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 87,
+   "situation": 1,
+   "source_x": 101.7,
+   "source_y": 544.1,
+   "text": "勝李安還價八十兩，未能成交。77",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.136,
+    "edge": 0.602,
+    "ctr": 0.735,
+    "fill": 0.63,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
   },
   {
    "page": 1730,
-   "class": "ring",
-   "number": 88,
-   "situation": 1,
    "col": [
     404.6,
     248.2,
     421.6,
     285.1
    ],
-   "source_x": 421.6,
-   "source_y": 285.1,
+   "class": "ring",
+   "number": 88,
+   "situation": 1,
+   "source_x": 412.9,
+   "source_y": 274.9,
    "text": "。88",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.102,
+    "edge": 0.63,
+    "ctr": 0.889,
+    "fill": 0.66,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1730,
+   "col": [
+    129.7,
+    246.1,
+    151.6,
+    382.6
+   ],
+   "class": "ring",
+   "number": 88,
+   "situation": 1,
+   "source_x": 140.7,
+   "source_y": 374.0,
+   "text": "潘金蓮葬處。88",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.84,
+    "hole": 0.085,
+    "edge": 0.64,
+    "ctr": 0.926,
+    "fill": 0.684,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1731,
+   "col": [
+    583.8,
+    291.6,
+    607.7,
+    888.9
+   ],
+   "class": "ring",
+   "number": 88,
+   "situation": 1,
+   "source_x": 596.7,
+   "source_y": 878.4,
+   "text": "北邊徐公公姪女兒，大擺酒席。88",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.44,
+    "hole": 0.061,
+    "edge": 0.615,
+    "ctr": 0.978,
+    "fill": 0.697,
+    "ar": 0.964,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1732,
-   "class": "ring",
-   "number": 22,
-   "situation": 1,
    "col": [
     472.4,
     255.8,
     490.7,
     293.8
    ],
-   "source_x": 490.7,
-   "source_y": 293.8,
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 482.0,
+   "source_y": 282.5,
    "text": "。22",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.114,
+    "edge": 0.647,
+    "ctr": 0.886,
+    "fill": 0.68,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
   },
   {
    "page": 1734,
-   "class": "ring",
-   "number": 22,
-   "situation": 1,
    "col": [
     576.7,
     252.6,
     598.5,
     466.1
    ],
-   "source_x": 598.5,
-   "source_y": 466.1,
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 588.5,
+   "source_y": 455.8,
    "text": "情，開釋陳經濟主僕。22",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.107,
+    "edge": 0.655,
+    "ctr": 0.83,
+    "fill": 0.694,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
   },
   {
    "page": 1734,
+   "col": [
+    543.5,
+    291.6,
+    565.4,
+    681.9
+   ],
    "class": "ring",
-   "number": 22,
+   "number": 92,
    "situation": 1,
+   "source_x": 556.2,
+   "source_y": 671.1,
+   "text": "通判韃子，限三日内返回原籍。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.084,
+    "edge": 0.697,
+    "ctr": 0.927,
+    "fill": 0.711,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1734,
    "col": [
     477.3,
     253.7,
     497.0,
     331.7
    ],
-   "source_x": 497.0,
-   "source_y": 331.7,
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 487.2,
+   "source_y": 323.0,
    "text": "清河。22",
-   "how": "ring_digit"
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.106,
+    "edge": 0.637,
+    "ctr": 0.875,
+    "fill": 0.677,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
   },
   {
    "page": 1734,
-   "class": "ring",
-   "number": 22,
-   "situation": 1,
    "col": [
     442.8,
     291.6,
     464.6,
     680.8
    ],
-   "source_x": 464.6,
-   "source_y": 680.8,
-   "text": "。某月日。（應爲十月間。）陳經濟返抵家。22",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 454.5,
+   "source_y": 669.8,
+   "text": "應爲十月間。）陳經濟返抵家。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.24,
+    "hole": 0.11,
+    "edge": 0.655,
+    "ctr": 0.854,
+    "fill": 0.724,
+    "ar": 0.984,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1734,
+   "col": [
+    410.3,
+    293.8,
+    432.1,
+    701.4
+   ],
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 421.6,
+   "source_y": 690.5,
+   "text": "西門大姐自縊死。亡年廿四歲。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 15.6,
+    "hole": 0.087,
+    "edge": 0.65,
+    "ctr": 0.89,
+    "fill": 0.684,
+    "ar": 1.054,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1734,
+   "col": [
+    207.9,
+    294.9,
+    230.6,
+    816.2
+   ],
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 219.8,
+   "source_y": 805.0,
+   "text": "濟兇頑，欺凌孤寡，逼死髮妻。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 14.76,
+    "hole": 0.082,
+    "edge": 0.671,
+    "ctr": 0.87,
+    "fill": 0.71,
+    "ar": 1.114,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1734,
+   "col": [
+    141.7,
+    260.1,
+    162.8,
+    525.8
+   ],
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 153.5,
+   "source_y": 516.4,
+   "text": "。具結不得再向西門氏騷擾。22",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.096,
+    "edge": 0.594,
+    "ctr": 0.853,
+    "fill": 0.676,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3252",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1734,
+   "col": [
+    74.8,
+    259.1,
+    97.3,
+    946.4
+   ],
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 88.2,
+   "source_y": 935.7,
+   "text": "濟把楊大推入江中，要陳還人。23",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.071,
+    "edge": 0.701,
+    "ctr": 0.88,
+    "fill": 0.703,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3253",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1734,
+   "col": [
+    42.3,
+    292.7,
+    65.5,
+    872.6
+   ],
+   "class": "ring",
+   "number": 92,
+   "situation": 1,
+   "source_x": 54.4,
+   "source_y": 861.3,
+   "text": "餘下獨自一人，在外賃屋居住。23",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.64,
+    "hole": 0.083,
+    "edge": 0.619,
+    "ctr": 0.89,
+    "fill": 0.718,
+    "ar": 1.074,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+3253",
+   "ring_fix": "battle4:t20"
   },
   {
    "page": 1735,
+   "col": [
+    628.1,
+    282.9,
+    650.0,
+    805.4
+   ],
+   "class": "ring",
+   "number": 93,
+   "situation": 1,
+   "source_x": 639.8,
+   "source_y": 794.4,
+   "text": "錢，賣了家具，淪入冷舖存身。33",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 16.44,
+    "hole": 0.052,
+    "edge": 0.659,
+    "ctr": 0.946,
+    "fill": 0.707,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+325D",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1735,
+   "col": [
+    595.8,
+    282.9,
+    617.6,
+    899.7
+   ],
+   "class": "ring",
+   "number": 93,
+   "situation": 1,
+   "source_x": 606.1,
+   "source_y": 890.1,
+   "text": "郴搖鈴。宿冷舖。常在夢中哭醒。3",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.72,
+    "hole": 0.067,
+    "edge": 0.737,
+    "ctr": 0.921,
+    "fill": 0.754,
+    "ar": 0.954,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": "U+2462",
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1735,
+   "col": [
+    396.2,
+    282.9,
+    418.1,
+    937.6
+   ],
+   "class": "ring",
+   "number": 93,
+   "situation": 1,
+   "source_x": 406.9,
+   "source_y": 928.3,
+   "text": "清宴公廟，任道士處作學徒。（83",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.84,
+    "hole": 0.066,
+    "edge": 0.705,
+    "ctr": 0.853,
+    "fill": 0.716,
+    "ar": 0.992,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t20"
+  },
+  {
+   "page": 1735,
+   "col": [
+    330.6,
+    246.1,
+    351.8,
+    513.8
+   ],
+   "class": "ring",
+   "number": 93,
+   "situation": 1,
+   "source_x": 340.9,
+   "source_y": 505.2,
+   "text": "上遊玩，重會馮（鄭）金寶。93",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.08,
+    "edge": 0.679,
+    "ctr": 0.826,
+    "fill": 0.707,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1735,
+   "col": [
+    197.4,
+    282.9,
+    219.2,
+    691.6
+   ],
    "class": "ring",
    "number": 94,
    "situation": 1,
+   "source_x": 208.2,
+   "source_y": 680.8,
+   "text": "士一氣病卒，陳經濟再回清河。94",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.093,
+    "edge": 0.712,
+    "ctr": 0.963,
+    "fill": 0.695,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1735,
    "col": [
     131.2,
     246.1,
     153.7,
     653.6
    ],
-   "source_x": 153.7,
-   "source_y": 653.6,
-   "text": "她坐大，怒打孫雪娥，喊薛嫂領出賣入娼門。94",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1736,
    "class": "ring",
    "number": 94,
    "situation": 1,
+   "source_x": 142.2,
+   "source_y": 642.1,
+   "text": "孫雪娥，喊薛嫂領出賣入娼門。94",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.112,
+    "edge": 0.705,
+    "ctr": 0.905,
+    "fill": 0.723,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
    "col": [
     590.8,
     281.9,
     613.4,
     881.3
    ],
-   "source_x": 613.4,
-   "source_y": 881.3,
-   "text": "某月日。守備府張勝到臨清治遊。包占孫雪娥。妻弟劉二免除房錢。（94",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 94,
+   "situation": 1,
+   "source_x": 602.6,
+   "source_y": 869.7,
+   "text": "孫雪娥。妻弟劉二免除房錢。（94",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 14.4,
+    "hole": 0.127,
+    "edge": 0.619,
+    "ctr": 0.936,
+    "fill": 0.681,
+    "ar": 1.1,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    524.5,
+    245.0,
+    545.0,
+    456.4
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 535.2,
+   "source_y": 447.5,
+   "text": "興與奶子如意圓房。）)95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.097,
+    "edge": 0.609,
+    "ctr": 0.92,
+    "fill": 0.685,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    489.9,
+    282.9,
+    513.2,
+    994.0
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 502.2,
+   "source_y": 983.1,
+   "text": "水推舟，把小玉給了岱安爲妻。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.6,
+    "hole": 0.091,
+    "edge": 0.59,
+    "ctr": 0.931,
+    "fill": 0.677,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    390.6,
+    245.0,
+    411.0,
+    360.9
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 400.9,
+   "source_y": 351.5,
+   "text": "恩將仇報。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.099,
+    "edge": 0.603,
+    "ctr": 0.941,
+    "fill": 0.664,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    322.9,
+    250.4,
+    345.4,
+    899.7
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 334.6,
+   "source_y": 888.6,
+   "text": "將仇報。托薛嫂央求春梅相助。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.36,
+    "hole": 0.098,
+    "edge": 0.645,
+    "ctr": 0.897,
+    "fill": 0.716,
+    "ar": 0.977,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    289.8,
+    281.9,
+    312.3,
+    994.0
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 301.2,
+   "source_y": 983.1,
+   "text": "況。以及吳月娘致送春梅書帖。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.6,
+    "hole": 0.094,
+    "edge": 0.559,
+    "ctr": 0.904,
+    "fill": 0.678,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    256.6,
+    281.9,
+    279.2,
+    994.0
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 268.1,
+   "source_y": 983.1,
+   "text": "安，贓物封貯，敎本家人領去。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.6,
+    "hole": 0.075,
+    "edge": 0.67,
+    "ctr": 0.956,
+    "fill": 0.699,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    190.3,
+    245.0,
+    211.5,
+    359.9
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 200.8,
+   "source_y": 350.7,
+   "text": "盤纏生活。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.84,
+    "hole": 0.078,
+    "edge": 0.616,
+    "ctr": 0.945,
+    "fill": 0.689,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1736,
+   "col": [
+    156.5,
+    280.8,
+    178.3,
+    571.2
+   ],
+   "class": "ring",
+   "number": 95,
+   "situation": 1,
+   "source_x": 167.7,
+   "source_y": 561.9,
+   "text": "某月日。吳月娘送禮春梅謝情。95",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.44,
+    "hole": 0.087,
+    "edge": 0.606,
+    "ctr": 0.927,
+    "fill": 0.675,
+    "ar": 0.964,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
   },
   {
    "page": 1737,
+   "col": [
+    628.9,
+    252.6,
+    651.4,
+    739.3
+   ],
    "class": "ring",
-   "number": 97,
+   "number": 96,
    "situation": 1,
+   "source_x": 640.5,
+   "source_y": 728.3,
+   "text": "祝三周歲生日。重遊舊家池館。96",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.36,
+    "hole": 0.087,
+    "edge": 0.683,
+    "ctr": 0.992,
+    "fill": 0.738,
+    "ar": 0.977,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
+   "col": [
+    595.8,
+    289.4,
+    617.6,
+    699.2
+   ],
+   "class": "ring",
+   "number": 96,
+   "situation": 1,
+   "source_x": 607.2,
+   "source_y": 688.3,
+   "text": "思念陳經濟，周守備差人尋找。96",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.6,
+    "hole": 0.079,
+    "edge": 0.677,
+    "ctr": 0.943,
+    "fill": 0.706,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
+   "col": [
+    528.8,
+    258.0,
+    550.6,
+    660.1
+   ],
+   "class": "ring",
+   "number": 96,
+   "situation": 1,
+   "source_x": 539.8,
+   "source_y": 650.7,
+   "text": "子。帶去城南水月寺作修殿工。96",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.07,
+    "edge": 0.67,
+    "ctr": 0.975,
+    "fill": 0.708,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
+   "col": [
+    494.9,
+    291.6,
+    516.8,
+    795.6
+   ],
+   "class": "ring",
+   "number": 96,
+   "situation": 1,
+   "source_x": 506.3,
+   "source_y": 784.5,
+   "text": "尋到陳經濟。隨張勝去守備府。96",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.24,
+    "hole": 0.084,
+    "edge": 0.661,
+    "ctr": 0.962,
+    "fill": 0.721,
+    "ar": 0.984,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
    "col": [
     462.5,
     291.6,
     484.4,
     699.2
    ],
-   "source_x": 484.4,
-   "source_y": 699.2,
-   "text": "三月中旬。春梅假認經濟爲兄弟，收回面首。97",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1737,
    "class": "ring",
    "number": 97,
    "situation": 1,
+   "source_x": 473.0,
+   "source_y": 689.4,
+   "text": "梅假認經濟爲兄弟，收回面首。97",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.0,
+    "hole": 0.126,
+    "edge": 0.638,
+    "ctr": 0.755,
+    "fill": 0.663,
+    "ar": 1.048,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
    "col": [
     429.4,
     291.6,
     451.2,
     678.6
    ],
-   "source_x": 451.2,
-   "source_y": 678.6,
-   "text": "四月二十五日。吳月娘送禮盒賀春梅生日。97",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1737,
    "class": "ring",
    "number": 97,
    "situation": 1,
+   "source_x": 439.6,
+   "source_y": 669.9,
+   "text": "日。吳月娘送禮盒賀春梅生日。97",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.0,
+    "hole": 0.159,
+    "edge": 0.667,
+    "ctr": 0.659,
+    "fill": 0.679,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
    "col": [
     396.2,
     291.6,
     418.1,
     620.0
    ],
-   "source_x": 418.1,
-   "source_y": 620.0,
-   "text": "五月端陽節。春梅經濟，花亭宣淫。97",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1737,
    "class": "ring",
    "number": 97,
    "situation": 1,
+   "source_x": 406.2,
+   "source_y": 611.7,
+   "text": "端陽節。春梅經濟，花亭宣淫。97",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.104,
+    "edge": 0.647,
+    "ctr": 0.805,
+    "fill": 0.659,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
    "col": [
     363.1,
     290.5,
     385.6,
     869.4
    ],
-   "source_x": 385.6,
-   "source_y": 869.4,
-   "text": "五月某日。周守備奉旨會同濟州知府張叔夜征剿梁山泊賊王宋江。97",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1737,
    "class": "ring",
    "number": 97,
    "situation": 1,
+   "source_x": 373.5,
+   "source_y": 859.3,
+   "text": "府張叔夜征剿梁山泊賊王宋江。97",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.0,
+    "h": 15.84,
+    "hole": 0.103,
+    "edge": 0.717,
+    "ctr": 0.728,
+    "fill": 0.718,
+    "ar": 0.947,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
    "col": [
     296.8,
     255.8,
     314.4,
     274.2
    ],
-   "source_x": 314.4,
-   "source_y": 274.2,
-   "text": "97",
-   "how": "ring_digit"
-  },
-  {
-   "page": 1737,
    "class": "ring",
    "number": 97,
    "situation": 1,
+   "source_x": 305.6,
+   "source_y": 264.5,
+   "text": "97",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.145,
+    "edge": 0.571,
+    "ctr": 0.684,
+    "fill": 0.603,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
    "col": [
     227.7,
     252.6,
     250.2,
     984.2
    ],
-   "source_x": 250.2,
-   "source_y": 984.2,
-   "text": "子房裏的，年十三歲。因爲李智黃四虧官糧錢，都拏到官裏追贓，李三已死在監中。97",
-   "how": "ring_digit"
+   "class": "ring",
+   "number": 97,
+   "situation": 1,
+   "source_x": 239.7,
+   "source_y": 973.7,
+   "text": "到官裏追贓，李三已死在監中。97",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 16.32,
+    "hole": 0.142,
+    "edge": 0.571,
+    "ctr": 0.615,
+    "fill": 0.599,
+    "ar": 0.971,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
+   "col": [
+    161.4,
+    258.0,
+    182.6,
+    388.1
+   ],
+   "class": "ring",
+   "number": 98,
+   "situation": 1,
+   "source_x": 172.2,
+   "source_y": 379.2,
+   "text": "。回家探視。98",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.079,
+    "edge": 0.617,
+    "ctr": 0.985,
+    "fill": 0.698,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1737,
+   "col": [
+    126.9,
+    290.5,
+    150.2,
+    965.9
+   ],
+   "class": "ring",
+   "number": 98,
+   "situation": 1,
+   "source_x": 138.4,
+   "source_y": 954.4,
+   "text": "錢給陳經濟，要他作買賣營生。98",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 14.52,
+    "hole": 0.055,
+    "edge": 0.729,
+    "ctr": 0.949,
+    "fill": 0.746,
+    "ar": 1.083,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1739,
+   "col": [
+    291.9,
+    247.2,
+    313.8,
+    400.0
+   ],
+   "class": "ring",
+   "number": 99,
+   "situation": 1,
+   "source_x": 302.7,
+   "source_y": 391.6,
+   "text": "夜，防守地方。99",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.0,
+    "hole": 0.086,
+    "edge": 0.596,
+    "ctr": 0.981,
+    "fill": 0.723,
+    "ar": 1.056,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null
+  },
+  {
+   "page": 1740,
+   "col": [
+    583.8,
+    241.8,
+    605.6,
+    748.0
+   ],
+   "class": "ring",
+   "number": 99,
+   "situation": 1,
+   "source_x": 595.5,
+   "source_y": 736.8,
+   "text": "收算來家。陳經濟葬在永福寺。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 16.44,
+    "h": 14.88,
+    "hole": 0.066,
+    "edge": 0.677,
+    "ctr": 0.961,
+    "fill": 0.726,
+    "ar": 1.105,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1740,
+   "col": [
+    549.9,
+    279.6,
+    571.0,
+    552.9
+   ],
+   "class": "ring",
+   "number": 99,
+   "situation": 1,
+   "source_x": 561.4,
+   "source_y": 542.8,
+   "text": "某月日。周統制出征東昌府。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.72,
+    "h": 15.72,
+    "hole": 0.061,
+    "edge": 0.709,
+    "ctr": 0.97,
+    "fill": 0.737,
+    "ar": 1.0,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
+  },
+  {
+   "page": 1740,
+   "col": [
+    484.4,
+    242.8,
+    505.5,
+    532.2
+   ],
+   "class": "ring",
+   "number": 99,
+   "situation": 1,
+   "source_x": 494.8,
+   "source_y": 523.2,
+   "text": "回府。韓道國夫婦回臨清酒店。69",
+   "how": "ring_digit",
+   "measure": {
+    "w": 15.84,
+    "h": 15.72,
+    "hole": 0.065,
+    "edge": 0.667,
+    "ctr": 0.967,
+    "fill": 0.716,
+    "ar": 1.008,
+    "crit": "v2",
+    "dpi": 600
+   },
+   "cp": null,
+   "ring_fix": "battle4:t18"
   }
- ]
+ ],
+ "ring_digit_merge": {
+  "source": "census_ring_digit.py",
+  "n_census": 352,
+  "n_new": 331,
+  "n_kept_manual": 21,
+  "n_ring_total": 367,
+  "n_ring_gt50": 214,
+  "note": "number 取自 OCR 文本尾数字；>50 无 Unicode 圈码，渲染端画 ○+小号数字"
+ }
 }

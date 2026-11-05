@@ -7,13 +7,11 @@ test_cases.py - 排版还原功能断言测试
 改 build_classic.py 后运行,防功能级回归。
 
 用法:
-    python3 src/test/test_cases.py output/成果_wz2_classic_latest.pdf
-    python3 src/test/test_cases.py output/成果_wz2_classic_latest.pdf --src source_pdf/wz2.pdf
+    /usr/bin/python3 src/test/test_cases.py <pdf路径>
 """
 import fitz
 import statistics
 import sys
-import os
 import re
 
 # ============================================================
@@ -71,7 +69,11 @@ def test_no_overflow(pdf):
     assert n == 783, f'页数={n}, 应=783(0溢出)'
 
 def test_pitch_rate(pdf):
-    """pitch达标率>50%(需verify_geom数据,简化:测p11/p26/p51 pitch合理)"""
+    """三条采样页(11/26/51)的 pitch 下限检查。
+
+    真正的「pitch 达标率」由 src/test/verify_geom.py 判（它读 coords/lines 与源书比对）；
+    本函数只依赖已打开的 PDF，不接收 coords_path/lines_path/src_pdf（#4：旧版死参已移除）。
+    """
     p11 = _get_pitch(pdf, 10)
     p26 = _get_pitch(pdf, 25)
     p51 = _get_pitch(pdf, 50)

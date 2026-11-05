@@ -36,7 +36,7 @@ def v13():
     return load(
         'build_pdf_v13.py',
         func_names={'clean_text', 'normalize_text', 'escape_tex',
-                    'escape_body', 'is_page_number', '_heading_core'},
+                    'escape_body', 'is_page_number', 'is_heading_by_md', '_heading_core'},
         const_names={'_QUOTE_MAP', 'FN_CIRCLE'},
     )
 
@@ -127,7 +127,8 @@ class TestNormalizeText:
 class TestEscapeTex:
     """escape_tex(text)：标准 LaTeX 转义，**保留** \\ { }。
 
-    \\ -> \\textbackslash{}, { -> \\{, } -> \\}, & % # $ _ ~ ^ 各自转义。
+    \\ -> \\textbackslash{}（反斜杠先换占位符，末尾还原 -> 其 {} 不被二次转义，#2），
+    { -> \\{, } -> \\}, & % # $ _ ~ ^ 各自转义（单反斜杠）。
     """
 
     @pytest.mark.parametrize("inp,exp", [
@@ -137,6 +138,8 @@ class TestEscapeTex:
         ("100%", "100\\%"),
         ("$5", "\\$5"),
         ("a#b&c", "a\\#b\\&c"),
+        ("a\\\\b", "a\\textbackslash{}\\textbackslash{}b"),   # 两个反斜杠各自转义、互不串扰
+        ("a\\%", "a\\textbackslash{}\\%"),                     # 反斜杠与 % 各转义一次
         ("plain", "plain"),
         ("中文", "中文"),
         ("", ""),
@@ -145,8 +148,14 @@ class TestEscapeTex:
         assert v13['escape_tex'](inp) == exp
 
     def test_escape_tex_backslash(self, v13):
-        # \\ -> \textbackslash{}，但其中的 {} 被后续 {/} 规则二次转义 -> \{\}
-        assert v13['escape_tex']('a\\b') == r'a\textbackslash{}b'  # #2 修复：占位符防二次转义
+        # \\ -> \textbackslash{}（#2 修复：占位符防 {} 被后续 {/} 规则二次转义）
+        assert v13['escape_tex']('a\\b') == r'a\textbackslash{}b'
+
+    def test_escape_tex_backslash_braces_not_double_escaped(self, v13):
+        """#2 回归：输出中不得出现 `\\{\\}`（二次转义痕迹）。"""
+        out = v13['escape_tex']('a\\b')
+        assert r'\{\}' not in out
+        assert v13['escape_tex']('\\\\') == r'\textbackslash{}\textbackslash{}'
 
     def test_escape_tex_none_raises(self, v13):
         with pytest.raises(AttributeError):
@@ -211,6 +220,51 @@ class TestIsPageNumber:
             v13['is_page_number'](None)
 
 
+class TestIsHeadingByMd:
+    """is_heading_by_md(text, headings_set)：markdown 标题模糊匹配（v13）。
+
+    契约（#3：删除两行 `.replace('“','“').replace('”','”')` identity no-op 后行为不变）：
+    - 先剥脚注标记 `$^{X}$`、去首尾空白；两边都只去空白，**引号不归一**；
+    - 完全相等 -> 返回 level；
+    - 双方长度都 >8 且 长度比 >0.7 且 短串是长串子串 -> 返回 level；否则 0。
+    """
+
+    HEADINGS = [('第一章 绪论', 1), ('“引言”', 2), ('（一）概述', 3),
+                ('A Long English Heading Title', 4)]
+
+    @pytest.mark.parametrize("inp,exp", [
+        ('第一章 绪论', 1),
+        ('第一章绪论', 1),                    # 空白差异被归一
+        (' 第一章 绪论 ', 1),
+        ('第一章 绪论 $^{[一]}$', 1),          # 脚注标记剥除
+        ('“引言”', 2),
+        ('（一）概述', 3),
+        ('A Long English Heading Title', 4),
+        ('A Long English Heading', 4),        # 模糊：长度比>0.7 且子串
+        ('完全不同', 0),
+        ('', 0),
+        ('第一章 绪论 续', 0),
+    ])
+    def test_is_heading_by_md(self, v13, inp, exp):
+        assert v13['is_heading_by_md'](inp, self.HEADINGS) == exp
+
+    @pytest.mark.parametrize("inp", ['"引言"', '‘引言’', '「引言」', '『引言』'])
+    def test_quote_forms_not_normalized(self, v13, inp):
+        """#3 回归：引号不做归一（删掉的是 identity replace，与原实现逐字节等价）。
+
+        原实现 `.replace('“','“').replace('”','”')` 是 no-op，所以 ASCII 双引号 /
+        单引号 / 角引号形式都不会匹配弯引号 heading——删除后此行为不变。
+        """
+        assert v13['is_heading_by_md'](inp, [('“引言”', 2)]) == 0
+
+    def test_headings_empty(self, v13):
+        assert v13['is_heading_by_md']('任意文本', []) == 0
+
+    def test_none_raises(self, v13):
+        with pytest.raises(TypeError):
+            v13['is_heading_by_md'](None, [])
+
+
 # ======================================================================
 # build_classic.py
 # ======================================================================
@@ -223,7 +277,8 @@ class TestEscChars:
     """
 
     @pytest.mark.parametrize("inp,exp", [
-        ("a%b", r"a\%b"),             # 转义为单反斜杠（修复双反斜杠 bug）
+        ("a%b", r"a\%b"),             # 转义为单反斜杠（#1：原 r'\\%' 双反斜杠=LaTeX 换行）
+        (r"a\\%b", r"a\%b"),          # 双反斜杠先删，再对 % 单反斜杠转义（#1 回归）
         ("{x}", "x"),                  # 花括号删除
         ("a\\b", "a\\b"),              # 单反斜杠保留（_esc_chars 只删双反斜杠 \\）
         (r"a\\b", "ab"),               # 双反斜杠 -> 删除
@@ -237,6 +292,12 @@ class TestEscChars:
     ])
     def test_esc_chars(self, classic, inp, exp):
         assert classic['_esc_chars'](inp) == exp
+
+    def test_esc_chars_percent_single_backslash(self, classic):
+        """#1 回归：`%` 转义符必须是单反斜杠（双反斜杠是 LaTeX 换行）。"""
+        out = classic['_esc_chars']('100%')
+        assert out == '100\\%'
+        assert r'\\%' not in out
 
     def test_esc_chars_none_raises(self, classic):
         with pytest.raises(AttributeError):
@@ -458,12 +519,12 @@ class TestCrossFuncDivergence:
     def test_escape_tex_vs_esc_chars(self, v13, classic, inp):
         """escape_tex(v13) vs _esc_chars(classic)。
 
-        核心差异：
+        核心差异（#1/#2 修复后的现状）：
         - { }：v13 保留并转义（\\{），classic 删除。
-        - \\：v13 单反斜杠 -> \\textbackslash\\{\\}（含二次转义）；classic 单反斜杠保留、双反斜杠删除。
+        - \\：v13 单反斜杠 -> \\textbackslash{}（花括号不二次转义）；classic 单反斜杠保留、双反斜杠删除。
         - ○：v13 不变，classic -> 〇。
         - 【】：v13 不变，classic -> 〔〕。
-        - % # _ & 等：v13 单反斜杠转义（\\%），classic 双反斜杠（\\\\%）-> 不一致。
+        - % # _ & 等：两边都是单反斜杠转义（\\% / \\#）-> 一致。
         - plain：两者一致。
         """
         a = v13['escape_tex'](inp)
@@ -471,20 +532,20 @@ class TestCrossFuncDivergence:
         if inp == "{x}":
             assert a == r"\{x\}" and b == "x"
         elif inp == "a\\b":
-            # v13 单反斜杠 -> \textbackslash\{\}；classic 单反斜杠保留 -> a\b
-            assert a == r"a\textbackslash{}b" and b == r"a\b" and a != b  # #2 修复：不再二次转义
+            # v13 单反斜杠 -> \textbackslash{}（#2：不再二次转义）；classic 单反斜杠保留 -> a\b
+            assert a == r"a\textbackslash{}b" and b == r"a\b" and a != b
         elif inp == "○":
             assert a == "○" and b == "〇"
         elif inp == "【注】":
             assert a == "【注】" and b == "〔注〕"
         elif inp == "a%b":
-            # v13 单反斜杠 \%, classic 双反斜杠 \\% -> 不一致
-            assert a == r"a\%b" and b == r"a\%b"  # classic 修复后与 v13 一致
+            # 两边都是单反斜杠转义（#1 修复后 classic 与 v13 一致）
+            assert a == r"a\%b" and b == r"a\%b"
         elif inp == "plain":
             assert a == "plain" and b == "plain"          # 一致
         elif inp == "#":
-            # v13 单反斜杠 \#, classic 双反斜杠 \\# -> 不一致
-            assert a == r"\#" and b == r"\#"  # classic 修复后与 v13 一致
+            # 两边都是单反斜杠转义（#1 修复后 classic 与 v13 一致）
+            assert a == r"\#" and b == r"\#"
 
     def test_heading_core_v13_vs_geom_no_quote(self, v13, geom):
         """无引号时 v13 与 geom 的 _heading_core 一致（都剥编号+去空白）。"""
@@ -531,9 +592,13 @@ class TestLongInput:
     def test_is_page_number_long(self, v13):
         assert v13['is_page_number']('1' * 10000) is False  # 超 4 位
 
+    def test_is_heading_by_md_long(self, v13):
+        assert v13['is_heading_by_md'](self.LONG, [('第一章 绪论', 1)]) == 0
+
     def test_esc_chars_long(self, classic):
         out = classic['_esc_chars'](self.LONG)
-        assert '\%' in out                               # 双反斜杠转义
+        assert '\\%' in out                             # 转义生效（单反斜杠，#1）
+        assert r'\\%' not in out                        # 不得输出双反斜杠（#1 回归）
 
     def test_esc_long(self, classic):
         assert len(classic['esc'](self.LONG)) > 0

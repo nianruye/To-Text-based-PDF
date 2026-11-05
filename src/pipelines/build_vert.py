@@ -522,13 +522,19 @@ def _apply_missed_fix(path):
             n = int(it['number'])
             sent = chr(int(globals().get('RING_INS_BASE', 0xE100)) + n)
             cur = sl[k][idx]
-            if int(it.get('situation') or 0) == 1 and cur.endswith(str(n)):
-                sl[k][idx] = cur[:-len(str(n))] + sent
+            # t18：情形①的「1:1 替换」以**文本尾的 OCR 数字**为准，不再要求它 == 修正后的 n。
+            #   圈内数字被纠正（如 81->61）时，OCR 文本尾仍是 81；若按 n 匹配会走「情形②插」，
+            #   旧数字留在文本层（v32 首版实测 p1712/p1729/p1740 出现「８１○６１」双份 +19 字）。
+            _tail = None
+            if int(it.get('situation') or 0) == 1:
+                _tail = re.search(r'[0-9０１２３４５６７８９]{1,2}$', cur)
+            if _tail is not None:
+                sl[k][idx] = cur[:_tail.start()] + sent
                 st['ring1'] += 1
             else:
                 if int(it.get('situation') or 0) == 1:
-                    print('[漏识元素] p%d x%.1f 情形①但文本尾不是 %s(%r) -> 按情形②插'
-                          % (pg, it.get('source_x') or 0, n, cur[-8:]))
+                    print('[漏识元素] p%d x%.1f 情形①但文本尾无数字(%r) -> 按情形②插'
+                          % (pg, it.get('source_x') or 0, cur[-8:]))
                 sl[k][idx] = cur + sent
                 st['ring2'] += 1
             if n > 50:
@@ -851,24 +857,46 @@ def _br_put(ch, x_pt, y_pt, F, xs=None):
 #   **只改文本, 不动 OCR 盒**: 实测两行的盒都覆盖该括号墨迹区, 移动后两列 步进 = 盒高/字数 反而
 #   更贴源书(p3 例: 8 字 34.75pt -> 9 字 30.9pt, 源书实测 30.5pt); 页内字符总量守恒。
 BR_OPEN_OF = {'）': '（', '」': '「', '』': '『', '〕': '〔', '】': '【', '》': '《', '〉': '〈'}
+BR_QUOTE = set('」』')   # t13：引号在特定条件下不参与「行首闭括号回上一列」（按源书保留）
+QUOTE_RELOC_ALWAYS = os.environ.get('VERT_QUOTE_RELOC_ALWAYS', '0') == '1'   # =1 回到 battle2 口径（引号一律回上一列）
 
 def fix_split_brackets(rows):
     """页内 OCR 行文本(阅读序) -> (新行文本列表, [(行号, 括号)] 归位记录)。
-    行首闭括号且页内(含前面的行)存在未闭合的同类开括号时, 该括号归位到上一行行尾。"""
+    行首闭括号且页内(含前面的行)存在未闭合的同类开括号时, 该括号归位到**开括号所在行**的行尾
+    （t13 修正：原来机械地归到「上一行」——开/闭括号之间夹着短列时（如 p230「但見：」在
+    诗句列与 `」：「…` 列之间）会把 `」` 挂到短列尾，产出「：﹂」；归到开括号行才是源书语义）。"""
+    import os as _os
     out = list(rows)
-    stack = []                                # 未闭合开括号(按阅读序)
+    stack = []                                # 未闭合开括号 (char, row_idx)，按阅读序
     fixes = []
     for i, t in enumerate(out):
-        while t and t[0] in BR_OPEN_OF and stack and stack[-1] == BR_OPEN_OF[t[0]] and i > 0 and out[i - 1]:
-            stack.pop()
-            out[i - 1] = out[i - 1] + t[0]
+        while t and t[0] in BR_OPEN_OF and stack and stack[-1][0] == BR_OPEN_OF[t[0]]:
+            _oc, oj = stack.pop()
+            if t[0] in ('」', '』') and _os.environ.get('VERT_QUOTE_RELOC_ALWAYS', '0') != '1':
+                # t13：**上一行是「以句末标点结尾的短列」时不归位** —— 源书竖排常见
+                #   「短列(但見：) | 下一列从 」：「 开头」；机械归到上一行会产出「：﹂」，
+                #   归到开引号行又会把下一列首的「：」顶到列首（新造禁止行首的点号）。
+                #   其余引号拆分保持 taskK-B 原行为（wz6 零回归依赖此口径）。
+                _nxt = t[1] if len(t) > 1 else ''
+                # ① 归位后会把禁止行首的标点顶到列首（」：/」、/」；...）-> 不归位（无论 oj 是否相邻）
+                if _nxt in '：。！？；、，':
+                    break
+                # ② 上一行以句末标点结尾的短列（但見：）-> 不归位
+                if oj != i - 1 and out[i - 1] and out[i - 1][-1] in '：。！？；':
+                    break
+                out[i - 1] = out[i - 1] + t[0]
+            else:
+                # 括号保留 taskK-B 原行为（回上一列行尾；wz6 零回归依赖此口径）
+                if not (i > 0 and out[i - 1]):
+                    break
+                out[i - 1] = out[i - 1] + t[0]
             fixes.append((i, t[0]))
             t = t[1:]
             out[i] = t
         for c in t:
             if c in BR_OPEN_OF.values():
-                stack.append(c)
-            elif c in BR_OPEN_OF and stack and stack[-1] == BR_OPEN_OF[c]:
+                stack.append((c, i))
+            elif c in BR_OPEN_OF and stack and stack[-1][0] == BR_OPEN_OF[c]:
                 stack.pop()
     return out, fixes
 
@@ -3689,6 +3717,12 @@ def _merge_col_rows(rows, step, prov=None):
                 ov = min(x1, ox1) - max(x0, ox0)
                 if ov < 0.6 * min(x1 - x0, ox1 - ox0): continue
                 if 0 <= oy0 - y1 <= 2.5 * step:                # o 在本行之下
+                    # t13：短列合并护栏 —— 下一行以闭引号开头且本行以句末标点结尾时**不并入**：
+                    #   源书这里通常是「短列(但見：) | 下一列从 」：「 开头」两列，合并+按槽切分
+                    #   会把 」 挪到短列尾（battle2 B 类「：﹂」/「：」的根因）。
+                    if (_NF.get('on') and MERGE_QGUARD and t and t[-1] in '：。！？；'
+                            and ot and ot[0] in '」﹂』﹄'):
+                        continue
                     t = t + ot; y1 = oy1; pieces.append((id(o), len(ot)))
                 elif 0 <= y0 - oy1 <= 2.5 * step:              # o 在本行之上
                     t = ot + t; y0 = oy0; pieces.insert(0, (id(o), len(ot)))
@@ -4070,7 +4104,7 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
     # taskCM: 列尾闭引号形状纠错(只无版框书)。在算完 step/top 之后、铺字之前判: 只读源图。
     _qsf = None
     if (QSF_ON and _NF['on'] and src_doc is not None and pi is not None and sl is not None
-            and t and t[-1] in ('。', '一')):
+            and t and t[-1] in ('。', '一', '！', '？', '；')):
         _qsf = _qsf_plan(pi, sl, step, m, t[-1], t)
         if QSF_DBG:
             _qsf_audit(pi, sl, t, step, m)
@@ -6302,6 +6336,9 @@ def nf_fix_quotes(k, pi, m):
 QSF_ON = os.environ.get('VERT_QSF', '1') not in ('0', 'false', 'False')
 QSF_DBG = os.environ.get('VERT_QSF_DBG') == '1'
 QSF_APPEND = os.environ.get('VERT_QSF_APPEND', '1') not in ('0', 'false', 'False')
+QSF_POS_TOL = float(os.environ.get('VERT_QSF_POS_TOL') or 2.5)   # 补字位置闸门: 源墨 run 顶距末字 <= 该步进数
+QSF_PAIR_GUARD = os.environ.get('VERT_QSF_PAIR', '1') not in ('0', 'false', 'False')  # 补字前查引号对是否已闭合
+MERGE_QGUARD = os.environ.get('VERT_MERGE_QGUARD', '1') not in ('0', 'false', 'False')  # 合并列: 后行以 」 开头时不并入
 QSF_MIN_PIX = int(os.environ.get('VERT_QSF_MIN_PIX') or 24)      # 墨迹像素下限(< = 无墨, 不动)
 QSF_TAIL_DN = float(os.environ.get('VERT_QSF_TAIL_DN') or 1.3)   # 槽底向下找 run 的外扩(步进倍数)
 QSF_MIN_RUN = float(os.environ.get('VERT_QSF_MIN_RUN') or 2.5)   # 尾 run 高下限(pt, 排扫描噪点)
@@ -6329,7 +6366,7 @@ QSF_MIN_AR = float(os.environ.get('VERT_QSF_MIN_AR') or 1.3)     # corner: 宽�
 QSF_OPEN_BIAS = float(os.environ.get('VERT_QSF_OPEN_BIAS') or 0.0)
 QSF_MAX_AR = float(os.environ.get('VERT_QSF_MAX_AR') or 4.0)     # corner: 宽高比 上限  # 单字形最小尺寸/字格(排碎墨)
 _qsf_stat = {'cand': 0, 'corner': 0, 'replace': 0, 'append': 0, 'ring': 0, 'bar': 0, 'ctx_skip': 0,
-             'other': 0, 'norun': 0}
+             'other': 0, 'norun': 0, 'pos_skip': 0, 'pair_skip': 0, 'num_skip': 0}
 _qsf_log = []
 
 def _qsf_analyze(g):
@@ -6374,18 +6411,80 @@ def _qsf_classify(f, cell_pt, px_per_pt=2.0):
         return 'ring', desc
     return 'other', desc
 
-def _qsf_decide(ch, tail_cls, prev_cls):
-    """尾格形状 + 文本末字 -> 'replace'(1:1 换) / 'append'(补一字) / None(不动)。纯函数。"""
+_QSF_OPENERS = set('「﹁『﹃')
+_QSF_CLOSERS = set('」﹂』﹄')
+
+def _qsf_pairs_state(text):
+    """列文本的引号配对状态 -> (depth, has_quote)。
+    depth>0 = 有未闭合的开引号（append 允许）；
+    depth==0 且 has_quote=True = 本列内引号已闭合（append 禁止，t13 双 ﹂﹂）；
+    has_quote=False = 本列没有引号字符，引号对可能在**别的列**（如 p620 的歌曲收尾列只写
+      「你撇的人…！」），此时不拦，交给位置闸门 + 源墨形状判据。"""
+    openers = set('「﹁『﹃')
+    closers = set('」﹂』﹄')
+    depth = 0
+    has = False
+    for c in (text or ''):
+        if c in openers:
+            depth += 1; has = True
+        elif c in closers:
+            has = True
+            if depth:
+                depth -= 1
+    return depth, has
+
+def _qsf_pos_ok(tail_y, top, n, step, tol=None):
+    """补字位置闸门（纯函数，t13）：源墨 run 顶必须落在**本列末字附近**。
+    top = 本列首字锚点(页顶向下 pt), n = 本列字数, step = 字步进(pt), tail_y = 源墨 run 顶(pt)。
+    返回 True = 允许在该源墨处补字；False = 该墨在列中段（补出来会错位成「：﹂」「西﹂門」）。"""
+    if tol is None:
+        tol = globals().get('QSF_POS_TOL', 2.5)
+    if n <= 0 or step <= 0:
+        return False
+    last_y = (top or 0.0) + (n - 1) * step
+    return tail_y >= last_y - tol * step
+
+def _qsf_decide(ch, tail_cls, prev_cls, text=None):
+    """尾格形状 + 文本末字 + 引号对状态 -> 'replace'(1:1 换) / 'append'(补一字) / None(不动)。纯函数。
+    t13：append 前必须过两道闸门 —— ①文本层该对引号尚未闭合（QSF_PAIR_GUARD）
+    ②源墨 run 落在末字附近（位置闸门在 _qsf_plan 里做）。句末标点扩到 。！？；。
+    """
     if tail_cls == 'corner_open':
         return None          # 开引号位置：不是闭引号，不动（见 QSF_OPEN_BIAS 注释）
 
     if tail_cls != 'corner':
         return None
     if ch == '一':
+        # t13：① 文本层引号对已闭合时，末尾的「一」更可能是真「一」/页码一，不再 1:1 换引号
+        #   （battle2 p85「…都休。」一」曾因此变成双 ﹂﹂）；
+        #   ② 末尾两个字符都是汉字数字（章回行 + 页码，如「…蔣竹山二六一」）时也不换。
+        if globals().get('QSF_PAIR_GUARD', True) and text is not None:
+            _d, _has = _qsf_pairs_state(text)
+            if _has and _d == 0:
+                _st = globals().get('_qsf_stat')
+                if isinstance(_st, dict):
+                    _st['pair_skip'] = _st.get('pair_skip', 0) + 1
+                return None
+        if text is not None and len(text) >= 2 and all(c in '一二三四五六七八九十百千〇' for c in text[-2:]):
+            _st = globals().get('_qsf_stat')
+            if isinstance(_st, dict):
+                _st['num_skip'] = _st.get('num_skip', 0) + 1
+            return None
         return 'replace'
-    if ch == '。' and prev_cls == 'ring' and QSF_APPEND:
+    if not globals().get('QSF_APPEND', True):
+        return 'replace' if ch == '。' else None
+    if ch == '。' and prev_cls != 'ring':
+        return 'replace'     # 末字「。」本身就是源墨那个字形（不是「句号 + 引号」）-> 1:1 换
+    if ch in ('。', '！', '？', '；'):
+        if globals().get('QSF_PAIR_GUARD', True) and text is not None:
+            _d, _has = _qsf_pairs_state(text)
+            if _has and _d == 0:
+                _st = globals().get('_qsf_stat')
+                if isinstance(_st, dict):
+                    _st['pair_skip'] = _st.get('pair_skip', 0) + 1
+                return None  # 本列引号已闭合：不得在已闭合后再补（t13 双 ﹂﹂）
         return 'append'
-    return 'replace'
+    return None
 
 def _qsf_win_x(sl, ink_w):
     """取样 x 窗(px, 2x): 槽中心 ±0.75 x 本槽宽。**不能直接用槽带** —— 实测槽格是标定后的均匀
@@ -6551,7 +6650,16 @@ def _qsf_plan(pi, sl, step, m, ch, text=None):
     _qsf_stat['cand'] += 1
     if cls in _qsf_stat:
         _qsf_stat[cls] += 1
-    act = _qsf_decide(ch, cls, prev_cls)
+    act = _qsf_decide(ch, cls, prev_cls, text)
+    # t13 位置闸门：补字必须落在**本列末字附近**的源墨上。合并列/短列会让槽底落在列中段，
+    #   此时 tail run 是列中某个引号的墨 -> 补出来就是「：﹂」「西﹂門」这类错位（battle2 B 类主因）。
+    if act == 'append' and text:
+        if not _qsf_pos_ok(tail[0], sl.get('top'), len(text), step):
+            _qsf_stat['pos_skip'] += 1
+            if QSF_DBG:
+                print('    [QSF] p%d 列x%.1f 末字%r 源墨y%.1f 早于末字y%.1f %.1f步进 -> 位置闸门跳过'
+                      % (pi + 1, sl['x0'], ch, tail[0], _last_y, (tail[0] - _last_y) / step))
+            return None
     if QSF_DBG:
         print('    [QSF] p%d 列x%.1f-%.1f top%.1f bot%.1f step%.2f 末字%r 尾墨y%.1f-%.1f %s 前条=%s -> %s'
               % (pi + 1, sl['x0'], sl['x1'], sl.get('top') or 0.0, sl.get('bot') or 0.0, step,
