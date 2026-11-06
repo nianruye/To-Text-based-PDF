@@ -38,7 +38,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 | 11 | [11_short_col_punct_cell.md](11_short_col_punct_cell.md) | **短列检出（又曰：类低覆盖短列）** + **标点占格口径按本书标定** + 引號类小墨修剪：覆盖率分母换成「本行自身墨迹窗」+ 密度/字高三道判据；`PUNCT_CELL` 由源图逐槽反推（wz7=1 占格 / wz6=0 挤格） | §1.0a0 L146-220、§1.976 L2390-3186、`_trim_marks` L3269、`col_puts` L3997、`_calib_punct_cell` L7010；测试 `test_vert_taskS.py` | key54 两个 `又曰：` 落位 Δ≤2pt、空隙 4/5 列与源书同位置同格数、wz7 300 页 PASS（字符量 98.2%→98.4%）、wz6 逐字节零回归 |
 | 12 | [12_punct_ink_calib.md](12_punct_ink_calib.md) | **标点墨迹口径标定**（尺寸/格内位置/锚点）：`PUNCT_CELL` 提前到采样之前 + 占格书标点样本按「格内墨心」取（不再靠 DP 预测，否则命中前字笔画碎片）+ 不做尺寸窗筛选（保 `！：；？`）+ NF 的 `PUNCT_INK` 改用探针渲染实测墨心（与 tate 实际字形同源） | §1.956：`_calib_own_marks` L7184、`_calib_punct_ink` L6990（调用 L7574）、`_calib_src_page` L7222/L7486、`_calib_punct_cell` L7010；消费端 `col_puts` L3997；测试 `test_vert_taskT.py` | 15 页 1717 条双侧实测：标点墨心绝对位置差 −11.25pt→**−0.25pt**、相对前字 −10.00→**+1.00pt**、墨高差 0.00pt；wz7 300 页 PASS（字符量 128683 与基线逐页相同）、wz6 逐字节零回归 |
 | 15 | [15_vert_dash_rule.md](15_vert_dash_rule.md) | **竖排破折号 = 源图墨迹实测的一条连续竖线**（taskD / R2）：相邻两个 `—` = 源图同一墨块 -> 一条 rule；线长/线位/线心/线宽全实测；文本层保留原 `—`（3 Tr 不可见）；读不到墨段 -> 兜底每字 1.0 step 并登记 | §1.0a4 L291-452（`DASH_*` L321-332 / `_dash_rule_on` L336 / `_dash_runs` L347 / `_dash_ink_seg` L365 / `_dash_rule_tex` L433 / `_fg_origin_shift` L445）、`_put_tex(invisible=)` L601、`col_puts` L3997（`_rule_h` L4116）；测试 `test_vert_dash_rule.py` | p57 产物 80.00pt=**1.255 step**（源图 1.259）、线位 Δ≤0.25pt、空隙 **0.00pt**；p29 逐字节不变；wz6 md5 `ae9d2f52` 零回归 + `all` 模式逐书实测 1.85-1.98；**590 测试全绿（battle8 时点）** |
-| 16 | [16_missing_char_insert.md](16_missing_char_insert.md) | **missing_char 缺字 1:1 插入**（battle6–8）：汉字/引号漏识按 `docs/vert_taskF_missed_fix.json` 逐条插入；上下文重定位三步（子串 → pos−shift → 跳过）；与 QSF/fix_split_brackets/dash/ring 的互斥与去重；每条源图裁片证据 | §1.0a5 L453-647（`MISSED_FIX` L313-320/`_relocate_missing` L480/`_apply_missed_fix` L512/`_br_shift` L983-988）；数据 `docs/vert_taskF_missed_fix.json` | v38 verify PASS（931,178 字 / +72）、72 引号 + 58 汉字逐条证据、无双引号/QSF 925 条不变、wz6 零回归、pytest 590 |
+| 16 | [16_missing_char_insert.md](16_missing_char_insert.md) | **missing_char 缺字/标点串 1:1 插入**（battle6–9）：汉字/引号/标点串按 `docs/vert_taskF_missed_fix.json` 逐条插入；`ch` 1–2 字符、增量 `len(ch)`；上下文重定位三步（子串 → pos−shift → 跳过）；source 含 api_strip / quote / census / punct；与 QSF/fix_split_brackets/dash/ring 的互斥与去重；**dash 边界**（`——` 走 missing_char，§1.0a4 画一条线） | §1.0a5 L453-647（`MISSED_FIX` L313-320/`_relocate_missing` L480/`_apply_missed_fix` L512/`_br_shift` L983-988）；dash 锚点 `DASH_CHARS` L321 / `_dash_rule_on` L336 / `_dash_runs` L347 / `_dash_ink_seg` L365 / `_dash_rule_tex` L433；数据 `docs/vert_taskF_missed_fix.json` | v40 verify PASS（931,190 字 / +12 vs v38）、150 条（58+11+72+6+3）、无双引号/QSF 925 条不变、p57 dash 1 条线、wz6 零回归、pytest 590 |
 
 ## 特殊行与影印页（§1.995，taskR / taskR2）实现锚点
 
@@ -211,16 +211,17 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 > （实测 `vert.tex` md5 逐字节相同）；`_trim_marks` ④ 同理（该函数只被 `page_puts` 调用）。
 > 目录页的补救路径改动默认关，开启会丢字（见 13 §4）。行号以函数名为准。
 
-## missing_char（battle6–8，spec 16）实现锚点
+## missing_char（battle6–9，spec 16）实现锚点
 
 | 分部 | 内容 | 锚点（2026-11-06 实测） |
 |---|---|---|
 | 16_missing_char §16.3 | 默认数据路径 / `=0` 关闭 / 缺失关闭 | `MISSED_FIX` L313-320 |
 | 16_missing_char §16.3 | 重定位三步（上下文子串 → pos−shift → 跳过并记日志） | `_relocate_missing` L480 |
-| 16_missing_char §16.3 | 分组/列匹配/按 pos 排序/1:1 插入 | `_apply_missed_fix` L512；missing_char 分支 L556-570 |
+| 16_missing_char §16.3 | 分组/列匹配/按 pos 排序/`len(ch)` 插入（1–2 字符） | `_apply_missed_fix` L512；missing_char 分支 L556-570 |
 | 16_missing_char §16.3 | 行首闭引号移走数（`_br_fix` → `_br_shift`） | L969-988（`_br_shift` L983；`_MISSED_ST` L988） |
 | 16_missing_char §16.4 | 小书保护（`len(keys) < 1000` 跳过）/ 未匹配/失败日志 | `_apply_missed_fix` L556-570、L596 |
-| 16_missing_char §16.7 | 验收：verify_vert + 逐条证据 + 无双引号 + QSF 925 条不变 + wz6 零回归 | 见 [16_missing_char_insert.md](16_missing_char_insert.md) §16.7 |
+| 16_missing_char §16.4.1 | dash 边界：`class=dash` 仅列首前置；列中/标题行 `——` 走 missing_char，dash rule 画一条线 | `_dash_runs` L347 / `_dash_ink_seg` L365 / `_dash_rule_tex` L433 / `_put_tex(invisible=)` L601 |
+| 16_missing_char §16.7 | 验收：verify_vert + 逐条证据 + 无双引号 + QSF 925 条不变 + p57 1 条线 + wz6 零回归 | 见 [16_missing_char_insert.md](16_missing_char_insert.md) §16.7 |
 
 > `missing_char` 目前只由 `build_vert.py` 消费；`fix_tounicode_circled.py` 只读 `class=ring`，
 > 故不属跨工具契约（PIPELINE_BEHAVIOR 不改；理由见 spec 16 §16.8）。

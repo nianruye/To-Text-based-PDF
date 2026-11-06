@@ -27,8 +27,8 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
-| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线 / 16 missing_char 缺字 1:1 插入（battle6–8））；验证脚本 `src/test/verify_vert.py` |
-| [vertical/16_missing_char_insert.md](vertical/16_missing_char_insert.md) | missing_char 缺字 1:1 插入（battle6–8）：数据契约（page/col/pos/ch/source/confidence/ratio/exp_len/text/api/crop/cell/feat/complete 等）/ 重定位三步（上下文 → pos−shift → 跳过）/ 不插条件 / 源图证据 / 与 QSF·fix_split_brackets·dash·ring 的互斥去重；battle7 58 汉字 → v37、battle8b 72 引号 → v38 |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线 / 16 missing_char 缺字/标点串 1:1 插入（battle6–9））；验证脚本 `src/test/verify_vert.py` |
+| [vertical/16_missing_char_insert.md](vertical/16_missing_char_insert.md) | missing_char 缺字/标点串 1:1 插入（battle6–9）：数据契约（page/col/pos/ch/source/confidence/ratio/exp_len/text/api/crop/cell/feat/verdict/strip/shape/complete/note 等；`ch` 1–2 字符、增量 `len(ch)`）/ 重定位三步（上下文 → pos−shift → 跳过）/ 不插条件 / 源图证据 / 与 QSF·fix_split_brackets·dash·ring 的互斥去重 + **dash 边界**（`——` 走 missing_char，dash rule 画一条线）；battle7 58 汉字 → v37、battle8b 72 引号 → v38、battle9 6 普查汉字 + 3 标点串 → v40 |
 | [docs/vert_wz7_layout3_report.md](../docs/vert_wz7_layout3_report.md) | 竖排 wz7 300 页版面元素报告（taskR 实现西文行/标题署名/影印页贴图 + taskR2 西文行紧凑化口径：拉丁 TFM 字体、破折号按 run 实测长、bp↔TeX pt 换算、逐片基线；含四项复核的实测对账与影印页普查分离度） |
 | [docs/vert_dash_rule_report.md](../docs/vert_dash_rule_report.md) | 竖排破折号源图实测竖线报告（taskD / R2：相邻两 `—` = 同一墨块 -> 一条 rule，线长/线位/线心/线宽全实测 + FG 原点偏移修正；p57 1.255 step（源 1.259）/ Δ≤0.25pt / 空隙 0.00pt；p29 逐字节不变；wz6 默认零回归 + `all` 模式逐书实测 1.85-1.98；含 p57 产物侧间隙不可满足的反证与假破折号数据审计建议） |
 | [docs/vert_taskE_census_report.md](../docs/vert_taskE_census_report.md) | 全书普查「OCR 漏识的占整格元素」（taskE：连通域 + y 聚簇 + 首/末格形状 + OCR 边字对账；全书 dash **1 处**（p1683 3.0×28.0）、ring **36 处/15 页**（p1682-1721 句末圈号）、other 0；反例 p1742 異體字表 / p29 西文页 / p100/p400/p1000 = 0；工具 `src/tools/census_missed_cells.py`，交付 JSON `docs/vert_taskE_census.json`；未改渲染端） |
@@ -44,6 +44,11 @@
 | [docs/battle6_missing_chars.md](../docs/battle6_missing_chars.md) | 竖排真实缺字回收报告（battle6：异体字归一化 + 检测加严 F1–F5 + 241 列 API 抽样；列框外整字漏识 ≈1、列内真插入 12（汉字 3）/ 抽样外推 300-400；下一阶段全量 API 计划） |
 | [docs/battle7_missing_chars.md](../docs/battle7_missing_chars.md) | battle7 58 处汉字缺字落库报告（t27 hanzi_list → t28：57 新增 + 1 去重（p634 籤），missing_char 12→69；v37 重建 + verify PASS（931,106 字 / +57）；wz6 零回归、pytest 590） |
 | [docs/battle8_quotes.md](../docs/battle8_quotes.md) | battle8b 引号类漏识落库报告（t34：96 条 punct_list 全查 → 72 条落库（70 」+2 「；43 条 —— 按角形重判）；v38 重建 + verify PASS（931,178 字 / +72）；无双引号、QSF 925 条决策不变、wz6 零回归） |
+| [docs/battle9_census.md](../docs/battle9_census.md) | battle9 非候选列全书普查报告（t37：23,775 列 / 2,972 页 / 100 批；same 18,739 / other 4,934 / nonchar 45 / true_insert 57；16 条完整汉字候选，逐条 page/col/cell/ch/crop；`api_battle9.json` md5 `77327304…`） |
+| [docs/battle9_fix.md](../docs/battle9_fix.md) | battle9c 破折号 + 引号落库报告（t40：p57 `——` 走 missing_char 由 dash rule 画一条线（80.0pt/1.255 step）；p186 `」。`、p147 `」，`；p1330 噪点不落；v39 verify PASS 931,184 / +6） |
+| [docs/battle9d_census_fix.md](../docs/battle9d_census_fix.md) | battle9d 16 条普查汉字复核落库报告（t41：6 落（p68 尚/p932 人/p1219 纖/p1419 慌/p1678 步/p1703 四）、10 不落（重复/异体/源无/圆圈/泓/OCR 誤读）；v40 verify PASS 931,190 / +12 vs v38） |
+| [docs/battle9e_acceptance.md](../docs/battle9e_acceptance.md) | battle9 独立验收报告（t42：v39/v40 复跑、p57 源墨四道比值、16 条自裁、wz6/pytest；内容等价 R1、p57 线宽 R2、p1678 抄/投 R3） |
+| [docs/battle9e_review.md](../docs/battle9e_review.md) | battle9 终审报告（t43：verdict pass；独立复跑 build40/verify/wz6/pytest，v39 3 条 + v40 16 条逐条核对，字节绑定/token；R1–R4 残留，R4 spec 16 已在 t44 更新） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
 | [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
 | [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（14 函数契约；battle1 更正 #1/#2 旧契约、补 is_heading_by_md、刷新行号锚点） |
