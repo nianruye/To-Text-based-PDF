@@ -27,8 +27,9 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
-| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线 / 16 missing_char 缺字/标点串 1:1 插入（battle6–9））；验证脚本 `src/test/verify_vert.py` |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线 / 16 missing_char 缺字/标点串 1:1 插入（battle6–9） / 18 圈码普查与读数三层方案）；验证脚本 `src/test/verify_vert.py` |
 | [vertical/16_missing_char_insert.md](vertical/16_missing_char_insert.md) | missing_char 缺字/标点串 1:1 插入（battle6–9）：数据契约（page/col/pos/ch/source/confidence/ratio/exp_len/text/api/crop/cell/feat/verdict/strip/shape/complete/note 等；`ch` 1–2 字符、增量 `len(ch)`）/ 重定位三步（上下文 → pos−shift → 跳过）/ 不插条件 / 源图证据 / 与 QSF·fix_split_brackets·dash·ring 的互斥去重 + **dash 边界**（`——` 走 missing_char，dash rule 画一条线）；battle7 58 汉字 → v37、battle8b 72 引号 → v38、battle9 6 普查汉字 + 3 标点串 → v40 |
+| [vertical/18_ring_digit_census.md](vertical/18_ring_digit_census.md) | 圈码普查与读数三层方案（battle1/4/5 方法 implemented；参数化/一键化/读数去人工化 planned）：数据契约（fix JSON `class=ring` 的 page/col/source_x/y/number/situation/text/measure 等；situation 1 替换 / 2 追加；占位符 chr(0xE100+n) 不落库）/ 五步流程（检测→读数→序列→落库渲染→验证）/ 读数三层（模板兜底 → **PaddleOCR-VL 带上下文条带** → 序列+人工兜底；孤立裁片会读成 E/ETI 的教训）/ 序列（非降 + LNDS 锚点；页边界合法回退）/ 换书复用清单（阈值相对化、工具路径参数化、一键流程、读数去人工化）；§2 仅列 wz7 参考基线（184→352 / 34 / 21 / 16→2 / LOO 66% / p1720–1723 78/76/77/76），不作判据 |
 | [docs/vert_wz7_layout3_report.md](../docs/vert_wz7_layout3_report.md) | 竖排 wz7 300 页版面元素报告（taskR 实现西文行/标题署名/影印页贴图 + taskR2 西文行紧凑化口径：拉丁 TFM 字体、破折号按 run 实测长、bp↔TeX pt 换算、逐片基线；含四项复核的实测对账与影印页普查分离度） |
 | [docs/vert_dash_rule_report.md](../docs/vert_dash_rule_report.md) | 竖排破折号源图实测竖线报告（taskD / R2：相邻两 `—` = 同一墨块 -> 一条 rule，线长/线位/线心/线宽全实测 + FG 原点偏移修正；p57 1.255 step（源 1.259）/ Δ≤0.25pt / 空隙 0.00pt；p29 逐字节不变；wz6 默认零回归 + `all` 模式逐书实测 1.85-1.98；含 p57 产物侧间隙不可满足的反证与假破折号数据审计建议） |
 | [docs/vert_taskE_census_report.md](../docs/vert_taskE_census_report.md) | 全书普查「OCR 漏识的占整格元素」（taskE：连通域 + y 聚簇 + 首/末格形状 + OCR 边字对账；全书 dash **1 处**（p1683 3.0×28.0）、ring **36 处/15 页**（p1682-1721 句末圈号）、other 0；反例 p1742 異體字表 / p29 西文页 / p100/p400/p1000 = 0；工具 `src/tools/census_missed_cells.py`，交付 JSON `docs/vert_taskE_census.json`；未改渲染端） |
@@ -41,6 +42,9 @@
 | [docs/battle1_horizontal.md](../docs/battle1_horizontal.md) | 横排 local-bug 清零报告（battle1：#1-#9 逐项实测核销 —— #1/#2/#5/#6/#7/#8 在 HEAD `bed0d25` 已修/已安全，#3/#4/#9 本轮收口；516->557 测试（本任务 +41；全量 562）；四书 geom + wz2 classic 改动前后重跑：逐页文本/行 bbox 0 差异、verify_geom JSON 逐字节相同、hard split 0 / missing 0） |
 | [docs/battle1_vertical_ring.md](../docs/battle1_vertical_ring.md) | 竖排两位数圈码判据重标定报告（battle1 P0-a：hole 必要条件证伪 -> 主块尺寸窗+四边墨闸门；184->352 处 / 段外 0 误报；p1704/1705/1706 圈码 49/50/51/52 渲染 + 文本层 ㊾/㊿ 码位；wz7 verify_vert PASS、wz6 md5 逐字节相同、562 测试） |
 | [docs/battle2_punct_audit.md](../docs/battle2_punct_audit.md) | 双管线标点禁则/配对审计报告（battle2：GB/T 15834—2011 规则表 + `punct_audit.py`；横排四书重跑 + 竖排 wz7 v30；A/B/C 三类归因 + p620 缺 」的 OCR 漏识定位 + 门禁建议） |
+| [docs/battle4_ring_digits.md](../docs/battle4_ring_digits.md) | battle4 圈内数字识别 + 年表序号非降校验报告（t18/t19：352 处圈码识别框架、27 处非降违反清单；7 处高置信落库 + t19 4 处区间唯一解；v33/v34 PASS、wz6 零回归、pytest 590） |
+| [docs/battle5_ring_hires.md](../docs/battle5_ring_hires.md) | battle5 圈码高清全量判定报告（t21：60 页 4700×7225 / align 6.65 px/pt；367 条判定、21 处读图改判、余 2 处页边界保留；v35 PASS 931,040、wz6 零回归、pytest 590） |
+| [docs/battle5_acceptance.md](../docs/battle5_acceptance.md) | battle5 独立验收报告（t22：对齐独立复测、v35 md5/verify、21 处改判误判 0、2 处页边界 78/76/77/76 清晰保留；wz6/pytest；R1–R5 低级别文档问题） |
 | [docs/battle6_missing_chars.md](../docs/battle6_missing_chars.md) | 竖排真实缺字回收报告（battle6：异体字归一化 + 检测加严 F1–F5 + 241 列 API 抽样；列框外整字漏识 ≈1、列内真插入 12（汉字 3）/ 抽样外推 300-400；下一阶段全量 API 计划） |
 | [docs/battle7_missing_chars.md](../docs/battle7_missing_chars.md) | battle7 58 处汉字缺字落库报告（t27 hanzi_list → t28：57 新增 + 1 去重（p634 籤），missing_char 12→69；v37 重建 + verify PASS（931,106 字 / +57）；wz6 零回归、pytest 590） |
 | [docs/battle8_quotes.md](../docs/battle8_quotes.md) | battle8b 引号类漏识落库报告（t34：96 条 punct_list 全查 → 72 条落库（70 」+2 「；43 条 —— 按角形重判）；v38 重建 + verify PASS（931,178 字 / +72）；无双引号、QSF 925 条决策不变、wz6 零回归） |
@@ -184,4 +188,38 @@ python3 src/test/verify_geom.py output/out.pdf data/wz2/wz2_spotting_coords.json
 2. 格式：目标/背景/方案/输入/输出/约束/测试点
 3. 更新本 README 索引
 4. 实现后写测试用例（`src/test/test_cases.py` 扩展）
+
+### 判据 / 数据分离（2026-11-06 治理规则）
+
+spec 是**换书也要能用**的契约；判定条件与本书实测数据必须分离：
+
+1. **判定条件不得使用绝对数字**（如 `14.5–19.5pt`、`0.040×F`、固定 px/页数）。必须写成相对量
+   （`×本页字步进` / `×页幅` / 无量纲比值），或注明「由源图/字体自标定」；确属实现默认值的，
+   在判据处标注「参数默认（参考值，非判据），换书需参数化」。
+2. **本书实测数据只能进「参考基线（本书实测）」小节**（条目计数、耗时、对账百分比、具体 pt 线宽/位置、
+   测试数等），每条标注 **书目 + 日期 + 来源报告**；正文判据只引用小节，不复制数字。
+3. **确属契约的绝对数字可保留**（如 `ch` 长度 1–2、`source` 枚举、字段名、坐标空间），但必须注明「契约值」。
+4. 新增/修改 spec 时按此规则写；发现旧文档混入时，按「原位置 → 新位置」清单归位，**不改判据语义**。
+
+**本轮归位清单（2026-11-06；只移动/加注，不改判据语义）**：
+
+| spec | 原位置 | 新位置 | 内容（保留） |
+|---|---|---|---|
+| 16 | §16.1 数据总量/构成；§16.2 `ch` 条数、字段族条数、t24 条数；§16.4.1 p57/46/43/3；§16.5 抽样数/倍率；§16.6 QSF 925/696/229、ring 367/150、dash 46/43/3、census/punct 条数；§16.7 +57/+72/+12、925、wz6 md5/231 | **§16.10 参考基线** | 150=69+72+6+3、147 单+3 双、QSF 925、+57/+72/+12、931,190、46→43、p57/p186/p147、p1330/p1560、抽样 24/12/16、wz6 基线 |
+| 16 | §16.2 side/confidence 当前值；§16.3 0.6/1000/3 条；§16.5 8×/600dpi/≥10；§16.2 0.55；§16.2 去重 ±2pt | **§16.10.1 参数默认（参考值，非判据）** | 列框容差 0.6pt、上下文 8+8、小书 1000 页、完整字块 0.55×步进、裁片 8×/600dpi、去重 ±2pt |
+| 16 | §16.6 `fix_split_brackets` 的 p1241/p1399 例 | **§16.10** | 重定位实测（依依不/茶筍→依不依/筍茶） |
+| 09 | §2 耗时 2.3s/0.8s/16.9→17.7；§6 全部实测（12/0.863/0.658/…/68412/1.009/0.960/28/277） | **§13.1 taskM/wz6** | 标定耗时、对账表、verify/覆盖率、测试计数 |
+| 09 | §8.2 21 项 0.0000%；§8.3 wz6 内框缘 567.8/45.5；§8.4 线簇 1.50/3.50-4.50→2.45/6.75、206 条 0.833/1.068；§8.7 100 页预检/16 页降级原因；§8.8 零回归/21 项/296 测试 | **§13.2 taskN/wz6+wz7** | 21 项等价性、页边带、线宽自标定、wz7 预检、零回归、测试 |
+| 09 | §9.2 混纸型页幅/页宽比例 92.4%/87%；§9.3 p406 1.203/−184/1.12、p407 90°；§9.5 24 页验收 | **§13.3 taskO/wz7** | 922×1437 / 892×1323 / 705×1084、92.4%/87%、p406/p407 仿射例、98.8%/0.01%/列数 17 vs 16/34.1 vs 33.7/316 测试 |
+| 09 | §10 验收 300 页 | **§13.4 taskP/wz7** | 98.7%/丢失 0/越界 1/页幅 0.01% |
+| 09 | §11 文本框比例、列带证据、伪版心夹回 | **§13.5 taskP2/wz7** | 1.734F/1.006F/2.740F/4.9pt、4pt/3 条/3pt、p182 −138.8/8pt、705pt 页 214pt 越界 |
+| 09 | §12.1–12.5 逆映射/梳状/窗外扩/重试例证；§12.6 验收 | **§13.6 taskQ/wz7** | 224/250、193/146、2/250→221/250、p30 109/89.5、245/52/348/39、p254 14.6/95、p130 84、p214 62/52/22、p24 82/103/123、300 页 99.5%/336 测试 |
+| 15 | §1 p57 127.44pt/80.2pt/1.26 格；§5 p57 5.37/5.38；§7 验收全表 | **§9.1/§9.2 参考基线** | p57 线长/线位/线宽/空隙/邻字间隙、wz6/wz7/p29 回归、506 测试 |
+| 15 | §3 1.26；§4 0.040；§6 env 默认 0.040/1.26；§8 遗留证据 | **§9.3 参数默认（参考值，非判据）/§9.4 证据** | 0.040×F、1.26、线宽 5.25/2.78、间隙 2.093/1.479 step、88/87/1019 条 |
+
+> 扫描范围：`spec/vertical/*.md`。除 16/09/15 外，发现以下**候选**（均在 in-scope 之外，本轮未改，避免扩大改动面）：
+> 02_tate_layout §1.9 的 47.6pt 例、03_marginalia 的 4-40px/5-90px、04_frame_lines 的 0.30/36pt/12 列/799pt、
+> 06_derot 的 300px、14_quote_shape_fix 的 185 灰度等；它们多为**实现默认参数/实测例**，非本书数据清单。
+> 07/10/11/12/13 的实测数字主要位于「验收/实测/报告引用」小节。以上列入后续 backlog，按同规则逐文迁移。
+
 - taskP：wz7《金瓶梅詞話》300 页全量建排（无版框书第二本实战交付）—— 见 [docs/vert_wz7_300_report.md](../docs/vert_wz7_300_report.md) / [spec/vertical/09_calibration.md](vertical/09_calibration.md) §10。状态：implemented（2026-10-16）。
