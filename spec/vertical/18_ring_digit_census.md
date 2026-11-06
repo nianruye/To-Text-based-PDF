@@ -38,7 +38,7 @@
 |---|---|---|---|
 | `class` | str | 是 | 固定 `"ring"`（与 `dash` / `missing_char` 并列） |
 | `page` | int | 是 | 1-based 源页号；必须在 `1..len(keys)` 内 |
-| `col` | [x0,y0,x1,y1] | 是 | 该列 **OCR 列框（PDF pt，页左上原点）**；运行时把 OCR coords（144dpi px）`/2` 转到同一 pt 坐标系，用**小容差**与当前列框匹配；**当前实现为固定 0.6pt（`_apply_missed_fix` L540；实现默认，参考值非判据），参数化 planned** |
+| `col` | [x0,y0,x1,y1] | 是 | 该列 **OCR 列框（PDF pt，页左上原点）**；运行时把 OCR coords（144dpi px）`/2` 转到同一 pt 坐标系，用**小容差**与当前列框匹配；**当前实现为固定 0.6pt（`_apply_missed_fix` L542；实现默认，参考值非判据），参数化 planned** |
 | `source_x` / `source_y` | number | 是 | 圈心（PDF pt，页左上原点）；必须落在该页纸幅内 |
 | `number` | int | 是 | **最终读数** 1–99（经 §1.3 序列校验/人工后的值；不是 OCR 原值） |
 | `situation` | int | 是 | `1` = 文本尾已有 OCR 数字（替换）；`2` = 整格漏识（追加）；其他值不落库 |
@@ -141,7 +141,7 @@
 - **输入**：第 3 步的最终 `number`/置信/依据 + 检测阶段的 `col/source_x/y/text` 证据。
 - **落库**：`class="ring"`，`situation` 1/2；`number` 为最终值；`col/source_x/y/text` 证据齐全；
   `situation=1` 的文本尾数字只用于定位，替换为占位符；`situation=2` 追加占位符。
-- **运行时**（`_apply_missed_fix`）：按 `(page, col)` 分组；与当前列框小容差匹配（当前固定 0.6pt，L540；实现默认，参考值非判据）；page 越界/列未匹配 → 跳过 + 日志，
+- **运行时**（`_apply_missed_fix`）：按 `(page, col)` 分组；与当前列框小容差匹配（当前固定 0.6pt，L542；实现默认，参考值非判据）；page 越界/列未匹配 → 跳过 + 日志，
   **不做部分落库**；一个 ring 只产生一个占位符。situation=1 若文本尾无数字 → 打日志并**改走 situation 2 追加**（fallback）。
 - **渲染**（`_ring_put`）：
   - `number ≤ 50`：Unicode 圈码字形（①–⑳ / ㉑–㉟ / ㊱–㊿），整圆、不做横向压缩；
@@ -217,7 +217,7 @@
 | 4 | 检测 DPI | 工具默认 600，可 `VERT_RING_DPI=900` | 固定 DPI/内存 | 按源扫描分辨率选 ≥2× 过采样；参数化 | 部分 |
 | 5 | 工具路径 | `census_ring_digit.py` 硬编码 `data/wz7_full/...`、`source_pdf/wz7.pdf`、`tmp_vert/cj5` | 换书即改代码 | 加 `--lines/--coords/--src/--out/--pages`；env 覆盖 | planned |
 | 6 | 一键流程 | 检测、API 条带、判定、人工、fix JSON、build 分散 | 无 wrapper；步骤间人工搬 JSON | 一条 `ring_census.py --book ...` 串起 §1.3 五步 | planned |
-| 7 | API 条带 | `api_candidates_all_build/run.py` 已有「8 条/页、30 页/批」通道 | 条目是**整列上下文**，非圈码专用 5 格条带 | 参数化条带高=5 格、圈居中；复用同一 API/凭证 | planned |
+| 7 | API 条带 | `api_candidates_all_build/run.py` 已有「8 条/页、30 页/批」通道；**t56 已参数化**（`--book/--data-dir/--src/--cols-per-page/--pages-per-batch/--strips-dir`，wz7 默认向后兼容） | 条目是**整列上下文**，非圈码专用 5 格条带 | 参数化条带高=5 格、圈居中；复用同一 API/凭证 | **部分（通道参数化 implemented；圈码专用条带 planned）** |
 | 8 | 读数去人工化 | 模板 LOO 66%；battle5 人工 21 条；序列+人工兜底 | 模板不足；API 圈码专用条带未接 | 先 API 条带为主，模板只作交叉校验；人工只处理低置信/冲突 | planned |
 | 9 | 序列语义 | 年表非降 + LNDS 在 battle4/5 已跑通，但为**临时脚本**；`src/tools` 无 LNDS/非降工具 | 无复用工具；「非降」是本书年表假设 | 抽成可复用工具（可开关/按段配置）；无年表书只做读数+人工 | 部分（临时脚本；工具化 planned） |
 | 10 | 落库/渲染 | `class=ring`；situation 1 替换/2 追加；≤50 Unicode、>50 合成 | 3 位圈码/其他圈形未覆盖；RING_SIZE 默认 wz7 比例 | 扩展 number 范围/字形；按书标定 RING_SIZE | 部分 |
@@ -235,14 +235,14 @@
 | 项 | 位置 |
 |---|---|
 | `RING_INS_BASE` / `RING_SIZE` | `build_vert.py` L304 / L305 |
-| `_ring_ins_num` / `_ring_put` | L454 / L460 |
-| `_apply_missed_fix`（ring 分支） | L512 起；ring 分支 **L574–596**（597–598 是统计 print） |
-| `_apply_missed_fix` 列匹配容差 0.6pt | L540 |
-| 圈码渲染调用（`_ring_put`） | L4176–4178 |
-| `MISSED_FIX`（默认路径/关闭） | L313–320 |
+| `_ring_ins_num` / `_ring_put` | L456 / L462 |
+| `_apply_missed_fix`（ring 分支） | L514 起；ring 分支 **L576–598**（600 是统计 print） |
+| `_apply_missed_fix` 列匹配容差 0.6pt | L542 |
+| 圈码渲染调用（`_ring_put`） | L4178–4180 |
+| `MISSED_FIX`（默认路径/关闭） | L313–322（MIN_PAGES 常量 L316） |
 | `ring_judge.py`：`P_V1` / `P_V2` / `judge_v1` / `judge_v2` | L19 / L21 / L33 / L40 |
 | `census_ring_digit.py`：默认路径 / `ring_at` / 输出 | L59–61 / L141 / L230 |
 | `api_candidates_all_run.py`：`JOB` / `PAYLOAD` / `submit` / `poll` / `parse` | L7 / L8 / L13 / L24 / L34 |
 | `api_candidates_all_build.py`：`main`（8 条/页、30 页/批） | L13 |
 
-> 锚点以函数/常量名为准；`build_vert.py` 当前 8007 行（未改）。换书/改工具后按同样方法重测。
+> 锚点以函数/常量名为准；`build_vert.py` 当前 **8009 行**（t56 加 `VERT_MISSED_FIX_MIN_PAGES` 常量 +2 行）。换书/改工具后按同样方法重测。

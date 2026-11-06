@@ -58,9 +58,14 @@ def parse(url, n_slots, slot_xs):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--plan', default='tmp_vert/battle6/pilot25_plan.json')
-    ap.add_argument('--out', default='tmp_vert/battle6/api_pilot_25_raw.json')
+    ap.add_argument('--book', default='wz7')
+    ap.add_argument('--out-dir', default=None, help='默认 tmp_vert/battle6（wz7）/ tmp_vert/{book}')
+    ap.add_argument('--plan', default=None, help='默认 {out-dir}/pilot25_plan.json')
+    ap.add_argument('--out', default=None, help='默认 {out-dir}/api_pilot_25_raw.json')
     a = ap.parse_args()
+    out_dir = a.out_dir or ('tmp_vert/battle6' if a.book == 'wz7' else f'tmp_vert/{a.book}')
+    a.plan = a.plan or os.path.join(out_dir, 'pilot25_plan.json')
+    a.out = a.out or os.path.join(out_dir, 'api_pilot_25_raw.json')
     tok = open('/tmp/paddle_token').read().strip()
     headers = {'Authorization': 'bearer ' + tok}
     plan = json.load(open(a.plan, encoding='utf-8'))

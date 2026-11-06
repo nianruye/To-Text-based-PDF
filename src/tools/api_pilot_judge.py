@@ -46,10 +46,16 @@ def judge(ocr, api):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--items', default='tmp_vert/battle6/pilot25_items.json')
-    ap.add_argument('--polys', default='tmp_vert/battle6/api_pilot_25_polys.json')
-    ap.add_argument('--out', default='tmp_vert/battle6/api_pilot_25.json')
+    ap.add_argument('--book', default='wz7')
+    ap.add_argument('--out-dir', default=None, help='默认 tmp_vert/battle6（wz7）/ tmp_vert/{book}')
+    ap.add_argument('--items', default=None, help='默认 {out-dir}/pilot25_items.json')
+    ap.add_argument('--polys', default=None, help='默认 {out-dir}/api_pilot_25_polys.json')
+    ap.add_argument('--out', default=None, help='默认 {out-dir}/api_pilot_25.json')
     a = ap.parse_args()
+    out_dir = a.out_dir or ('tmp_vert/battle6' if a.book == 'wz7' else f'tmp_vert/{a.book}')
+    a.items = a.items or os.path.join(out_dir, 'pilot25_items.json')
+    a.polys = a.polys or os.path.join(out_dir, 'api_pilot_25_polys.json')
+    a.out = a.out or os.path.join(out_dir, 'api_pilot_25.json')
     items = json.load(open(a.items, encoding='utf-8'))
     D = json.load(open(a.polys, encoding='utf-8'))
     slots = []

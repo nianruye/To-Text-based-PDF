@@ -48,16 +48,26 @@ def wilson(k, n, z=1.96):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--items', default='tmp_vert/battle6/all_items.json')
-    ap.add_argument('--raw', default='tmp_vert/battle6/api_candidates_all_raw.json')
-    ap.add_argument('--out', default='tmp_vert/battle6/api_candidates_all.json')
+    ap.add_argument('--book', default='wz7')
+    ap.add_argument('--out-dir', default=None, help='默认 tmp_vert/battle6（wz7）/ tmp_vert/{book}')
+    ap.add_argument('--items', default=None, help='默认 {out-dir}/all_items.json')
+    ap.add_argument('--raw', default=None, help='默认 {out-dir}/api_candidates_all_raw.json')
+    ap.add_argument('--out', default=None, help='默认 {out-dir}/api_candidates_all.json')
+    ap.add_argument('--src', default=None, help='默认 source_pdf/{book}.pdf')
+    ap.add_argument('--crops-dir', default=None, help='默认 {out-dir}/all_insert_crops')
     a = ap.parse_args()
+    out_dir = a.out_dir or ('tmp_vert/battle6' if a.book == 'wz7' else f'tmp_vert/{a.book}')
+    a.items = a.items or os.path.join(out_dir, 'all_items.json')
+    a.raw = a.raw or os.path.join(out_dir, 'api_candidates_all_raw.json')
+    a.out = a.out or os.path.join(out_dir, 'api_candidates_all.json')
+    a.src = a.src or f'source_pdf/{a.book}.pdf'
+    a.crops_dir = a.crops_dir or os.path.join(out_dir, 'all_insert_crops')
     items = json.load(open(a.items, encoding='utf-8'))
     raw = json.load(open(a.raw, encoding='utf-8'))
     import fitz
     from PIL import Image
-    src = fitz.open('source_pdf/wz7.pdf')
-    os.makedirs('tmp_vert/battle6/all_insert_crops', exist_ok=True)
+    src = fitz.open(a.src)
+    os.makedirs(a.crops_dir, exist_ok=True)
     slots = []
     for b in raw['batches']:
         if not b.get('ok'): continue
@@ -94,7 +104,7 @@ def main():
                 if hh < 4 or ww < 4: continue
                 if best is None or hh * ww > best[0]: best = (hh * ww, hh, ww, float((lab[s] == j).mean()))
             rec['cell'] = [round(it['col'][0], 1), round(ya, 1), round(it['col'][2], 1), round(ya + step, 1)]
-            cp = 'tmp_vert/battle6/all_insert_crops/%05d.png' % it['id']
+            cp = os.path.join(a.crops_dir, '%05d.png' % it['id'])
             Image.fromarray(arr.astype(np.uint8)).resize((96, 96), Image.LANCZOS).save(cp)
             rec['crop'] = cp
             if best:

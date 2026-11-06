@@ -312,6 +312,8 @@ for _n in range(36, 51):
     _CIRCLED_CP[_n] = 0x32B1 + _n - 36
 # taskF 修复数据(默认: 仓库 docs/ 下; 不存在则关闭; 可用 VERT_MISSED_FIX 覆盖, =0 关闭)
 MISSED_FIX = os.environ.get('VERT_MISSED_FIX')
+# 小书保护阈值(页数): 小于该值整类跳过 missing_char; 默认 1000, 显式 0 = 关闭保护
+MISSED_FIX_MIN_PAGES = int(os.environ.get('VERT_MISSED_FIX_MIN_PAGES') or 1000)
 if MISSED_FIX is None:
     _mf = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                        'docs', 'vert_taskF_missed_fix.json')
@@ -556,7 +558,7 @@ def _apply_missed_fix(path, br_shift=None):
             if it.get('class') == 'missing_char':
                 # battle6：列条带 API 复核出的 OCR 漏字，按 pos 1:1 插入（仅 wz7 类大书启用，
                 # 防止 wz6 小页被同号页误插；wz6 页数 231 < 1000）。
-                if len(keys) < 1000:
+                if len(keys) < MISSED_FIX_MIN_PAGES:
                     st['skip'] += 1
                     continue
                 ch = it.get('ch') or ''
