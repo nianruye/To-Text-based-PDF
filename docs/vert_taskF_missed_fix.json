@@ -15079,6 +15079,276 @@
     "h": 13.4,
     "fill": 0.646
    }
+  },
+  {
+   "class": "missing_char",
+   "page": 126,
+   "col": [
+    55.4,
+    204.4,
+    89.6,
+    1330.1
+   ],
+   "pos": 15,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 44,
+   "text": "武大娘子這手針線，這一表人物。西門慶道：「便是先妻也沒武大娘子這一般兒風流！」那婆子笑道",
+   "api": "武大娘子這手針線，這一表人物。」西門慶道：「便是先妻也沒武大娘子這一般兒風流！」那婆子笑道",
+   "crop": "tmp_vert/battle10/quotes/q00_p126_」.png",
+   "cell": [
+    55.4,
+    588.2,
+    89.6,
+    613.7
+   ],
+   "note": "battle10b: 角形复核 」 -> 」"
+  },
+  {
+   "class": "missing_char",
+   "page": 806,
+   "col": [
+    58.9,
+    131.0,
+    92.0,
+    1247.6
+   ],
+   "pos": 10,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 44,
+   "text": "刺的，你替他說說罷。西門慶道：「如今齊香兒拏了不曾？」桂姐道：「齊香兒他在王皇親宅裡躲着",
+   "api": "刺的，你替他說說罷。」西門慶道：「如今齊香兒拏了不曾？」桂姐道：「齊香兒他在王皇親宅裡躲着",
+   "crop": "tmp_vert/battle10/quotes/q01_p806_」.png",
+   "cell": [
+    58.9,
+    384.8,
+    92.0,
+    410.1
+   ],
+   "note": "battle10b: 角形复核 」 -> 」"
+  },
+  {
+   "class": "missing_char",
+   "page": 1178,
+   "col": [
+    447.7,
+    148.5,
+    472.4,
+    994.0
+   ],
+   "pos": 10,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "來，今日天氣寒冷些。須臾，左右火池火叉，拿上一包暖閣水磨細炭，向中間四方黃銅火盆內只一",
+   "api": "來，今日天氣寒冷些。」須臾，左右火池火叉，拿上一包暖閣水磨細炭，向中間四方黃銅火盆內只一",
+   "crop": "tmp_vert/battle10/quotes/q02_p1178_」.png",
+   "cell": [
+    447.7,
+    345.1,
+    472.4,
+    364.8
+   ],
+   "note": "battle10b: 角形复核 」 -> 」"
+  },
+  {
+   "class": "missing_char",
+   "page": 1178,
+   "col": [
+    246.8,
+    151.8,
+    270.7,
+    998.4
+   ],
+   "pos": 22,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "又拿上一道茶來吃了。何太監道：「叫小厮們來。原來家中教了十二名吹打的小厮，兩個師範領着",
+   "api": "又拿上一道茶來吃了。何太監道：「叫小厮們來。」原來家中教了十二名吹打的小厮，兩個師範領着",
+   "crop": "tmp_vert/battle10/quotes/q03_p1178_」.png",
+   "cell": [
+    246.8,
+    584.9,
+    270.7,
+    604.6
+   ],
+   "note": "battle10b: 角形复核 」 -> 」"
+  },
+  {
+   "class": "missing_char",
+   "page": 551,
+   "col": [
+    837.2,
+    212.7,
+    866.7,
+    1333.5
+   ],
+   "pos": 21,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.933,
+   "exp_len": 44,
+   "text": "口茶兒罷。我使迎春前頭叫個小廝，接你娘去。因把手中吃的那蓋木樨芝麻薰笋泡茶遮與他。那春梅",
+   "api": "口茶兒罷。我使迎春前頭叫個小廝，接你娘去。——因把手中吃的那盞木樨芝麻薫笋泡茶遮與他。那春梅",
+   "crop": "tmp_vert/battle10/quotes/q04_p551_——.png",
+   "cell": [
+    837.2,
+    747.6,
+    866.7,
+    773.1
+   ],
+   "note": "battle10b: 角形复核 —— -> 」"
+  },
+  {
+   "class": "missing_char",
+   "page": 818,
+   "col": [
+    747.9,
+    131.0,
+    781.0,
+    1250.2
+   ],
+   "pos": 23,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.978,
+   "exp_len": 44,
+   "text": "後面不去聽佛曲兒，兩口子且在房裡拌的甚麼嘴兒？陳經濟出來，看見二人。說道：「早是我沒曾罵",
+   "api": "後面不去聽佛曲兒，兩口子且在房裡拌的甚麼嘴兒？——陳經濟出來，看見二人。說道：「早是我沒曾罵",
+   "crop": "tmp_vert/battle10/quotes/q05_p818_——.png",
+   "cell": [
+    747.9,
+    716.0,
+    781.0,
+    741.5
+   ],
+   "note": "battle10b: 角形复核 —— -> 」"
+  },
+  {
+   "class": "missing_char",
+   "page": 1231,
+   "col": [
+    196.7,
+    237.4,
+    224.2,
+    1000.5
+   ],
+   "pos": 6,
+   "ch": "「",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.975,
+   "exp_len": 40,
+   "text": "」〔金字經〕夜迢迢，孤另另，冷清清，更靜初，不寄平安一紙書。腮邊流淚珠，不把佳期",
+   "api": "〔金字經〕「夜迢迢，孤另另，冷清清，更靜初，不寄平安一紙書。腮邊流淚珠，不把佳期",
+   "crop": "tmp_vert/battle10/quotes/q06_p1231_「.png",
+   "cell": [
+    196.7,
+    351.9,
+    224.2,
+    370.9
+   ],
+   "note": "battle10b: 角形复核 「 -> 「"
+  },
+  {
+   "class": "missing_char",
+   "page": 1178,
+   "col": [
+    415.2,
+    148.5,
+    440.6,
+    997.3
+   ],
+   "pos": 38,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "倒，斤前放下油紙暖簾來，日光掩映，十分明亮。何老太監道：「大人請寬了盛服罷。西門慶道：",
+   "api": "倒，斤前放下油紙暖簾來，日光掩映，十分明亮。何老太監道：「大人請寬了盛服罷。」西門慶道：",
+   "crop": "tmp_vert/battle10/quotes/q04_p1178_」.png",
+   "cell": [
+    415.2,
+    898.6,
+    440.6,
+    918.3
+   ],
+   "note": "t52: 复审补落（p1178 pos38/39、p1291 pos31）"
+  },
+  {
+   "class": "missing_char",
+   "page": 1178,
+   "col": [
+    315.1,
+    148.5,
+    339.1,
+    996.2
+   ],
+   "pos": 39,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "text": "「大人只顧穿，怕怎的？昨日萬歲賜了我蟒衣，我也不穿他了，就进了大人遮衣服兒罷。不一时，",
+   "api": "「大人只顧穿，怕怎的？昨日萬歲賜了我蟒衣，我也不穿他了，就进了大人遮衣服兒罷。」不一時，",
+   "crop": "tmp_vert/battle10/quotes/q05_p1178_」.png",
+   "cell": [
+    315.1,
+    917.3,
+    339.1,
+    937.1
+   ],
+   "note": "t52: 复审补落（p1178 pos38/39、p1291 pos31）"
+  },
+  {
+   "class": "missing_char",
+   "page": 1291,
+   "col": [
+    163.6,
+    151.8,
+    196.0,
+    995.1
+   ],
+   "pos": 31,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "下墜着疼，腰酸，吃飲食無味。任醫官道：「我已知道，說得明白了。西門慶道：「不瞞后溪說，",
+   "api": "下墜着疼，腰酸，吃飲食無味。任醫官道：「我已知道，說得明白了。」西門慶道：「不瞞后溪說，",
+   "crop": "tmp_vert/battle10/quotes/q06_p1291_」.png",
+   "cell": [
+    163.6,
+    759.8,
+    196.0,
+    779.4
+   ],
+   "note": "t52: 复审补落（p1178 pos38/39、p1291 pos31）"
   }
  ],
  "ring_digit_merge": {
