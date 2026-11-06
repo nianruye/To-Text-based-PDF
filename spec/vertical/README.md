@@ -23,7 +23,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 
 ## Spec 文件
 
-| 编号 | 文件 | 功能 | 实现锚点（build_vert.py，2026-11-06 实测） | 验收 |
+| 编号 | 文件 | 功能 | 实现锚点（build_vert.py / tools，2026-11-06 实测） | 验收 |
 |---|---|---|---|---|
 | 01 | [engine.md](01_engine.md) | 引擎链选型（upLaTeX + tarticle + pxchfon + Noto TC）+ JY1/JT1 报错修法 | preamble L6829、编译 L7984-8007 | 编译零报错、字形与源书同款 |
 | 02 | [tate_layout.md](02_tate_layout.md) | tate 参数语义（textwidth/textheight/右缘公式）+ 列参数拟合 + 断列 | §1 L958-1049 参数拟合、`page_tex` L6755、§1.96a/§1.96 L2159-2206 右缘复测、§1.98 L3187-5130 框驱动（槽格/列位/列顶数据驱动） | 列数/列位/断点与源书一致 |
@@ -39,6 +39,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 | 12 | [12_punct_ink_calib.md](12_punct_ink_calib.md) | **标点墨迹口径标定**（尺寸/格内位置/锚点）：`PUNCT_CELL` 提前到采样之前 + 占格书标点样本按「格内墨心」取（不再靠 DP 预测，否则命中前字笔画碎片）+ 不做尺寸窗筛选（保 `！：；？`）+ NF 的 `PUNCT_INK` 改用探针渲染实测墨心（与 tate 实际字形同源） | §1.956：`_calib_own_marks` L7184、`_calib_punct_ink` L6990（调用 L7574）、`_calib_src_page` L7222/L7486、`_calib_punct_cell` L7010；消费端 `col_puts` L3997；测试 `test_vert_taskT.py` | 15 页 1717 条双侧实测：标点墨心绝对位置差 −11.25pt→**−0.25pt**、相对前字 −10.00→**+1.00pt**、墨高差 0.00pt；wz7 300 页 PASS（字符量 128683 与基线逐页相同）、wz6 逐字节零回归 |
 | 15 | [15_vert_dash_rule.md](15_vert_dash_rule.md) | **竖排破折号 = 源图墨迹实测的一条连续竖线**（taskD / R2）：相邻两个 `—` = 源图同一墨块 -> 一条 rule；线长/线位/线心/线宽全实测；文本层保留原 `—`（3 Tr 不可见）；读不到墨段 -> 兜底每字 1.0 step 并登记 | §1.0a4 L291-452（`DASH_*` L321-332 / `_dash_rule_on` L336 / `_dash_runs` L347 / `_dash_ink_seg` L365 / `_dash_rule_tex` L433 / `_fg_origin_shift` L445）、`_put_tex(invisible=)` L601、`col_puts` L3997（`_rule_h` L4116）；测试 `test_vert_dash_rule.py` | p57 产物 80.00pt=**1.255 step**（源图 1.259）、线位 Δ≤0.25pt、空隙 **0.00pt**；p29 逐字节不变；wz6 md5 `ae9d2f52` 零回归 + `all` 模式逐书实测 1.85-1.98；**590 测试全绿（battle8 时点）** |
 | 16 | [16_missing_char_insert.md](16_missing_char_insert.md) | **missing_char 缺字/标点串 1:1 插入**（battle6–9）：汉字/引号/标点串按 `docs/vert_taskF_missed_fix.json` 逐条插入；`ch` 1–2 字符、增量 `len(ch)`；上下文重定位三步（子串 → pos−shift → 跳过）；source 含 api_strip / quote / census / punct；与 QSF/fix_split_brackets/dash/ring 的互斥与去重；**dash 边界**（`——` 走 missing_char，§1.0a4 画一条线） | §1.0a5 L453-647（`MISSED_FIX` L313-320/`_relocate_missing` L480/`_apply_missed_fix` L512/`_br_shift` L983-988）；dash 锚点 `DASH_CHARS` L321 / `_dash_rule_on` L336 / `_dash_runs` L347 / `_dash_ink_seg` L365 / `_dash_rule_tex` L433；数据 `docs/vert_taskF_missed_fix.json` | v40 verify PASS（931,190 字 / +12 vs v38）、150 条（58+11+72+6+3）、无双引号/QSF 925 条不变、p57 dash 1 条线、wz6 零回归、pytest 590 |
+| 18 | [18_ring_digit_census.md](18_ring_digit_census.md) | **圈码普查与读数三层方案**（battle1/4/5 方法 implemented；参数化/一键化/读数去人工化 planned）：检测（主块尺寸窗/四边/圈心/填充/长宽比；设计目标相对 step，**当前 P_V2 仍 wz7 pt**）→ 读数（模板兜底 → **PaddleOCR-VL 带上下文条带** → 序列+人工兜底；孤立裁片会读成 E/ETI 的教训）→ 序列校验（非降 + LNDS 锚点；页边界合法回退）→ 落库渲染（situation 1 替换 / 2 追加；≤50 Unicode 圈码，>50 ○+数字）→ verify；367 条是 wz7 数据、ring 判据/渲染/验证是机制 | `census_ring_digit.py` L59-61/L141/L230、`ring_judge.py` P_V2 L21/judge_v2 L40、`build_vert.py` `_apply_missed_fix` L512/ring 分支 L574–596/`_ring_put` L460/渲染 L4176–4178/`RING_SIZE` L305；列匹配容差 0.6pt L540、API 通道 `api_candidates_all_run.py` L7/L8/L13/L24/L34；换书清单见 spec §3 | wz7 参考：184→352 / 34 处确认 / 21 处改判 / 违反 16→2 / 模板 LOO 66% / 页边界 78/76/77/76；方法门禁 verify_vert PASS、wz6 零回归、pytest 590；参数化/一键/去人工化 planned（不写死 wz7 数字作判据） |
 
 ## 特殊行与影印页（§1.995，taskR / taskR2）实现锚点
 
@@ -55,7 +56,7 @@ taskP / taskP2 为该路径新增/修正的锚点：
 > 详细口径/验收见 [10_west_latin_fax.md](10_west_latin_fax.md) 与 [docs/vert_wz7_layout3_report.md](../../docs/vert_wz7_layout3_report.md)。
 
 > 锚点行号为 **2026-11-06（battle3–8 后）当前文件**实测：`grep -n '^# ---------- '`（节）、
-> `grep -n '^def '`（函数）、`grep -n '<常量/函数名>'`（常量与调用点）；本次刷新覆盖 01–16 的 Spec 表、
+> `grep -n '^def '`（函数）、`grep -n '<常量/函数名>'`（常量与调用点）；本次刷新覆盖 01–16、18 的 Spec 表、
 > 无版框表、taskP/Q/U/D 表。改 `build_vert.py` 后须按同样方法同步本表。
 
 ## 架构
@@ -225,6 +226,19 @@ VERT_PAGES=3-8 /usr/bin/python3 src/pipelines/build_vert.py ... output/wz6/wz6_v
 
 > `missing_char` 目前只由 `build_vert.py` 消费；`fix_tounicode_circled.py` 只读 `class=ring`，
 > 故不属跨工具契约（PIPELINE_BEHAVIOR 不改；理由见 spec 16 §16.8）。
+
+## 圈码（ring，spec 18）实现锚点
+
+| 项 | 内容 | 锚点（2026-11-06 `grep -n` 实测） |
+|---|---|---|
+| 18_ring §1.2 | 检测判据（v2 形态闸门；尺寸窗设计目标 ×step，当前 P_V2 为 wz7 pt） | `ring_judge.py` `P_V1` L19 / `P_V2` L21 / `judge_v1` L33 / `judge_v2` L40 |
+| 18_ring §1.3 第 1 步 | 列尾数字候选 / 列末一格 / 主块特征 | `census_ring_digit.py` 默认路径 L59-61 / `ring_at` L141 / 输出 L230 |
+| 18_ring §1.3 第 2 步 | PaddleOCR-VL 通道（模型/端点/提交/轮询/解析；8 条/页、30 页/批） | `api_candidates_all_run.py` `JOB` L7 / `PAYLOAD` L8 / `submit` L13 / `poll` L24 / `parse` L34；`api_candidates_all_build.py` `main` L13 |
+| 18_ring §1.3 第 4 步 | 落库（situation 1 替换 / 2 追加；1 位/2 位 → 详见 spec §1.2/§1.3） | `build_vert.py` `MISSED_FIX` L313-320 / `_apply_missed_fix` L512 / ring 分支 **L574–596**；列匹配容差 0.6pt L540 |
+| 18_ring §1.3 第 4 步 | 渲染（占位符 / ≤50 Unicode 圈码 / >50 ○+数字 / 字号比例） | `RING_INS_BASE` L304 / `RING_SIZE` L305 / `_ring_ins_num` L454 / `_ring_put` L460 / 渲染调用 L4176-4178 |
+| 18_ring §1.3 第 5 步 | 验证（verify_vert + wz6 + pytest + 源图 crop） | `src/test/verify_vert.py`（判据 = HEAD） |
+
+> spec 18 是**方法文档**（§1 通用判据、§2 wz7 参考基线、§3 换书复用清单）；367 条 ring 是数据，换书须重新普查。
 
 ## taskD（2026-10-22）新增锚点：竖排破折号 = 源图墨迹实测的一条连续竖线（R2）
 
