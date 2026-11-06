@@ -27,7 +27,8 @@
 | [00_system_architecture.md](00_system_architecture.md) | 系统总体架构 |
 | [ancient/](ancient/) | 古籍排版（01-08 + appendix_layout） |
 | [modern/](modern/) | 现代书籍排版（footnote / header_pagenum / heading / toc） |
-| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线）；验证脚本 `src/test/verify_vert.py` |
+| [vertical/](vertical/) | 竖排书排版（engine / tate_layout / marginalia / frame_lines / pagenum_sequence / derot / 07 字模横向压缩+列内空隙 / 08 标点竖排形态 / 09 参数自标定 + 纸型无关化 / 10 西文行侧排+标题署名行+影印页整页贴图 / 15 竖排破折号整格矢量竖线 / 16 missing_char 缺字 1:1 插入（battle6–8））；验证脚本 `src/test/verify_vert.py` |
+| [vertical/16_missing_char_insert.md](vertical/16_missing_char_insert.md) | missing_char 缺字 1:1 插入（battle6–8）：数据契约（page/col/pos/ch/source/confidence/ratio/exp_len/text/api/crop/cell/feat/complete 等）/ 重定位三步（上下文 → pos−shift → 跳过）/ 不插条件 / 源图证据 / 与 QSF·fix_split_brackets·dash·ring 的互斥去重；battle7 58 汉字 → v37、battle8b 72 引号 → v38 |
 | [docs/vert_wz7_layout3_report.md](../docs/vert_wz7_layout3_report.md) | 竖排 wz7 300 页版面元素报告（taskR 实现西文行/标题署名/影印页贴图 + taskR2 西文行紧凑化口径：拉丁 TFM 字体、破折号按 run 实测长、bp↔TeX pt 换算、逐片基线；含四项复核的实测对账与影印页普查分离度） |
 | [docs/vert_dash_rule_report.md](../docs/vert_dash_rule_report.md) | 竖排破折号源图实测竖线报告（taskD / R2：相邻两 `—` = 同一墨块 -> 一条 rule，线长/线位/线心/线宽全实测 + FG 原点偏移修正；p57 1.255 step（源 1.259）/ Δ≤0.25pt / 空隙 0.00pt；p29 逐字节不变；wz6 默认零回归 + `all` 模式逐书实测 1.85-1.98；含 p57 产物侧间隙不可满足的反证与假破折号数据审计建议） |
 | [docs/vert_taskE_census_report.md](../docs/vert_taskE_census_report.md) | 全书普查「OCR 漏识的占整格元素」（taskE：连通域 + y 聚簇 + 首/末格形状 + OCR 边字对账；全书 dash **1 处**（p1683 3.0×28.0）、ring **36 处/15 页**（p1682-1721 句末圈号）、other 0；反例 p1742 異體字表 / p29 西文页 / p100/p400/p1000 = 0；工具 `src/tools/census_missed_cells.py`，交付 JSON `docs/vert_taskE_census.json`；未改渲染端） |
@@ -40,6 +41,9 @@
 | [docs/battle1_horizontal.md](../docs/battle1_horizontal.md) | 横排 local-bug 清零报告（battle1：#1-#9 逐项实测核销 —— #1/#2/#5/#6/#7/#8 在 HEAD `bed0d25` 已修/已安全，#3/#4/#9 本轮收口；516->557 测试（本任务 +41；全量 562）；四书 geom + wz2 classic 改动前后重跑：逐页文本/行 bbox 0 差异、verify_geom JSON 逐字节相同、hard split 0 / missing 0） |
 | [docs/battle1_vertical_ring.md](../docs/battle1_vertical_ring.md) | 竖排两位数圈码判据重标定报告（battle1 P0-a：hole 必要条件证伪 -> 主块尺寸窗+四边墨闸门；184->352 处 / 段外 0 误报；p1704/1705/1706 圈码 49/50/51/52 渲染 + 文本层 ㊾/㊿ 码位；wz7 verify_vert PASS、wz6 md5 逐字节相同、562 测试） |
 | [docs/battle2_punct_audit.md](../docs/battle2_punct_audit.md) | 双管线标点禁则/配对审计报告（battle2：GB/T 15834—2011 规则表 + `punct_audit.py`；横排四书重跑 + 竖排 wz7 v30；A/B/C 三类归因 + p620 缺 」的 OCR 漏识定位 + 门禁建议） |
+| [docs/battle6_missing_chars.md](../docs/battle6_missing_chars.md) | 竖排真实缺字回收报告（battle6：异体字归一化 + 检测加严 F1–F5 + 241 列 API 抽样；列框外整字漏识 ≈1、列内真插入 12（汉字 3）/ 抽样外推 300-400；下一阶段全量 API 计划） |
+| [docs/battle7_missing_chars.md](../docs/battle7_missing_chars.md) | battle7 58 处汉字缺字落库报告（t27 hanzi_list → t28：57 新增 + 1 去重（p634 籤），missing_char 12→69；v37 重建 + verify PASS（931,106 字 / +57）；wz6 零回归、pytest 590） |
+| [docs/battle8_quotes.md](../docs/battle8_quotes.md) | battle8b 引号类漏识落库报告（t34：96 条 punct_list 全查 → 72 条落库（70 」+2 「；43 条 —— 按角形重判）；v38 重建 + verify PASS（931,178 字 / +72）；无双引号、QSF 925 条决策不变、wz6 零回归） |
 | [docs/pipeline_architecture.html](../docs/pipeline_architecture.html) | 架构图（深色 SVG） |
 | [src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md](../src/test/snapshots/CURRENT_BEHAVIOR_SPEC.md) | 回归快照现状 spec（wz1/优化前/wz2 排版现状） |
 | [src/test/unit/PURE_FUNC_SPEC.md](../src/test/unit/PURE_FUNC_SPEC.md) | 纯函数行为 spec（14 函数契约；battle1 更正 #1/#2 旧契约、补 is_heading_by_md、刷新行号锚点） |
