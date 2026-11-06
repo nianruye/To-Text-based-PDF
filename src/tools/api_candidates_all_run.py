@@ -45,9 +45,14 @@ def parse(url):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--plan', default='tmp_vert/battle6/all_plan.json')
-    ap.add_argument('--out', default='tmp_vert/battle6/api_candidates_all_raw.json')
+    ap.add_argument('--book', default='wz7')
+    ap.add_argument('--out-dir', default=None, help='默认 tmp_vert/battle6（wz7）/ tmp_vert/{book}')
+    ap.add_argument('--plan', default=None, help='默认 {out-dir}/all_plan.json')
+    ap.add_argument('--out', default=None, help='默认 {out-dir}/api_candidates_all_raw.json')
     a = ap.parse_args()
+    out_dir = a.out_dir or ('tmp_vert/battle6' if a.book == 'wz7' else f'tmp_vert/{a.book}')
+    a.plan = a.plan or os.path.join(out_dir, 'all_plan.json')
+    a.out = a.out or os.path.join(out_dir, 'api_candidates_all_raw.json')
     h = {'Authorization': 'bearer ' + open('/tmp/paddle_token').read().strip()}
     plan = json.load(open(a.plan, encoding='utf-8'))
     out = {'batches': [], 'n_cols': plan['n_items']}
