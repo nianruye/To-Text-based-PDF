@@ -477,8 +477,41 @@ def _ring_put(n, xc, cell_c, F):
         outs.append(_put_tex(d, x0 + i * adv, page_h - (cell_c + 0.360 * Fd), Fd, xs=1.0))
     return outs
 
-def _apply_missed_fix(path):
+def _relocate_missing(cur, pos, ch, ctx, shift):
+    """battle6/t32：missing_char 插入点按**当前行**重定位（防止 fix_split_brackets 移走行首闭引号后错位）。
+
+    优先级（t32/F1）：
+      ① 用该条保存的 OCR 上下文 ctx（item.text）在当前行做子串匹配 —— 左侧 8 字 + 右侧 8 字；
+         先试完整 needle（左+右），再退化为左/右单侧；
+      ② 匹配不到回退 pos - shift（shift = 该行被 fix_split_brackets 移走的行首字符数）；
+      ③ 都失败（回退越界）返回 None -> 调用方跳过并记日志（宁少插一字，不错位插）。
+    行首未被改动（shift=0 且 cur 与 ctx 一致）时 ① 命中原 pos -> no-op。
+    """
+    n = len(cur)
+    if ctx:
+        lo = max(0, pos - 8); hi = min(len(ctx), pos + 8)
+        left = ctx[lo:pos]; right = ctx[pos:hi]
+        if left + right:
+            j = cur.find(left + right)
+            if j >= 0:
+                return min(n, j + len(left))
+        if left:
+            j = cur.rfind(left)
+            if j >= 0:
+                return min(n, j + len(left))
+        if right:
+            j = cur.find(right)
+            if j >= 0:
+                return j
+    q = pos - shift
+    if 0 <= q <= n:
+        return q
+    return None
+
+
+def _apply_missed_fix(path, br_shift=None):
     """任务F: 把任务E普查的漏识元素灌进**内存 sl**(不改数据文件; 有版框书/别的书页号越界 -> 跳过)。
+    br_shift: {(k, row_idx): n} —— 该行被 fix_split_brackets 移走的行首字符数（t32/F1 重定位回退用）。
     · dash: 列首插 `insert_dash` 个 DASH_INS(占格, 由 §1.0a4 的 R2 机制测源图墨线并画线; 不进文本层);
     · ring 情形①(数字已在文本尾): 把尾部数字 1:1 换成 RING_INS 占位(1 格; 渲染时画圈码字形);
     · ring 情形②(整格漏识): 列尾追加 RING_INS 占位;
@@ -492,7 +525,7 @@ def _apply_missed_fix(path):
     groups = {}
     for it in items:
         groups.setdefault((int(it['page']), tuple(it['col'])), []).append(it)
-    st = {'dash': 0, 'ring1': 0, 'ring2': 0, 'comp': 0, 'skip': 0}
+    st = {'dash': 0, 'ring1': 0, 'ring2': 0, 'comp': 0, 'skip': 0, 'miss': 0}
     for (pg, col), its in sorted(groups.items()):
         if pg < 1 or pg > len(keys):
             st['skip'] += len(its)
@@ -511,11 +544,32 @@ def _apply_missed_fix(path):
             print('[漏识元素] p%d 列 %s 未匹配 -> 跳过 %d 项' % (pg, list(col), len(its)))
             st['skip'] += len(its)
             continue
+        _miss = sorted([x for x in its if x.get('class') == 'missing_char'],
+                       key=lambda x: int(x.get('pos') or 0))
+        its = _miss + [x for x in its if x.get('class') != 'missing_char']
         for it in its:
             if it.get('class') == 'dash':
                 n_ins = max(1, int(it.get('insert_dash') or 2))
                 sl[k][idx] = DASH_INS * n_ins + sl[k][idx]
                 st['dash'] += 1
+                continue
+            if it.get('class') == 'missing_char':
+                # battle6：列条带 API 复核出的 OCR 漏字，按 pos 1:1 插入（仅 wz7 类大书启用，
+                # 防止 wz6 小页被同号页误插；wz6 页数 231 < 1000）。
+                if len(keys) < 1000:
+                    st['skip'] += 1
+                    continue
+                ch = it.get('ch') or ''
+                cur = sl[k][idx]
+                shift = (br_shift or {}).get((k, idx), 0)
+                pos = _relocate_missing(cur, int(it.get('pos') or 0), ch, it.get('text') or '', shift)
+                if pos is None:
+                    print('[漏识元素] p%d x%.1f missing_char 重定位失败(pos=%s shift=%d) -> 跳过'
+                          % (pg, it.get('source_x') or 0, it.get('pos'), shift))
+                    st['skip'] += 1
+                    continue
+                sl[k][idx] = cur[:pos] + ch + cur[pos:]
+                st['miss'] += 1
                 continue
             if it.get('class') != 'ring':
                 continue
@@ -539,9 +593,9 @@ def _apply_missed_fix(path):
                 st['ring2'] += 1
             if n > 50:
                 st['comp'] += 1
-    print('[漏识元素] 灌入 %d 处: dash %d / ring① %d / ring② %d(其中 >50 合成圈 %d) / 跳过 %d'
-          % (st['dash'] + st['ring1'] + st['ring2'], st['dash'], st['ring1'], st['ring2'],
-             st['comp'], st['skip']))
+    print('[漏识元素] 灌入 %d 处: dash %d / ring① %d / ring② %d(其中 >50 合成圈 %d) / missing_char %d / 跳过 %d'
+          % (st['dash'] + st['ring1'] + st['ring2'] + st.get('miss', 0), st['dash'], st['ring1'],
+             st['ring2'], st['comp'], st.get('miss', 0), st['skip']))
     return st
 
 def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None, invisible=False,
@@ -925,8 +979,13 @@ if _br_fix:
 else:
     print('[禁则归位] 未检出(无行首闭括号待归位)')
 
+# t32/F1：行首闭引号归位后，missing_char 的 pos 需按当前行重定位 —— 记录每个被移走的行首字符数
+_br_shift = {}
+for _pi, _ri, _c in _br_fix:
+    _br_shift[(str(_pi - 1), _ri - 1)] = _br_shift.get((str(_pi - 1), _ri - 1), 0) + 1
+
 # §1.0a5 任务F: 灌入任务E普查的 37 处漏识元素(dash 2 格占位 + 句末圈码占位)
-_MISSED_ST = _apply_missed_fix(MISSED_FIX) if MISSED_FIX else None
+_MISSED_ST = _apply_missed_fix(MISSED_FIX, _br_shift) if MISSED_FIX else None
 
 all_rows = {k: col_stats(k) for k in keys}
 

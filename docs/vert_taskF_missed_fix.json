@@ -9875,6 +9875,4937 @@
    },
    "cp": null,
    "ring_fix": "battle4:t18"
+  },
+  {
+   "class": "missing_char",
+   "page": 263,
+   "col": [
+    747.5,
+    306.6,
+    776.0,
+    712.5
+   ],
+   "pos": 0,
+   "ch": "「",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.923,
+   "exp_len": 12,
+   "text": "自意得其墊，無風可動搖。",
+   "api": "「自意得其墊，無風可動搖。」"
+  },
+  {
+   "class": "missing_char",
+   "page": 263,
+   "col": [
+    747.5,
+    306.6,
+    776.0,
+    712.5
+   ],
+   "pos": 12,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.923,
+   "exp_len": 12,
+   "text": "自意得其墊，無風可動搖。",
+   "api": "「自意得其墊，無風可動搖。」"
+  },
+  {
+   "class": "missing_char",
+   "page": 445,
+   "col": [
+    815.5,
+    207.3,
+    846.9,
+    1331.5
+   ],
+   "pos": 44,
+   "ch": "。",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 44,
+   "text": "說話的，世上有三等人怕熱，有三等人不怕熱。那三等人怕熱？第一怕熱，田舍間農夫，每日耕田邁",
+   "api": "說話的，世上有三等人怕熱，有三等人不怕熱。那三等人怕熱？第一怕熱，田舍間農夫，每日耕田邁。"
+  },
+  {
+   "class": "missing_char",
+   "page": 459,
+   "col": [
+    763.4,
+    293.8,
+    792.9,
+    789.1
+   ],
+   "pos": 0,
+   "ch": "「",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.914,
+   "exp_len": 16,
+   "text": "都被六十收拾去，芦花明月竟難尋。",
+   "api": "「都被六十收拾去，\n芦花明月竟難尋。」"
+  },
+  {
+   "class": "missing_char",
+   "page": 459,
+   "col": [
+    763.4,
+    293.8,
+    792.9,
+    789.1
+   ],
+   "pos": 16,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.914,
+   "exp_len": 16,
+   "text": "都被六十收拾去，芦花明月竟難尋。",
+   "api": "「都被六十收拾去，\n芦花明月竟難尋。」"
+  },
+  {
+   "class": "missing_char",
+   "page": 473,
+   "col": [
+    817.3,
+    214.1,
+    851.5,
+    1333.5
+   ],
+   "pos": 44,
+   "ch": "一",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 44,
+   "text": "來。神仙道：「請先觀貴造，然後觀相尊容。」西門慶便說與八字：「屬虎的，二十九歲了，七月二",
+   "api": "來。神仙道：「請先觀貴造，然後觀相尊容。」西門慶便說與八字：「屬虎的，二十九歲了，七月二一"
+  },
+  {
+   "class": "missing_char",
+   "page": 473,
+   "col": [
+    729.5,
+    219.8,
+    761.0,
+    1336.4
+   ],
+   "pos": 45,
+   "ch": "。",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 45,
+   "text": "，,七月廿三日白露，已交八月算命。月令提剛辛酉，理傷官格。子平云：傷官傷盡復生財，財旺生官",
+   "api": "七月廿三日白露，已交八月算命。月令提剛辛酉，理傷官格。子平云：傷官傷盡復生財，財旺生官。"
+  },
+  {
+   "class": "missing_char",
+   "page": 508,
+   "col": [
+    724.7,
+    315.2,
+    755.1,
+    1335.8
+   ],
+   "pos": 40,
+   "ch": "。",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.975,
+   "exp_len": 40,
+   "text": "是那王勃殿試，滕王閣的詩是我做的。我先念兩句你聽：「南昌故郡，洪都新府。星分翼軫",
+   "api": "是那王勃殿試，滕王閣的詩是我做的。我先念兩句你聽：南昌故郡，洪都新府。星分翼軫。"
+  },
+  {
+   "class": "missing_char",
+   "page": 592,
+   "col": [
+    708.6,
+    121.7,
+    746.1,
+    1245.0
+   ],
+   "pos": 10,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.943,
+   "exp_len": 43,
+   "text": "公事所覊，幸爲寬恕。因問：「二位老先生仙鄉？尊號？」蔡狀元道：「學生蔡蘊，本貫滁州之匡",
+   "api": "公事所覊，幸爲寛恕。」因問：「二位老先生仙鄕？尊號？」蔡狀元道：「學生蔡蘊，本貫滁州之匡"
+  },
+  {
+   "class": "missing_char",
+   "page": 599,
+   "col": [
+    462.3,
+    170.7,
+    502.5,
+    1246.2
+   ],
+   "pos": 38,
+   "ch": "媽",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.964,
+   "exp_len": 41,
+   "text": "話說西門慶打發蔡狀元、安進士去了。一日，騎馬帶眼紗，在街上喝道而過，撞見馮媽。便敎",
+   "api": "話說西門慶打發蔡狀元、安進士去了。一日，騎馬帶眼紗，在街上喝道而過，撞見馮媽媽。便教"
+  },
+  {
+   "class": "missing_char",
+   "page": 620,
+   "col": [
+    777.4,
+    228.9,
+    806.8,
+    660.2
+   ],
+   "pos": 14,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.897,
+   "exp_len": 14,
+   "text": "一悶把幃屏來靠，和衣強睡倒。",
+   "api": "「悶把幃屏來靠，和衣強睡倒。」"
+  },
+  {
+   "class": "missing_char",
+   "page": 634,
+   "col": [
+    685.5,
+    116.4,
+    725.6,
+    1252.9
+   ],
+   "pos": 22,
+   "ch": "籤",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01183.png",
+   "cell": [
+    685.5,
+    684.6,
+    725.6,
+    710.5
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01183.png",
+   "shape": {
+    "w": 24.7,
+    "h": 26.2,
+    "fill": 0.692
+   },
+   "complete": true,
+   "text": "諸衆，一派音樂响起。吳道官身披大紅五彩雲織法，脚穿雲根飛鳥朱履，手執牙笏，關發文書，發",
+   "api": "諸衆，一派音樂响起。吳道官身披大紅五彩雲織法籤，脚穿雲根飛鳥朱履，手執牙笏，關發文書，發"
+  },
+  {
+   "class": "missing_char",
+   "page": 50,
+   "col": [
+    652.9,
+    387.2,
+    691.7,
+    598.9
+   ],
+   "pos": 3,
+   "ch": "竊",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.769,
+   "exp_len": 6,
+   "crop": "tmp_vert/battle6/all_insert_crops/00030.png",
+   "cell": [
+    652.9,
+    477.9,
+    691.7,
+    508.2
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00030.png",
+   "shape": {
+    "w": 25.4,
+    "h": 25.2,
+    "fill": 0.541
+   },
+   "complete": true,
+   "text": "陳經濟玉偷香",
+   "api": "陳經濟竊玉儉香"
+  },
+  {
+   "class": "missing_char",
+   "page": 85,
+   "col": [
+    372.1,
+    211.6,
+    417.4,
+    1338.8
+   ],
+   "pos": 42,
+   "ch": "峴",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00087.png",
+   "cell": [
+    372.1,
+    1287.6,
+    417.4,
+    1313.2
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00087.png",
+   "shape": {
+    "w": 25.4,
+    "h": 20.2,
+    "fill": 0.6
+   },
+   "complete": true,
+   "text": "」、「莫釾」、「太阿」、「吳鈎」、「魚腸」、「躅躅」之名，言丈夫心腸如鐵石，氣槩貫虹，",
+   "api": "」、「莫釾」、「太阿」、「吳鈎」、「魚腸」、「躅躅」之名，言丈夫心腸如鐵石，氣栗貫虹峴，"
+  },
+  {
+   "class": "missing_char",
+   "page": 105,
+   "col": [
+    143.2,
+    202.9,
+    180.1,
+    1333.0
+   ],
+   "pos": 39,
+   "ch": "逕",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.943,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00149.png",
+   "cell": [
+    143.2,
+    1204.6,
+    180.1,
+    1230.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00149.png",
+   "shape": {
+    "w": 24.7,
+    "h": 21.6,
+    "fill": 0.489
+   },
+   "complete": true,
+   "text": "松領了知縣的言語，出的縣門來，到下處叫了土兵，却來街上買了一瓶酒，并菜蔬之類，到武大家",
+   "api": "松領了知縣的言語，出的縣門來，到下處叫了士兵，却來街上買了一瓶酒，井菜蔬之類，逕到武大家"
+  },
+  {
+   "class": "missing_char",
+   "page": 141,
+   "col": [
+    270.6,
+    204.1,
+    308.4,
+    1333.5
+   ],
+   "pos": 17,
+   "ch": "謄",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00231.png",
+   "cell": [
+    270.6,
+    640.5,
+    308.4,
+    666.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00231.png",
+   "shape": {
+    "w": 27.1,
+    "h": 19.0,
+    "fill": 0.432
+   },
+   "complete": true,
+   "text": "哥道：「你說沒粉麥，怎的賺得你恁肥謄的便軟倒，提起你來也不防，煮你在鍋裡也沒氣。」武大",
+   "api": "哥道：「你說沒粉麥，怎的賺得你恁肥謄謄的便軟倒，提起你來也不防，煮你在鍋裡也沒氣。」武大"
+  },
+  {
+   "class": "missing_char",
+   "page": 213,
+   "col": [
+    197.7,
+    213.1,
+    235.4,
+    1344.5
+   ],
+   "pos": 40,
+   "ch": "颳",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00394.png",
+   "cell": [
+    197.7,
+    1241.6,
+    235.4,
+    1267.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00394.png",
+   "shape": {
+    "w": 23.3,
+    "h": 22.3,
+    "fill": 0.547
+   },
+   "complete": true,
+   "text": "只因送吴月娘出去送殯，起身早些，也有些身子倦，睡了一覺。走到亭子上，只見孟玉樓搖的走來",
+   "api": "只因送吳月娘出去送殯，起身早些，也有些身子倦，睡了一覺。走到亭子上，只見孟玉樓搖颳的走來"
+  },
+  {
+   "class": "missing_char",
+   "page": 231,
+   "col": [
+    319.1,
+    197.2,
+    351.2,
+    1333.0
+   ],
+   "pos": 15,
+   "ch": "人",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00440.png",
+   "cell": [
+    319.1,
+    584.4,
+    351.2,
+    610.2
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00440.png",
+   "shape": {
+    "w": 21.1,
+    "h": 20.2,
+    "fill": 0.26
+   },
+   "complete": true,
+   "text": "開肉綻，鮮血順腿淋漓，又教大家來保：「把奴才兩箇鬢與我撓了，趕將出去，再不許進門！」那",
+   "api": "開肉綻，鮮血順腿淋漓，又教大家人來保：「把奴才兩箇鬢與我撐了，趕將出去，再不許進門！」那"
+  },
+  {
+   "class": "missing_char",
+   "page": 247,
+   "col": [
+    392.6,
+    198.7,
+    431.2,
+    1331.5
+   ],
+   "pos": 18,
+   "ch": "不",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00473.png",
+   "cell": [
+    392.6,
+    662.1,
+    431.2,
+    687.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00473.png",
+   "shape": {
+    "w": 24.0,
+    "h": 16.8,
+    "fill": 0.374
+   },
+   "complete": true,
+   "text": "去了。他雨箇還不動。把箇李瓶兒急的要的。西門慶已是走出來，被花子虛再不放，說道：「今日",
+   "api": "去了。他兩箇還不動。把箇李瓶兒急的要不的。西門慶已是走出來，被花子虛再不放，說道：「今日"
+  },
+  {
+   "class": "missing_char",
+   "page": 276,
+   "col": [
+    750.5,
+    210.2,
+    789.2,
+    1327.7
+   ],
+   "pos": 2,
+   "ch": "人",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00528.png",
+   "cell": [
+    750.5,
+    261.0,
+    789.2,
+    286.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00528.png",
+   "shape": {
+    "w": 22.6,
+    "h": 19.4,
+    "fill": 0.255
+   },
+   "complete": true,
+   "text": "那大家叫來這裡看燈彈唱？」又一個走過來，便道：「自我認的，你每都猜不着。你把他當唱的，",
+   "api": "那大人家叫來這裡看燈彈唱？」又一個走過來，便道：「自我認的，你每都猜不着。你把他當唱的，"
+  },
+  {
+   "class": "missing_char",
+   "page": 319,
+   "col": [
+    95.9,
+    205.9,
+    130.0,
+    1337.8
+   ],
+   "pos": 37,
+   "ch": "前",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00613.png",
+   "cell": [
+    95.9,
+    1157.7,
+    130.0,
+    1183.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00613.png",
+   "shape": {
+    "w": 22.3,
+    "h": 19.2,
+    "fill": 0.18
+   },
+   "complete": true,
+   "text": "八，那花大怎不咬下他下截來？他有甚麼起解？招他進去，與他本錢，教他在我眼前開鋪子，大刺",
+   "api": "八，那花大怎不咬下他下截來？他有甚麼起解？招他進去，與他本錢，教他在我眼前前開鋪子，大刺"
+  },
+  {
+   "class": "missing_char",
+   "page": 320,
+   "col": [
+    301.6,
+    190.0,
+    332.9,
+    1322.9
+   ],
+   "pos": 24,
+   "ch": "了",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00617.png",
+   "cell": [
+    301.6,
+    807.9,
+    332.9,
+    833.7
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00617.png",
+   "shape": {
+    "w": 20.2,
+    "h": 21.8,
+    "fill": 0.251
+   },
+   "complete": true,
+   "text": "慶，不敢下手。只等的西門慶往那裡去，不在家，便使丫鬟叫進房中，與他茶水吃，常時兩個下棋",
+   "api": "慶，不敢下手。只等的西門慶往那裡去，不在家，便使了丫鬟叫進房中，與他茶水吃，常時兩個下棋"
+  },
+  {
+   "class": "missing_char",
+   "page": 329,
+   "col": [
+    832.1,
+    217.3,
+    865.2,
+    1338.8
+   ],
+   "pos": 7,
+   "ch": "刺",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00636.png",
+   "cell": [
+    832.1,
+    395.7,
+    865.2,
+    421.2
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00636.png",
+   "shape": {
+    "w": 15.8,
+    "h": 23.3,
+    "fill": 0.48
+   },
+   "complete": true,
+   "text": "西門慶道：「澁刺的，吃他做甚麼？」婦人道：「我的兒，你就吊了造化了，娘手裡拿的東西兒，",
+   "api": "西門慶道：「澁刺刺的，吃他做甚麼？」婦人道：「我的兒，你就吊了造化了，娘手裡拿的東西兒，"
+  },
+  {
+   "class": "missing_char",
+   "page": 404,
+   "col": [
+    292.2,
+    217.0,
+    322.7,
+    1337.8
+   ],
+   "pos": 30,
+   "ch": "人",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.965,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00784.png",
+   "cell": [
+    292.2,
+    981.2,
+    322.7,
+    1006.7
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00784.png",
+   "shape": {
+    "w": 21.6,
+    "h": 21.8,
+    "fill": 0.244
+   },
+   "complete": true,
+   "text": "不到罷。」賁四娘子道：「那嚛！三位娘上門，怪人家就笑話俺小家家，茶也奉不出一杯兒來。」",
+   "api": "不到罷。賁四娘子道：「那嚛！三位娘上門，怪人家就笑話俺小家人家，茶也奉不出一杯兒來。"
+  },
+  {
+   "class": "missing_char",
+   "page": 411,
+   "col": [
+    636.3,
+    594.9,
+    670.5,
+    796.1
+   ],
+   "pos": 6,
+   "ch": "粧",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.933,
+   "exp_len": 7,
+   "crop": "tmp_vert/battle6/all_insert_crops/00793.png",
+   "cell": [
+    636.3,
+    745.8,
+    670.5,
+    770.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00793.png",
+   "shape": {
+    "w": 22.6,
+    "h": 18.7,
+    "fill": 0.479
+   },
+   "complete": true,
+   "text": "搖拽鞦韆鬪艷，",
+   "api": "搖拽鞦韆鬪艷粧，"
+  },
+  {
+   "class": "missing_char",
+   "page": 433,
+   "col": [
+    264.6,
+    202.6,
+    297.8,
+    1326.3
+   ],
+   "pos": 7,
+   "ch": "你",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/00838.png",
+   "cell": [
+    264.6,
+    381.4,
+    297.8,
+    406.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00838.png",
+   "shape": {
+    "w": 22.6,
+    "h": 23.3,
+    "fill": 0.377
+   },
+   "complete": true,
+   "text": "：「嫂子，我告知了罷，俺哥這早晚到流沙河了。」惠蓮問其故。這鉞安千不合，萬不合，如此這",
+   "api": "：「嫂子，我告你知了罷，俺哥這早晚到流沙河了。」惠蓮問其故。這鉞安千不合，萬不合，如此這"
+  },
+  {
+   "class": "missing_char",
+   "page": 469,
+   "col": [
+    450.9,
+    272.1,
+    486.8,
+    1345.0
+   ],
+   "pos": 28,
+   "ch": "青",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.988,
+   "exp_len": 41,
+   "crop": "tmp_vert/battle6/all_insert_crops/00897.png",
+   "cell": [
+    450.9,
+    987.4,
+    486.8,
+    1012.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00897.png",
+   "shape": {
+    "w": 24.0,
+    "h": 22.1,
+    "fill": 0.472
+   },
+   "complete": true,
+   "text": "話說到次日，潘金蓮早起，打發西門慶，記掛着要做那紅鞋。拿針線筐兒，往花園翡翠軒臺基",
+   "api": "話說到次日，潘金蓮早起，打發西門慶，記掛着要做那紅鞋。拿青針線筐兒，往花園翡翠軒臺基"
+  },
+  {
+   "class": "missing_char",
+   "page": 527,
+   "col": [
+    748.0,
+    325.4,
+    777.6,
+    1029.2
+   ],
+   "pos": 22,
+   "ch": "宿",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.906,
+   "exp_len": 26,
+   "crop": "tmp_vert/battle6/all_insert_crops/00993.png",
+   "cell": [
+    748.0,
+    878.4,
+    777.6,
+    903.5
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/00993.png",
+   "shape": {
+    "w": 22.6,
+    "h": 23.8,
+    "fill": 0.567
+   },
+   "complete": true,
+   "text": "一鼓鬣遊蜂，嫩蕋半勻春蕩漾；浪香粉蝶，花房深夜風流。",
+   "api": "鼓鬣遊蜂，嫩蕋半勻春蕩漾；飡香粉蝶，花房深宿夜風流。」"
+  },
+  {
+   "class": "missing_char",
+   "page": 549,
+   "col": [
+    179.8,
+    211.6,
+    215.8,
+    1347.3
+   ],
+   "pos": 6,
+   "ch": "他",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01024.png",
+   "cell": [
+    179.8,
+    366.5,
+    215.8,
+    392.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01024.png",
+   "shape": {
+    "w": 22.6,
+    "h": 21.1,
+    "fill": 0.578
+   },
+   "complete": true,
+   "text": "十兩銀子，藏在僧房內，與小姐相會，管病就要好了。」那阮三喜歡，果用其計。薛姑子受了十兩",
+   "api": "十兩銀子，藏他在僧房內，與小姐相會，管病就要好了。——那阮三喜歡，果用其計。薛姑子受了十兩"
+  },
+  {
+   "class": "missing_char",
+   "page": 608,
+   "col": [
+    639.0,
+    116.4,
+    672.0,
+    1254.2
+   ],
+   "pos": 42,
+   "ch": "折",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01125.png",
+   "cell": [
+    639.0,
+    1202.5,
+    672.0,
+    1228.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01125.png",
+   "shape": {
+    "w": 24.7,
+    "h": 23.3,
+    "fill": 0.504
+   },
+   "complete": true,
+   "text": "在。通不來這里走走兒，忙的你恁樣兒的？丟下好些衣裳，帶孩子被褥，等你來幫着丫頭每折洗洗",
+   "api": "在。通不來這里走走兒，忙的你恁樣兒的？丟下好些衣裳，帶孩子被褥，等你來幫着丫頭每折洗折洗"
+  },
+  {
+   "class": "missing_char",
+   "page": 654,
+   "col": [
+    755.0,
+    104.5,
+    791.6,
+    1238.3
+   ],
+   "pos": 41,
+   "ch": "粧",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01230.png",
+   "cell": [
+    755.0,
+    1161.0,
+    791.6,
+    1186.8
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01230.png",
+   "shape": {
+    "w": 24.0,
+    "h": 22.1,
+    "fill": 0.604
+   },
+   "complete": true,
+   "text": "慶衙門中回來，開了箱櫃，打開出南邊織造的夾板羅叚尺頭來，使小厮叫將趙裁來，每人做件花通",
+   "api": "慶衙門中回來，開了箱櫃，打開出南邊織造的夾板羅叚尺頭來，使小厮叫將趙裁來，每人做件粧花通"
+  },
+  {
+   "class": "missing_char",
+   "page": 665,
+   "col": [
+    644.4,
+    131.0,
+    675.6,
+    1262.2
+   ],
+   "pos": 17,
+   "ch": "了",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01252.png",
+   "cell": [
+    644.4,
+    568.1,
+    675.6,
+    593.8
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01252.png",
+   "shape": {
+    "w": 20.2,
+    "h": 21.6,
+    "fill": 0.305
+   },
+   "complete": true,
+   "text": "歡。如今做濕親家還好，到明日休要做乾親家纔難。吹殺燈擠眼兒，後來的事，看不見的勾當。做",
+   "api": "歡。如今做濕親家還好，到明日休要做了乾親家纔難。吹殺燈擠眼兒，後來的事，看不見的勾當。做"
+  },
+  {
+   "class": "missing_char",
+   "page": 738,
+   "col": [
+    414.1,
+    120.4,
+    450.7,
+    1252.9
+   ],
+   "pos": 25,
+   "ch": "善",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01448.png",
+   "cell": [
+    414.1,
+    763.9,
+    450.7,
+    789.6
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01448.png",
+   "shape": {
+    "w": 24.0,
+    "h": 25.4,
+    "fill": 0.567
+   },
+   "complete": true,
+   "text": "。戊辰巳巳大林木，爲人一生有仁義，性格寬洪，心慈善，有經佈施，廣行方便，一生操持，把家",
+   "api": "戊辰巳巳大林木，爲人一生有仁義，性格寬洪，心慈善善，有經佈施，廣行方便，一生操持，把家"
+  },
+  {
+   "class": "missing_char",
+   "page": 779,
+   "col": [
+    678.3,
+    111.2,
+    714.0,
+    1239.7
+   ],
+   "pos": 42,
+   "ch": "遞",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01541.png",
+   "cell": [
+    678.3,
+    1188.4,
+    714.0,
+    1214.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01541.png",
+   "shape": {
+    "w": 23.3,
+    "h": 23.0,
+    "fill": 0.629
+   },
+   "complete": true,
+   "text": "道：「正是，你喚他來，我就此花下立飲一盃。」于是韓金釧兒拏大金桃盃滿斟一杯，用纖手捧上",
+   "api": "道：「正是，你喚他來，我就此花下立飲一盃。」于是韓金釧兒拏大金桃盃滿斟一杯，用纖手捧遞上"
+  },
+  {
+   "class": "missing_char",
+   "page": 781,
+   "col": [
+    636.4,
+    138.9,
+    672.0,
+    1263.5
+   ],
+   "pos": 36,
+   "ch": "舡",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01547.png",
+   "cell": [
+    636.4,
+    1059.0,
+    672.0,
+    1084.6
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01547.png",
+   "shape": {
+    "w": 24.7,
+    "h": 23.3,
+    "fill": 0.5
+   },
+   "complete": true,
+   "text": "胡知府已受了西門慶夏提刑囑託，無不做分上。要說此係後事。當日西門慶要送至上。蔡御史不肯",
+   "api": "胡知府已受了西門慶夏提刑囑託，無不做分上。要說此係後事。當日西門慶要送至舡上。蔡御史不肯"
+  },
+  {
+   "class": "missing_char",
+   "page": 830,
+   "col": [
+    456.1,
+    121.7,
+    490.9,
+    1246.2
+   ],
+   "pos": 41,
+   "ch": "拏",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.721,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01638.png",
+   "cell": [
+    456.1,
+    1169.5,
+    490.9,
+    1195.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01638.png",
+   "shape": {
+    "w": 23.3,
+    "h": 21.6,
+    "fill": 0.635
+   },
+   "complete": true,
+   "text": "你敢笑和尚没丈母？我就单丁摆饰不起你这小淫妇儿？你休笑讲，我半边俏还动的！」被桂姐手中",
+   "api": "你敢笑和尚沒丈母？我就單丁擺佈不起你這小淫婦兒？你休笑譁，我半邊俏還動的！被桂姐拏手中"
+  },
+  {
+   "class": "missing_char",
+   "page": 857,
+   "col": [
+    756.0,
+    145.6,
+    800.5,
+    1264.8
+   ],
+   "pos": 42,
+   "ch": "遞",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01710.png",
+   "cell": [
+    756.0,
+    1213.9,
+    800.5,
+    1239.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01710.png",
+   "shape": {
+    "w": 24.0,
+    "h": 24.0,
+    "fill": 0.545
+   },
+   "complete": true,
+   "text": "錢痰火政收散花錢，遂與敍揖。痰火就待領羹飯，交琴童掌燈。到李瓶兒房首，迎春接香進去，與",
+   "api": "錢痰火政收散花錢，遂與敍揖。痰火就待領羹飯，交琴童掌燈。到李瓶兒房首，迎春接香進去，遞與"
+  },
+  {
+   "class": "missing_char",
+   "page": 881,
+   "col": [
+    316.9,
+    148.2,
+    349.9,
+    1259.5
+   ],
+   "pos": 18,
+   "ch": "了",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01772.png",
+   "cell": [
+    316.9,
+    602.8,
+    349.9,
+    628.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01772.png",
+   "shape": {
+    "w": 19.4,
+    "h": 20.6,
+    "fill": 0.329
+   },
+   "complete": true,
+   "text": "，當直的拏了把椅子上來，西門慶朝上作個揖道：「告坐了。」就西邊坐地吃茶。翟管家佹跑出門",
+   "api": "，當直的峯了把椅子上來，西門慶朝上作了個揖道：「告坐了。」就西邊坐地吃茶。翟管家佹跑出門"
+  },
+  {
+   "class": "missing_char",
+   "page": 968,
+   "col": [
+    104.4,
+    142.9,
+    136.6,
+    943.3
+   ],
+   "pos": 13,
+   "ch": "官",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.967,
+   "exp_len": 30,
+   "crop": "tmp_vert/battle6/all_insert_crops/01951.png",
+   "cell": [
+    104.4,
+    478.6,
+    136.6,
+    504.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01951.png",
+   "shape": {
+    "w": 23.3,
+    "h": 23.8,
+    "fill": 0.441
+   },
+   "complete": true,
+   "text": "第三句要骨牌名，第四句要一名。俱要貫串，遇點照席飲酒。」說：",
+   "api": "第三句要骨牌名，第四句要一官名。俱要貫串，遇點照席飲酒。說："
+  },
+  {
+   "class": "missing_char",
+   "page": 987,
+   "col": [
+    548.9,
+    129.7,
+    585.5,
+    1255.5
+   ],
+   "pos": 34,
+   "ch": "於",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/01998.png",
+   "cell": [
+    548.9,
+    999.6,
+    585.5,
+    1025.2
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/01998.png",
+   "shape": {
+    "w": 23.3,
+    "h": 22.3,
+    "fill": 0.334
+   },
+   "complete": true,
+   "text": "吃了茶。吳大舅起身說道：「請姐夫到後邊說句話兒。」西門慶連忙讓大舅到後邊月娘房裡。月娘",
+   "api": "吃了茶。吳大舅起身說道：「請姐夫到後邊說句話兒。」西門慶連忙讓大舅到於後邊月娘房裡。月娘"
+  },
+  {
+   "class": "missing_char",
+   "page": 1114,
+   "col": [
+    592.6,
+    132.3,
+    624.8,
+    1258.2
+   ],
+   "pos": 42,
+   "ch": "作",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02217.png",
+   "cell": [
+    592.6,
+    1207.0,
+    624.8,
+    1232.6
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02217.png",
+   "shape": {
+    "w": 23.3,
+    "h": 21.6,
+    "fill": 0.424
+   },
+   "complete": true,
+   "text": "進來在鄭家吃酒，走來門首伺候，探頭舒腦，不敢進去。有認的玳安兒，向玳安打恭，央及作成成",
+   "api": "進來在鄭家吃酒，走來門首伺候，探頭舒腦，不敢進去。有認的玳安兒，向玳安打恭，央及作成作成"
+  },
+  {
+   "class": "missing_char",
+   "page": 1120,
+   "col": [
+    237.4,
+    145.6,
+    276.7,
+    1275.3
+   ],
+   "pos": 3,
+   "ch": "的",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02231.png",
+   "cell": [
+    237.4,
+    222.6,
+    276.7,
+    248.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02231.png",
+   "shape": {
+    "w": 23.3,
+    "h": 21.1,
+    "fill": 0.5
+   },
+   "complete": true,
+   "text": "邊歇不一兩夜，倒只在外邊常和人家偷猫遞狗，幹此勾當。」這西門慶聽了，見粉頭所事，合著他",
+   "api": "邊歇不的一兩夜，倒只在外邊常和人家偷猫獅狗，幹此勾當。」這西門慶聽了，見粉頭所事，合著他"
+  },
+  {
+   "class": "missing_char",
+   "page": 1188,
+   "col": [
+    149.4,
+    225.4,
+    174.2,
+    991.9
+   ],
+   "pos": 7,
+   "ch": "朗",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.923,
+   "exp_len": 39,
+   "crop": "tmp_vert/battle6/all_insert_crops/02382.png",
+   "cell": [
+    149.4,
+    359.5,
+    174.2,
+    378.7
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02382.png",
+   "shape": {
+    "w": 16.6,
+    "h": 17.0,
+    "fill": 0.638
+   },
+   "complete": true,
+   "text": "，玉砌臺，明明朗畫燭高焚。龍龍鑿鑿，報天敲擂疊三通；鑑鑑鉤鐗，長樂鐘撞一百八下",
+   "api": "玉砌臺，明明朗朗畫燭高焚。龍龍鑿鑿，報天敲擂疊三通；鑑鑑銅鐲，長樂鐘撞一百八下"
+  },
+  {
+   "class": "missing_char",
+   "page": 1189,
+   "col": [
+    96.6,
+    139.8,
+    127.6,
+    984.2
+   ],
+   "pos": 28,
+   "ch": "尚",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02384.png",
+   "cell": [
+    96.6,
+    677.1,
+    127.6,
+    696.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02384.png",
+   "shape": {
+    "w": 18.0,
+    "h": 17.0,
+    "fill": 0.556
+   },
+   "complete": true,
+   "text": "官不知多大，玉帶顯功名。視之，乃左丞相崇政殿大學士兼吏部書太師魯國公蔡京也。幞頭象簡，",
+   "api": "官不知多大，玉帶顯功名。視之，乃左丞相崇政殿大學士兼吏部尚書太師魯國公蔡京也。幞頭象簡，"
+  },
+  {
+   "class": "missing_char",
+   "page": 1196,
+   "col": [
+    508.3,
+    166.9,
+    536.5,
+    1012.5
+   ],
+   "pos": 4,
+   "ch": "邊",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02404.png",
+   "cell": [
+    508.3,
+    243.8,
+    536.5,
+    263.0
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02404.png",
+   "shape": {
+    "w": 17.3,
+    "h": 14.9,
+    "fill": 0.537
+   },
+   "complete": true,
+   "text": "「你往後問他每借來使使罷。」這潘金蓮正在房中炕上裹脚，忽然聽見，便問：「怎麼的？」這春",
+   "api": "「你往後邊問他每借來使使罷。」這潘金蓮正在房中炕上裹腳，忽然聽見，便問：「怎麼的？」這春"
+  },
+  {
+   "class": "missing_char",
+   "page": 1241,
+   "col": [
+    209.4,
+    147.4,
+    236.9,
+    987.5
+   ],
+   "pos": 33,
+   "ch": "不",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.965,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02544.png",
+   "cell": [
+    209.4,
+    777.5,
+    236.9,
+    796.6
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02544.png",
+   "shape": {
+    "w": 16.6,
+    "h": 15.8,
+    "fill": 0.299
+   },
+   "complete": true,
+   "text": "」西門慶道：「怎的不去？都收拾了去。」婦人道：「我有庄事兒央你，依依？」西門慶道：「怪",
+   "api": "西門慶道：「怎的不去？都收拾了去。」婦人道：「我有庄事兒央你，依不依？西門慶道：「怪"
+  },
+  {
+   "class": "missing_char",
+   "page": 1242,
+   "col": [
+    270.0,
+    151.8,
+    299.6,
+    996.2
+   ],
+   "pos": 39,
+   "ch": "尋",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02550.png",
+   "cell": [
+    270.0,
+    900.2,
+    299.6,
+    919.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02550.png",
+   "shape": {
+    "w": 18.0,
+    "h": 15.6,
+    "fill": 0.661
+   },
+   "complete": true,
+   "text": "當日卻是安郎中擺酒，西門慶起來梳頭淨面出門。婦人還睡在被裏，便說道：「你趁閒尋兒出來罷",
+   "api": "當日卻是安郎中擺酒，西門慶起來梳頭淨面出門。婦人還睡在被裏，便說道：「你趁閒尋尋兒出來罷"
+  },
+  {
+   "class": "missing_char",
+   "page": 1256,
+   "col": [
+    279.2,
+    145.2,
+    313.8,
+    997.3
+   ],
+   "pos": 36,
+   "ch": "絹",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.93,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02591.png",
+   "cell": [
+    279.2,
+    842.4,
+    313.8,
+    861.7
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02591.png",
+   "shape": {
+    "w": 19.4,
+    "h": 17.5,
+    "fill": 0.672
+   },
+   "complete": true,
+   "text": "「你唱『更深夜深靜峭』。」當下桂姐送衆人酒，取過琵琶來，輕舒玉笋，欺跨鮫，啓朱唇露皓齒",
+   "api": "「你唱「更深夜深靜峭」。當下桂姐送衆人酒，取過琵琶來，輕舒玉笋，欺跨鮫絹，啓朱唇露皓齒"
+  },
+  {
+   "class": "missing_char",
+   "page": 1293,
+   "col": [
+    594.3,
+    157.2,
+    621.1,
+    1001.6
+   ],
+   "pos": 33,
+   "ch": "個",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.736,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02671.png",
+   "cell": [
+    594.3,
+    790.5,
+    621.1,
+    809.7
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02671.png",
+   "shape": {
+    "w": 17.3,
+    "h": 17.3,
+    "fill": 0.669
+   },
+   "complete": true,
+   "text": "拿猪毛绳子套他不去。一个汉子的心，如同没笼头的马一般，他要喜欢那一，只喜欢那个。敢攔他",
+   "api": "拿豬毛繩子套他不去。一個漢子的心，如同沒籠頭的馬一般，他要喜歡那一個，只喜歡那個。敢攔他"
+  },
+  {
+   "class": "missing_char",
+   "page": 1301,
+   "col": [
+    314.4,
+    143.1,
+    345.4,
+    990.8
+   ],
+   "pos": 34,
+   "ch": "咽",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02698.png",
+   "cell": [
+    314.4,
+    798.1,
+    345.4,
+    817.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02698.png",
+   "shape": {
+    "w": 18.7,
+    "h": 18.0,
+    "fill": 0.613
+   },
+   "complete": true,
+   "text": "賠個不是！」說着，那桃花臉上止不住又滾下珍珠兒，倒在西門慶懷裡嗚嗚咽，哭的捽鼻涕，彈眼",
+   "api": "賠個不是！說着，那桃花臉上止不住又滾下珍珠兒，倒在西門慶懷裡嗚嗚咽咽，哭的捽鼻涕，彈眼"
+  },
+  {
+   "class": "missing_char",
+   "page": 1330,
+   "col": [
+    64.2,
+    437.9,
+    90.2,
+    620.0
+   ],
+   "pos": 1,
+   "ch": "知",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.933,
+   "exp_len": 7,
+   "crop": "tmp_vert/battle6/all_insert_crops/02782.png",
+   "cell": [
+    64.2,
+    458.1,
+    90.2,
+    478.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02782.png",
+   "shape": {
+    "w": 16.3,
+    "h": 11.3,
+    "fill": 0.562
+   },
+   "complete": true,
+   "text": "試梅花問主人。",
+   "api": "試知梅花問主人。"
+  },
+  {
+   "class": "missing_char",
+   "page": 1337,
+   "col": [
+    604.9,
+    421.7,
+    641.5,
+    906.2
+   ],
+   "pos": 11,
+   "ch": "翫",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.903,
+   "exp_len": 15,
+   "crop": "tmp_vert/battle7/p1337_11_crop.png",
+   "cell": [
+    609.1,
+    739.6,
+    635.8,
+    817.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02788.png",
+   "shape": {
+    "w": 26.2,
+    "h": 18.5,
+    "fill": 0.34
+   },
+   "complete": true,
+   "text": "西門慶雨戰林太太吳月娘燈請藍氏",
+   "api": "西門慶兩戰林太太吳月娘翫燈請藍氏"
+  },
+  {
+   "class": "missing_char",
+   "page": 1337,
+   "col": [
+    73.3,
+    226.6,
+    98.7,
+    675.4
+   ],
+   "pos": 16,
+   "ch": "翫",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.976,
+   "exp_len": 20,
+   "crop": "tmp_vert/battle7/p1337_16_crop.png",
+   "cell": [
+    79.7,
+    560.2,
+    97.2,
+    610.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02790.png",
+   "shape": {
+    "w": 13.0,
+    "h": 15.8,
+    "fill": 0.527
+   },
+   "complete": true,
+   "text": "第七十八回西門慶兩戰林太太吳月娘燈請藍氏",
+   "api": "第七十八回西門慶兩戰林太太吳月娘翫燈請藍氏"
+  },
+  {
+   "class": "missing_char",
+   "page": 1342,
+   "col": [
+    578.8,
+    148.5,
+    604.2,
+    994.0
+   ],
+   "pos": 31,
+   "ch": "翠",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02798.png",
+   "cell": [
+    578.8,
+    744.2,
+    604.2,
+    763.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02798.png",
+   "shape": {
+    "w": 16.3,
+    "h": 17.0,
+    "fill": 0.635
+   },
+   "complete": true,
+   "text": "至親何必計較！吳大舅於是拜畢西門慶，月娘出來與他哥磕頭。頭戴翡白繡紗金梁冠兒，海獺臥兔",
+   "api": "至親何必計較！吳大舅於是拜畢西門慶，月娘出來與他哥磕頭。頭戴翡翠白繡紗金粱冠兒，海獺臥兔"
+  },
+  {
+   "class": "missing_char",
+   "page": 1397,
+   "col": [
+    490.7,
+    434.7,
+    517.5,
+    615.7
+   ],
+   "pos": 1,
+   "ch": "條",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.933,
+   "exp_len": 7,
+   "crop": "tmp_vert/battle6/all_insert_crops/02932.png",
+   "cell": [
+    490.7,
+    454.8,
+    517.5,
+    474.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02932.png",
+   "shape": {
+    "w": 18.7,
+    "h": 14.4,
+    "fill": 0.644
+   },
+   "complete": true,
+   "text": "赤條的見閻王。",
+   "api": "赤條條的見閻王。"
+  },
+  {
+   "class": "missing_char",
+   "page": 1399,
+   "col": [
+    174.2,
+    143.1,
+    203.8,
+    987.5
+   ],
+   "pos": 13,
+   "ch": "筍",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02940.png",
+   "cell": [
+    174.2,
+    392.6,
+    203.8,
+    411.8
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02940.png",
+   "shape": {
+    "w": 15.6,
+    "h": 17.3,
+    "fill": 0.33
+   },
+   "complete": true,
+   "text": "」蔡御史道：「也不消坐了。茶來，我吃一鍾就是了。」左右須臾拿茶上來，蔡御史吃了，揚長起",
+   "api": "蔡御史道：「也不消坐了。筍茶來，我吃一鍾就是了。」左右須臾拿茶上來，蔡御史吃了，揚長起"
+  },
+  {
+   "class": "missing_char",
+   "page": 1406,
+   "col": [
+    263.6,
+    227.7,
+    289.1,
+    612.5
+   ],
+   "pos": 13,
+   "ch": "人",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.909,
+   "exp_len": 17,
+   "crop": "tmp_vert/battle6/all_insert_crops/02956.png",
+   "cell": [
+    263.6,
+    477.8,
+    289.1,
+    497.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02956.png",
+   "shape": {
+    "w": 18.7,
+    "h": 17.3,
+    "fill": 0.541
+   },
+   "complete": true,
+   "text": "「酒不醉人人自醉，色不迷人自迷！」",
+   "api": "酒不醉人人自醉，色不迷人人自迷！"
+  },
+  {
+   "class": "missing_char",
+   "page": 1419,
+   "col": [
+    208.7,
+    156.1,
+    239.7,
+    1002.7
+   ],
+   "pos": 28,
+   "ch": "粧",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/02980.png",
+   "cell": [
+    208.7,
+    694.8,
+    239.7,
+    714.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/02980.png",
+   "shape": {
+    "w": 18.7,
+    "h": 15.8,
+    "fill": 0.585
+   },
+   "complete": true,
+   "text": "如膠，無日不相會做一處。一日，也是合當有事。潘金蓮早晨梳打扮，走來樓上觀音菩薩前燒香。",
+   "api": "如膠，無日不相會做一處。一日，也是合當有事。潘金蓮早辰梳粧打扮，走來樓上觀音菩薩前燒香。"
+  },
+  {
+   "class": "missing_char",
+   "page": 1437,
+   "col": [
+    141.0,
+    152.8,
+    166.4,
+    998.4
+   ],
+   "pos": 31,
+   "ch": "面",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03032.png",
+   "cell": [
+    141.0,
+    748.6,
+    166.4,
+    767.8
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03032.png",
+   "shape": {
+    "w": 17.3,
+    "h": 13.4,
+    "fill": 0.595
+   },
+   "complete": true,
+   "text": "走糖人兒木頭兒，不拘那裡安放了一個漢子，那裡發落付莫穢？放在眼前不成？傳出去，知道的，",
+   "api": "走糖人兒木頭兒，不拘那裡安放了一個漢子，那裡發落付莫秪？放在眼面前不成？傳出去，知道的，"
+  },
+  {
+   "class": "missing_char",
+   "page": 1468,
+   "col": [
+    462.5,
+    156.1,
+    486.4,
+    1000.5
+   ],
+   "pos": 21,
+   "ch": "不",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03092.png",
+   "cell": [
+    462.5,
+    559.1,
+    486.4,
+    578.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03092.png",
+   "shape": {
+    "w": 17.3,
+    "h": 13.7,
+    "fill": 0.339
+   },
+   "complete": true,
+   "text": "方纔關後邊儀門，夜裏上鎖，方纔睡去。因此弄得手腳，十分急了，先和西門大姐嚷了兩場，淫婦",
+   "api": "方纔關後邊儀門，夜裏上鎖，方纔睡去。因此弄不得手脚，十分急了，先和西門大姐嚷了兩場，淫婦"
+  },
+  {
+   "class": "missing_char",
+   "page": 1495,
+   "col": [
+    189.7,
+    142.0,
+    214.3,
+    997.3
+   ],
+   "pos": 7,
+   "ch": "不",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03157.png",
+   "cell": [
+    189.7,
+    278.1,
+    214.3,
+    297.5
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03157.png",
+   "shape": {
+    "w": 18.7,
+    "h": 12.5,
+    "fill": 0.378
+   },
+   "complete": true,
+   "text": "叔殺了人，走的知下落。我姑夫將此女縣中領出，嫁與人為妻小去了。見今這兩個屍首，日久只顧",
+   "api": "叔殺了人，走的不知下落。我姑夫將此女縣中領出，嫁與人爲妻小去了。見今這兩個屍首，日久只顧"
+  },
+  {
+   "class": "missing_char",
+   "page": 1499,
+   "col": [
+    250.2,
+    139.8,
+    281.3,
+    995.1
+   ],
+   "pos": 37,
+   "ch": "襯",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.943,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03165.png",
+   "cell": [
+    250.2,
+    859.0,
+    281.3,
+    878.5
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03165.png",
+   "shape": {
+    "w": 18.7,
+    "h": 17.3,
+    "fill": 0.648
+   },
+   "complete": true,
+   "text": "柩跟前，燒帋祭祀。逃與長老經錢，教他二十日請八衆禪僧，念斷七經。長老接了經，備辦齋供。",
+   "api": "柩跟前，燒帚祭祀。遞與長老經錢，教他二十日請八眾禪僧，念斷七經。長老接了經襯，備辦齋供。"
+  },
+  {
+   "class": "missing_char",
+   "page": 1507,
+   "col": [
+    280.6,
+    153.9,
+    311.6,
+    1002.7
+   ],
+   "pos": 21,
+   "ch": "髫",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03183.png",
+   "cell": [
+    280.6,
+    559.0,
+    311.6,
+    578.3
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03183.png",
+   "shape": {
+    "w": 18.7,
+    "h": 15.6,
+    "fill": 0.414
+   },
+   "complete": true,
+   "text": "你爹燒紙，送大姐來了。」經濟便道：「我髫已合的纔是丈母。正月十六日貼門神，遲了半月！人",
+   "api": "你爹燒紙，送大姐來了。經濟便道：「我髫已髫合的纔是丈母。正月十六日貼門神，遲了半月！人"
+  },
+  {
+   "class": "missing_char",
+   "page": 1555,
+   "col": [
+    187.6,
+    139.8,
+    215.1,
+    997.3
+   ],
+   "pos": 37,
+   "ch": "封",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03289.png",
+   "cell": [
+    187.6,
+    860.9,
+    215.1,
+    880.4
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03289.png",
+   "shape": {
+    "w": 16.6,
+    "h": 19.4,
+    "fill": 0.568
+   },
+   "complete": true,
+   "text": "李通判，分付：「都且押送牢裡去，明日問理。」原來嚴州府正堂知府姓徐，名喚徐，係陝西臨洮",
+   "api": "李通判，分付：「都且押送牢裡去，明日問理。」原來嚴州府正堂知府姓徐，名喚徐封，係陝西臨洮"
+  },
+  {
+   "class": "missing_char",
+   "page": 1625,
+   "col": [
+    411.0,
+    126.8,
+    439.2,
+    986.5
+   ],
+   "pos": 19,
+   "ch": "遮",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03442.png",
+   "cell": [
+    411.0,
+    498.0,
+    439.2,
+    517.6
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03442.png",
+   "shape": {
+    "w": 18.0,
+    "h": 17.3,
+    "fill": 0.599
+   },
+   "complete": true,
+   "text": "上坐的，門上人禀報進去，擡進禮來。玳安上帖兒，扒在地下磕頭。守備看了禮帖兒，說道：「多",
+   "api": "上坐的，門上人禀報進去，擡進禮來。玳安遮上帖兒，扒在地下磕頭。守備看了禮帖兒，說道：「多"
+  },
+  {
+   "class": "missing_char",
+   "page": 1625,
+   "col": [
+    134.7,
+    126.8,
+    167.1,
+    981.0
+   ],
+   "pos": 33,
+   "ch": "遮",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03444.png",
+   "cell": [
+    134.7,
+    767.4,
+    167.1,
+    786.9
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03444.png",
+   "shape": {
+    "w": 18.0,
+    "h": 18.0,
+    "fill": 0.586
+   },
+   "complete": true,
+   "text": "？」玳安道：「不是守備，是咱家的陳姐夫！我初進去，周爺正在廳上。我上帖兒，與他磕了頭，",
+   "api": "？」玳安道：「不是守備，是咱家的陳姐夫！我初進去，周爺正在廳上。我遮上帖兒，與他磕了頭，"
+  },
+  {
+   "class": "missing_char",
+   "page": 1642,
+   "col": [
+    460.4,
+    143.1,
+    489.9,
+    1007.0
+   ],
+   "pos": 8,
+   "ch": "既",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03487.png",
+   "cell": [
+    460.4,
+    300.2,
+    489.9,
+    319.8
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03487.png",
+   "shape": {
+    "w": 18.0,
+    "h": 16.1,
+    "fill": 0.595
+   },
+   "complete": true,
+   "text": "便了。你每三口兒遇着我，也不消搬去，便在此間住也不妨。請自穩便。」婦人與韓道國一齊下禮",
+   "api": "便了。你每三口兒既遇着我，也不消搬去，便在此間住也不妨。請自穩便。——婦人與韓道國一齊下禮"
+  },
+  {
+   "class": "missing_char",
+   "page": 1653,
+   "col": [
+    270.0,
+    129.0,
+    295.4,
+    987.5
+   ],
+   "pos": 5,
+   "ch": "蠻",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "crop": "tmp_vert/battle6/all_insert_crops/03510.png",
+   "cell": [
+    270.0,
+    226.6,
+    295.4,
+    246.1
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03510.png",
+   "shape": {
+    "w": 16.6,
+    "h": 18.0,
+    "fill": 0.684
+   },
+   "complete": true,
+   "text": "叫，採去何子來要打。諕的兩個主管，見經濟在樓上睡，恐他聽見。慌忙走出櫃來，向前聲喏說道",
+   "api": "叫，採去何蠻子來要打。誕的兩個主管，見經濟在樓上睡，恐他聽見。慌忙走出櫃來，向前聲喏說道"
+  },
+  {
+   "class": "missing_char",
+   "page": 1689,
+   "col": [
+    296.8,
+    229.8,
+    324.3,
+    872.6
+   ],
+   "pos": 27,
+   "ch": "翫",
+   "side": "",
+   "source": "api_strip",
+   "confidence": "high",
+   "ratio": 0.954,
+   "exp_len": 33,
+   "crop": "tmp_vert/battle6/all_insert_crops/03602.png",
+   "cell": [
+    296.8,
+    740.3,
+    324.3,
+    759.2
+   ],
+   "strip": "tmp_vert/battle6/all25/strips/03602.png",
+   "shape": {
+    "w": 17.0,
+    "h": 15.8,
+    "fill": 0.576
+   },
+   "complete": true,
+   "text": "僱了五六付扛擔，把獅子街的物件，抬運到西門慶家，都堆在花樓上。19",
+   "api": "僱了五六付扛擔，把獅子街的物件，抬運到西門慶家，都堆在翫花樓上。"
+  },
+  {
+   "class": "missing_char",
+   "page": 86,
+   "col": [
+    69.0,
+    206.1,
+    99.3,
+    873.2
+   ],
+   "pos": 20,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.941,
+   "exp_len": 25,
+   "text": "此二君，豈不是一撞着虞姬戚氏，豪傑都休。有詩為證：",
+   "api": "此二君，豈不是「撞着虞姬戚氏，豪傑都休。」有詩為證：",
+   "crop": "tmp_vert/battle8/quote_crops/p0086_20.png",
+   "cell": [
+    69.0,
+    719.3,
+    99.3,
+    744.9
+   ],
+   "feat": {
+    "w": 20.3,
+    "h": 9.8,
+    "fill": 0.32,
+    "left": 1.0,
+    "right": 0.22,
+    "top": 0.11,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 118,
+   "col": [
+    51.6,
+    217.4,
+    83.0,
+    1343.5
+   ],
+   "pos": 17,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "怎的連日不見王乾娘？我來買盞茶吃。我便出來請你入房裡坐，吃茶。他若見你，便起身來走了歸",
+   "api": "怎的連日不見王乾娘？我來買盞茶吃。」我便出來請你入房裡坐，吃茶。他若見你，便起身來走了歸",
+   "crop": "tmp_vert/battle8/quote_crops/p0118_17.png",
+   "cell": [
+    51.6,
+    652.5,
+    83.0,
+    678.1
+   ],
+   "feat": {
+    "w": 20.3,
+    "h": 10.4,
+    "fill": 0.47,
+    "left": 1.0,
+    "right": 0.36,
+    "top": 0.22,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 119,
+   "col": [
+    733.9,
+    215.6,
+    768.0,
+    1339.3
+   ],
+   "pos": 38,
+   "ch": "「",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "是他不來兜攬答應時，此事便休了。他若口裡答應，與你說話時，這光便有五分。我却難爲這位娘",
+   "api": "是他不來兜攬答應時，此事便休了。他若口裡答應，與你說話時，這光便有五分。我却「難爲這位娘",
+   "crop": "tmp_vert/battle8/quote_crops/p0119_38.png",
+   "cell": [
+    733.9,
+    1186.1,
+    768.0,
+    1211.6
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 10.6,
+    "fill": 0.49,
+    "left": 0.42,
+    "right": 1.0,
+    "top": 1.0,
+    "bottom": 0.24,
+    "corner": true,
+    "side": "right",
+    "ends": "top"
+   },
+   "verdict": "open-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 136,
+   "col": [
+    56.4,
+    201.2,
+    86.8,
+    1322.0
+   ],
+   "pos": 9,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "個，便只是他那個。婆子道：「便是大官人，也有姓名。」鄆哥道：「便是兩個字的。」婆子道：",
+   "api": "個，便只是他那個。」婆子道：「便是大官人，也有姓名。」鄆哥道：「便是兩個字的。」婆子道：",
+   "crop": "tmp_vert/battle8/quote_crops/p0136_9.png",
+   "cell": [
+    56.4,
+    430.5,
+    86.8,
+    455.9
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.1,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 166,
+   "col": [
+    738.4,
+    214.5,
+    769.6,
+    1343.0
+   ],
+   "pos": 40,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "兩個硬張主。娶過門時，生辰貴長，官人放他來走走，就認俺這門窮親戚，也不過上你窮。西門慶",
+   "api": "兩個硬張主。娶過門時，生辰貴長，官人放他來走走，就認俺這門窮親戚，也不過上你窮。——西門慶",
+   "crop": "tmp_vert/battle8/quote_crops/p0166_40.png",
+   "cell": [
+    738.4,
+    1240.4,
+    769.6,
+    1266.1
+   ],
+   "feat": {
+    "w": 20.3,
+    "h": 9.0,
+    "fill": 0.37,
+    "left": 1.0,
+    "right": 0.33,
+    "top": 0.15,
+    "bottom": 0.96,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 182,
+   "col": [
+    55.3,
+    194.4,
+    87.6,
+    1329.1
+   ],
+   "pos": 20,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "有別人，你指着旺跳身子說個誓，我方信你。那西門慶道：「我若負了你情意，生碗來大疔瘡，害",
+   "api": "有別人，你指着旺跳身子說個誓，我方信你。——那西門慶道：「我若負了你情意，生碗來大疔瘡，害",
+   "crop": "tmp_vert/battle8/quote_crops/p0182_20.png",
+   "cell": [
+    55.3,
+    710.2,
+    87.6,
+    736.0
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 9.7,
+    "fill": 0.38,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.17,
+    "bottom": 0.97,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 286,
+   "col": [
+    69.0,
+    208.8,
+    101.2,
+    1333.0
+   ],
+   "pos": 40,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "text": "一所，通身打開，與那邊花園取齊。前邊起蓋山子捲棚，花園耍子去處。還蓋三間玩花樓。婦人因",
+   "api": "一所，通身打開，與那邊花園取齊。前邊起蓋山子捲棚，花園要子去處。還蓋三間玩花樓。」婦人因",
+   "crop": "tmp_vert/battle8/quote_crops/p0286_40.png",
+   "cell": [
+    69.0,
+    1230.8,
+    101.2,
+    1256.3
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 11.3,
+    "fill": 0.3,
+    "left": 0.94,
+    "right": 0.27,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 345,
+   "col": [
+    814.1,
+    200.2,
+    848.2,
+    1323.3
+   ],
+   "pos": 28,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.886,
+   "exp_len": 43,
+   "text": "他問我，你每沒有這鬃髻；到銀匠家替他毀了，打兩件頭面戴。金蓮問道：「這鬃髻多少重？他要",
+   "api": "他問我，你每沒有這鬆鬆；到銀匠家替他毀了，打兩件頭面戴。——金蓮問道：「這鬆鬆多少重？他要",
+   "crop": "tmp_vert/battle8/quote_crops/p0345_28.png",
+   "cell": [
+    814.1,
+    914.9,
+    848.2,
+    940.4
+   ],
+   "feat": {
+    "w": 20.3,
+    "h": 9.7,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.11,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 362,
+   "col": [
+    790.8,
+    210.2,
+    824.8,
+    1328.7
+   ],
+   "pos": 33,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "慌了，使丫頭叫我回去，纔拿出這銀子與我。沒來由，教我恁意氣刺刺的！金蓮拿過李嬌兒銀子來",
+   "api": "慌了，使丫頭叫我回去，纔拿出這銀子與我。沒來由，敎我恁意氣刺刺的！」金蓮拿過李嬌兒銀子來",
+   "crop": "tmp_vert/battle8/quote_crops/p0362_33.png",
+   "cell": [
+    790.8,
+    1049.1,
+    824.8,
+    1074.5
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 9.0,
+    "fill": 0.34,
+    "left": 1.0,
+    "right": 0.25,
+    "top": 0.14,
+    "bottom": 0.97,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 362,
+   "col": [
+    481.8,
+    211.6,
+    516.8,
+    1328.7
+   ],
+   "pos": 37,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "多虧應二爹眾人，再三勸住，爹使性步馬回家；路上發狠，到明日還要擺布淫婦哩！金蓮道：「賊",
+   "api": "多虧應二爹衆人，再三勸住，爹使性步馬回家；路上發狠，到明日還要擺布淫婦哩！」金蓮道：「賊",
+   "crop": "tmp_vert/battle8/quote_crops/p0362_37.png",
+   "cell": [
+    481.8,
+    1151.0,
+    516.8,
+    1176.4
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 9.7,
+    "fill": 0.34,
+    "left": 1.0,
+    "right": 0.23,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 391,
+   "col": [
+    486.8,
+    196.8,
+    520.0,
+    1322.0
+   ],
+   "pos": 21,
+   "ch": "「",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "了淫婦的臉；待要含忍了他，恐怕他明白不認。罷！罷！留下個記兒，使他知道，到明日我和他答",
+   "api": "了淫婦的臉；待要含忍了他，恐怕他明白不認。「罷！罷！留下個記兒，使他知道，到明日我和他答",
+   "crop": "tmp_vert/battle8/quote_crops/p0391_21.png",
+   "cell": [
+    486.8,
+    733.8,
+    520.0,
+    759.4
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 10.4,
+    "fill": 0.3,
+    "left": 0.22,
+    "right": 1.0,
+    "top": 1.0,
+    "bottom": 0.14,
+    "corner": true,
+    "side": "right",
+    "ends": "top"
+   },
+   "verdict": "open-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 428,
+   "col": [
+    568.0,
+    201.6,
+    599.3,
+    1324.3
+   ],
+   "pos": 19,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "證見，揣着狀子，押着來旺兒往提刑院去。說：「某日酒醉持刀，夤夜殺害家主，又抵換銀兩等情",
+   "api": "證見，揣着狀子，押着來旺兒往提刑院去。」說：「某日酒醉持刀，夤夜殺害家主，又抵換銀兩等情",
+   "crop": "tmp_vert/battle8/quote_crops/p0428_19.png",
+   "cell": [
+    568.0,
+    686.4,
+    599.3,
+    711.9
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.8,
+    "fill": 0.32,
+    "left": 1.0,
+    "right": 0.3,
+    "top": 0.11,
+    "bottom": 0.97,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 486,
+   "col": [
+    772.6,
+    215.9,
+    804.0,
+    1333.0
+   ],
+   "pos": 23,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "琴童小厮進來說，墳上張安兒在外邊，見爹說話哩。西門慶道：「拿衣我穿，等我起去。」春梅一",
+   "api": "琴童小厮進來說，墳上張安兒在外邊，見爹說話哩。——西門慶道：「拿衣我穿，等我起去。」春梅一",
+   "crop": "tmp_vert/battle8/quote_crops/p0486_23.png",
+   "cell": [
+    772.6,
+    799.8,
+    804.0,
+    825.2
+   ],
+   "feat": {
+    "w": 20.3,
+    "h": 10.4,
+    "fill": 0.32,
+    "left": 0.93,
+    "right": 0.29,
+    "top": 0.11,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 550,
+   "col": [
+    62.7,
+    205.8,
+    98.7,
+    1338.8
+   ],
+   "pos": 32,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "在家不在家便恁的？就是娘在家，遇着我心不耐煩，他讓我，我也不吃。西門慶道：「你不吃，呵",
+   "api": "在家不在家便恁的？就是娘在家，遇着我心不耐煩，他讓我，我也不吃。——西門慶道：「你不吃，呵",
+   "crop": "tmp_vert/battle8/quote_crops/p0550_32.png",
+   "cell": [
+    62.7,
+    1029.8,
+    98.7,
+    1055.5
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.35,
+    "left": 1.0,
+    "right": 0.38,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 552,
+   "col": [
+    595.9,
+    217.3,
+    629.9,
+    1344.5
+   ],
+   "pos": 18,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "了。休怪小的說，倒是潑丟潑養的還好。金蓮道：「潑丟潑養，恨不得成日金子兒裹着他哩！」平",
+   "api": "了。休怪小的說，倒是潑丟潑養的還好。——金蓮道：「潑丟潑養，恨不得成日金子兒裹着他哩！」平",
+   "crop": "tmp_vert/battle8/quote_crops/p0552_18.png",
+   "cell": [
+    595.9,
+    678.4,
+    629.9,
+    704.0
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.38,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 570,
+   "col": [
+    767.5,
+    129.7,
+    801.5,
+    1256.8
+   ],
+   "pos": 14,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "他寫禮帖兒來，我便搖在床上。金蓮道：「巴巴的關着門兒寫禮帖，什麼機密謠言，什麼三隻腿的",
+   "api": "他寫禮帖兒來，我便搖在床上。——金蓮道：「巴巴的關着門兒寫禮帖，什麼機密謠言，什麼三隻腿的",
+   "crop": "tmp_vert/battle8/quote_crops/p0570_14.png",
+   "cell": [
+    767.5,
+    488.3,
+    801.5,
+    513.9
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 9.7,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.38,
+    "top": 0.18,
+    "bottom": 0.96,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 592,
+   "col": [
+    752.4,
+    121.7,
+    789.9,
+    1245.0
+   ],
+   "pos": 8,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "堂下，爲幸多矣。西門慶答道：「不敢。昨日雲峯書來，具道二位老先生華輔下臨，理當迎接。奈",
+   "api": "堂下，爲幸多矣。」西門慶答道：「不敢。昨日雲峯書來，具道二位老先生華下臨，理當迎接。奈",
+   "crop": "tmp_vert/battle8/quote_crops/p0592_8.png",
+   "cell": [
+    752.4,
+    325.9,
+    789.9,
+    351.5
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.8,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.3,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 607,
+   "col": [
+    500.7,
+    232.8,
+    537.3,
+    1182.8
+   ],
+   "pos": 33,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.973,
+   "exp_len": 36,
+   "text": "似猛風飄敗葉。硫黃元帥，盔歪甲散走無門；銀甲將軍，守住老營還要命。正是：",
+   "api": "似猛風飄敗葉。硫黃元帥，盔歪甲散走無門；銀甲將軍，守住老營還要命。——正是：",
+   "crop": "tmp_vert/battle8/quote_crops/p0607_33.png",
+   "cell": [
+    500.7,
+    1080.1,
+    537.3,
+    1105.8
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 9.0,
+    "fill": 0.35,
+    "left": 1.0,
+    "right": 0.33,
+    "top": 0.1,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 608,
+   "col": [
+    54.5,
+    119.0,
+    86.5,
+    1254.2
+   ],
+   "pos": 9,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "text": "這裡。姐你收了罷。玉簫笑道：「怪媽媽子！你爹還在屋里兌銀子，等出去了，你還親交與他罷。",
+   "api": "這裡。姐你收了罷。——玉蕭笑道：「怪媽媽子！你爹還在屋里兌銀子，等出去了，你還親交與他罷。",
+   "crop": "tmp_vert/battle8/quote_crops/p0608_9.png",
+   "cell": [
+    54.5,
+    351.2,
+    86.5,
+    377.0
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 619,
+   "col": [
+    823.8,
+    120.4,
+    859.5,
+    1254.2
+   ],
+   "pos": 14,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "text": "多，這兩日，纔吃的好些兒了。夏提刑道：「這馬甚是會行，只好長騎着，每日蹺街道兒罷了，不",
+   "api": "多，這兩日，纔吃的好些兒了。——夏提刑道：「這馬甚是會行，只好長騎着，每日踐街道兒罷了，不",
+   "crop": "tmp_vert/battle8/quote_crops/p0619_14.png",
+   "cell": [
+    823.8,
+    481.2,
+    859.5,
+    506.9
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.41,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 620,
+   "col": [
+    56.2,
+    121.7,
+    86.5,
+    1260.8
+   ],
+   "pos": 19,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "丫頭篩酒來你吃。大雪裡來家，只怕冷哩。西門慶道：「還有那葡萄酒，你篩來我吃。今日他家吃",
+   "api": "丫頭篩酒來你吃。大雪裡來家，只怕冷哩。——西門慶道：「還有那葡萄酒，你篩來我吃。今日他家吃",
+   "crop": "tmp_vert/battle8/quote_crops/p0620_19.png",
+   "cell": [
+    56.2,
+    613.6,
+    86.5,
+    639.5
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 10.4,
+    "fill": 0.38,
+    "left": 1.0,
+    "right": 0.29,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 623,
+   "col": [
+    821.1,
+    131.0,
+    856.8,
+    1255.5
+   ],
+   "pos": 7,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "，留着別處使。西門慶道：「怪奴才，八十歲媽媽沒牙，有那些唇說的！李大姐那邊請你和他下盤",
+   "api": "，留着別處使。——西門慶道：「怪奴才，八十歲媽媽沒牙，有那些唇說的！李大姐那邊請你和他下盤",
+   "crop": "tmp_vert/battle8/quote_crops/p0623_7.png",
+   "cell": [
+    821.1,
+    309.9,
+    856.8,
+    335.5
+   ],
+   "feat": {
+    "w": 21.1,
+    "h": 10.6,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 650,
+   "col": [
+    42.9,
+    132.3,
+    78.5,
+    1271.4
+   ],
+   "pos": 24,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "text": "他們只說他爹又尋了個丫頭，說他們諕，管定就信了。春梅打着燈籠，在頭裡走。走到撞見陳經濟",
+   "api": "他們只說他爹又尋了個丫頭，說他們說，管定就信了。」春梅打着燈籠，在頭裡走。走到撞見陳經濟",
+   "crop": "tmp_vert/battle8/quote_crops/p0650_24.png",
+   "cell": [
+    42.9,
+    753.6,
+    78.5,
+    779.5
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 10.6,
+    "fill": 0.41,
+    "left": 0.93,
+    "right": 0.35,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 664,
+   "col": [
+    770.2,
+    108.5,
+    804.1,
+    1241.0
+   ],
+   "pos": 9,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "崔親家母兩個姪女。西門慶說：「做親也罷了，只是有些不搬陪。」月娘道：「倒是俺嫂子見他家",
+   "api": "崔親家母兩個姪女。——西門慶說：「做親也罷了，只是有些不搬陪。」月娘道：「倒是俺嫂子見他家",
+   "crop": "tmp_vert/battle8/quote_crops/p0664_9.png",
+   "cell": [
+    770.2,
+    340.1,
+    804.1,
+    365.9
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 10.4,
+    "fill": 0.38,
+    "left": 1.0,
+    "right": 0.29,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 749,
+   "col": [
+    817.5,
+    107.2,
+    850.5,
+    1243.6
+   ],
+   "pos": 14,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "限他幾日拿他。敎他即便進禮。當下樂三娘子得此口詞，回報苗青。苗青滿心歡喜。西門慶見間壁",
+   "api": "限他幾日拿他。敎他即便進禮。」當下樂三娘子得此口詞，回報苗青。苗青滿心歡喜。西門慶見間壁",
+   "crop": "tmp_vert/battle8/quote_crops/p0749_14.png",
+   "cell": [
+    817.5,
+    468.8,
+    850.5,
+    494.6
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 10.4,
+    "fill": 0.31,
+    "left": 0.93,
+    "right": 0.22,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 774,
+   "col": [
+    66.0,
+    115.1,
+    98.2,
+    1245.0
+   ],
+   "pos": 36,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "中，坐名叫了董嬌兒、韓金釧兒兩個，打後門裡，用轎子擡了來，休交一人知道。那玳安一面應諾",
+   "api": "中，坐名叫了董嬌兒、韓金釧兒兩個，打後門裡，用轎子擡了來，休交一人知道。」那玳安一面應諾",
+   "crop": "tmp_vert/battle8/quote_crops/p0774_36.png",
+   "cell": [
+    66.0,
+    1039.6,
+    98.2,
+    1065.2
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 10.4,
+    "fill": 0.37,
+    "left": 1.0,
+    "right": 0.29,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 819,
+   "col": [
+    801.5,
+    132.3,
+    840.8,
+    1250.2
+   ],
+   "pos": 39,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "text": "同心結，方勝地兒，一個方勝兒裡面一對兒喜相逢，兩邊欄子兒都是纓絡出珠碎八寶兒。經濟聽了",
+   "api": "同心結，方勝地兒，一個方勝兒裡面一對兒喜相逢，兩邊欄子兒都是縷絡出珠碎八寶兒。——經濟聽了",
+   "crop": "tmp_vert/battle8/quote_crops/p0819_39.png",
+   "cell": [
+    801.5,
+    1123.2,
+    840.8,
+    1148.6
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.8,
+    "fill": 0.39,
+    "left": 1.0,
+    "right": 0.3,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 866,
+   "col": [
+    45.5,
+    121.7,
+    77.7,
+    1245.0
+   ],
+   "pos": 6,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "裡的言語呢！一走出去，東西南北都看得眼花了，那得董嬌兒的魂靈？望空罵道：「賊淫婦，在二",
+   "api": "裡的言語呢！——一走出去，東西南北都看得眼花了，那得董嬌兒的魂靈？望空罵道：「賊淫婦，在二",
+   "crop": "tmp_vert/battle8/quote_crops/p0866_6.png",
+   "cell": [
+    45.5,
+    271.5,
+    77.7,
+    296.4
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 9.7,
+    "fill": 0.42,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.17,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 925,
+   "col": [
+    718.5,
+    119.0,
+    756.9,
+    1250.2
+   ],
+   "pos": 35,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "奶，李大姐便有銀姐在這裡，我那屋裡有他潘姥姥，且輪不到往你那屋裡去哩。玉樓道：「你還沒",
+   "api": "奶，李大姐便有銀姐在這裡，我那屋裡有他潘姥姥，且輪不到往你那屋裡去哩。——玉樓道：「你還沒",
+   "crop": "tmp_vert/battle8/quote_crops/p0925_35.png",
+   "cell": [
+    718.5,
+    1018.8,
+    756.9,
+    1044.5
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.43,
+    "left": 1.0,
+    "right": 0.38,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 925,
+   "col": [
+    497.1,
+    121.7,
+    535.5,
+    1255.5
+   ],
+   "pos": 13,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "與你使便了。」真個有此話？小玉道：「我不曉的，敢是玉簫他聽見來？」金蓮向桂姐道：「你爹",
+   "api": "與你使便了。」真個有此話？」小玉道：「我不曉的，敢是玉簫他聽見來？」金蓮向桂姐道：「你爹",
+   "crop": "tmp_vert/battle8/quote_crops/p0925_13.png",
+   "cell": [
+    497.1,
+    456.7,
+    535.5,
+    482.5
+   ],
+   "feat": {
+    "w": 20.3,
+    "h": 9.8,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.3,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 928,
+   "col": [
+    56.2,
+    125.7,
+    97.3,
+    1252.9
+   ],
+   "pos": 26,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "了批合同。我會了喬親家，好收拾那邊房子。一兩日卸貨。伯爵道：「哥不消分付，我知道。」一",
+   "api": "了批合同。我會了喬親家，好收拾那邊房子。一兩日卸貨。——伯爵道：「哥不消分付，我知道。」一",
+   "crop": "tmp_vert/battle8/quote_crops/p0928_26.png",
+   "cell": [
+    56.2,
+    791.8,
+    97.3,
+    817.4
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 10.4,
+    "fill": 0.36,
+    "left": 0.93,
+    "right": 0.29,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 931,
+   "col": [
+    616.7,
+    132.3,
+    653.3,
+    1250.2
+   ],
+   "pos": 5,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "，你走了！教春梅：「與我採過跪着。取馬鞭子來，把他身上衣服與我扯了，好好教我打三十馬鞭",
+   "api": "，你走了！——教春梅：「與我採過跪着。取馬鞭子來，把他身上衣服與我扯了，好好教我打三十馬鞭",
+   "crop": "tmp_vert/battle8/quote_crops/p0931_5.png",
+   "cell": [
+    616.7,
+    259.3,
+    653.3,
+    284.7
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 9.7,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 934,
+   "col": [
+    53.5,
+    123.0,
+    86.5,
+    1256.8
+   ],
+   "pos": 11,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "打架子，要在出月開張。玉樓又問：「那寫書溫秀才家小，搬過來了不曾？」平安道：「從昨日就",
+   "api": "打架子，要在出月開張。」玉樓又問：「那寫書溫秀才家小，搬過來了不曾？」平安道：「從昨日就",
+   "crop": "tmp_vert/battle8/quote_crops/p0934_11.png",
+   "cell": [
+    53.5,
+    406.4,
+    86.5,
+    432.2
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 10.6,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 956,
+   "col": [
+    50.9,
+    134.9,
+    85.7,
+    1256.8
+   ],
+   "pos": 29,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "功行，他投害你不得，今此離身，到明日再生下來，纔是你兒女。這李瓶兒聽了，終是愛緣不斷。",
+   "api": "功行，他投害你不得，今此離身，到明日再生下來，纔是你兒女。——這李瓶兒聽了，終是愛緣不斷。",
+   "crop": "tmp_vert/battle8/quote_crops/p0956_29.png",
+   "cell": [
+    50.9,
+    874.3,
+    85.7,
+    899.8
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 10.6,
+    "fill": 0.33,
+    "left": 0.92,
+    "right": 0.28,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 977,
+   "col": [
+    706.0,
+    119.0,
+    739.9,
+    1242.3
+   ],
+   "pos": 41,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "叫了宅裡去，唱與他娘每聽。他也常在各人家走。若叫他，預先兩日定下他，他並不敢悮了。西門",
+   "api": "叫了宅裡去，唱與他娘每聽。他也常在各人家走。若叫他，預先兩日定下他，他並不敢悮了。——西門",
+   "crop": "tmp_vert/battle8/quote_crops/p0977_41.png",
+   "cell": [
+    706.0,
+    1165.7,
+    739.9,
+    1191.2
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 11.3,
+    "fill": 0.34,
+    "left": 1.0,
+    "right": 0.27,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 978,
+   "col": [
+    49.1,
+    123.0,
+    82.1,
+    1248.9
+   ],
+   "pos": 34,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "爹到明日呼喚他，早些兒來對我說。我使孩子早拏轎子去接他，送到宅內去。西門慶因說：「申二",
+   "api": "爹到明日呼喚他，早些兒來對我說。我使孩子早拏轎子去接他，送到宅內去。——西門慶因說：「申二",
+   "crop": "tmp_vert/battle8/quote_crops/p0978_34.png",
+   "cell": [
+    49.1,
+    993.0,
+    82.1,
+    1018.6
+   ],
+   "feat": {
+    "w": 22.4,
+    "h": 11.3,
+    "fill": 0.31,
+    "left": 0.93,
+    "right": 0.34,
+    "top": 0.13,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 996,
+   "col": [
+    498.0,
+    141.6,
+    536.4,
+    1262.2
+   ],
+   "pos": 19,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "如何？只怕犯着甚麼星辰，替他禳保禳保。西門慶這裡旋差人拏帖兒往周守備府裡問去。那裡說：",
+   "api": "如何？只怕犯着甚麼星辰，替他禳保禳保。——西門慶這裡旋差人拏帖兒往周守備府裡問去。那裡說：",
+   "crop": "tmp_vert/battle8/quote_crops/p0996_19.png",
+   "cell": [
+    498.0,
+    625.5,
+    536.4,
+    651.0
+   ],
+   "feat": {
+    "w": 22.6,
+    "h": 11.3,
+    "fill": 0.32,
+    "left": 1.0,
+    "right": 0.27,
+    "top": 0.13,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1002,
+   "col": [
+    767.5,
+    121.7,
+    807.7,
+    1245.0
+   ],
+   "pos": 37,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "反被他推我一交。說他那里又買了房子，來纏了好幾遍，只叫我去。只不好對你說。西門慶聽了，",
+   "api": "反被他推我一交。說他那里又買了房子，來纏了好幾遍，只叫我去。只不好對你說。——西門慶聽了，",
+   "crop": "tmp_vert/battle8/quote_crops/p1002_37.png",
+   "cell": [
+    767.5,
+    1066.3,
+    807.7,
+    1091.8
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 10.4,
+    "fill": 0.44,
+    "left": 0.93,
+    "right": 0.43,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1034,
+   "col": [
+    15.2,
+    134.9,
+    49.1,
+    1259.5
+   ],
+   "pos": 42,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "姐兒三個在這裡，何不請出來與喬老親家、老舅席上遞杯酒兒？他到是會看戲，又倒便益了他。西",
+   "api": "姐兒三個在這裡，何不請出來與喬老親家、老舅席上遞杯酒兒？他到是會看戲，又倒便益了他。——西",
+   "crop": "tmp_vert/battle8/quote_crops/p1034_42.png",
+   "cell": [
+    15.2,
+    1208.4,
+    49.1,
+    1233.9
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 9.7,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.17,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1090,
+   "col": [
+    675.6,
+    121.7,
+    710.5,
+    1243.6
+   ],
+   "pos": 38,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "相，發恨要親往東平府自家抬銀子去，只怕他老牛瘡嘴癒了去，却不難為哥的本錢了。西門慶道：",
+   "api": "相，發恨要親往東平府自家抬銀子去，只怕他老牛瘡嘴癒了去，却不難爲哥的本錢了。」西門慶道：",
+   "crop": "tmp_vert/battle8/quote_crops/p1090_38.png",
+   "cell": [
+    675.6,
+    1090.6,
+    710.5,
+    1116.1
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 10.4,
+    "fill": 0.32,
+    "left": 1.0,
+    "right": 0.22,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1118,
+   "col": [
+    62.5,
+    131.0,
+    100.0,
+    1262.2
+   ],
+   "pos": 11,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "使小厮再送一罐來你吃。又問：「爹連日會桂姐來沒有？」西門慶道：「自從孝堂裡到如今，誰見",
+   "api": "使小厮再送一罐來你吃。」又問：「爹連日會桂姐來沒有？」西門慶道：「自從孝堂裡到如今，誰見",
+   "crop": "tmp_vert/battle8/quote_crops/p1118_11.png",
+   "cell": [
+    62.5,
+    413.8,
+    100.0,
+    439.5
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 10.6,
+    "fill": 0.35,
+    "left": 0.93,
+    "right": 0.28,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1120,
+   "col": [
+    326.6,
+    146.8,
+    365.9,
+    1272.8
+   ],
+   "pos": 30,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.953,
+   "exp_len": 43,
+   "text": "呵啓殺我罷了！只好樊家百家奴兒接他，一向董金兒也與他丁八了。西門慶道：「我猜不著，端的",
+   "api": "阿殺我罷了！只好樊家百家奴兒接他，一向董金兒也與他丁八了。」西門慶道：「我猜不著，端的",
+   "crop": "tmp_vert/battle8/quote_crops/p1120_30.png",
+   "cell": [
+    326.6,
+    914.5,
+    365.9,
+    940.1
+   ],
+   "feat": {
+    "w": 21.0,
+    "h": 10.4,
+    "fill": 0.34,
+    "left": 0.93,
+    "right": 0.36,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1124,
+   "col": [
+    784.5,
+    146.8,
+    819.3,
+    1274.0
+   ],
+   "pos": 41,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "今早辰問溫師父，倒沒酒，應二爹醉了，吐了一地。月姨恐怕夜深了，使鄭春送了他家去了。西門",
+   "api": "今早辰問溫師父，倒沒酒，應二爹醉了，吐了一地。月姨恐怕夜深了，使鄭春送了他家去了。——西門",
+   "crop": "tmp_vert/battle8/quote_crops/p1124_41.png",
+   "cell": [
+    784.5,
+    1197.1,
+    819.3,
+    1222.8
+   ],
+   "feat": {
+    "w": 21.8,
+    "h": 9.7,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1134,
+   "col": [
+    43.8,
+    113.8,
+    75.8,
+    1241.0
+   ],
+   "pos": 9,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "激不淺，自當重謝。西門慶道：「老太太怎生這般說，言「謝」之一字？尊家乃世代簪纓，先朝將",
+   "api": "激不淺，自當重謝。——西門慶道：「老太太怎生這般說，言「謝」之一字？尊家乃世代簪纓，先朝將",
+   "crop": "tmp_vert/battle8/quote_crops/p1134_9.png",
+   "cell": [
+    43.8,
+    344.4,
+    75.8,
+    370.0
+   ],
+   "feat": {
+    "w": 21.7,
+    "h": 10.6,
+    "fill": 0.34,
+    "left": 0.92,
+    "right": 0.28,
+    "top": 0.17,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1178,
+   "col": [
+    382.1,
+    148.5,
+    406.1,
+    998.4
+   ],
+   "pos": 31,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.952,
+   "exp_len": 42,
+   "text": "「學生裡邊没穿甚麼衣服，使小价下處取來。何太監道：「不消取去。令左右接了衣服：「拿我",
+   "api": "學生裡邊沒穿甚麼衣服，使小价下處取來。何太監道：「不消取去。」令左右接了衣服：「拿我",
+   "crop": "tmp_vert/battle8/quote_crops/p1178_31.png",
+   "cell": [
+    382.1,
+    761.2,
+    406.1,
+    781.0
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 6.5,
+    "fill": 0.21,
+    "left": 1.0,
+    "right": 0.07,
+    "top": 0.18,
+    "bottom": 0.96,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1178,
+   "col": [
+    349.0,
+    148.5,
+    372.9,
+    996.2
+   ],
+   "pos": 37,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.988,
+   "exp_len": 42,
+   "text": "穿的飛魚綠絨褧衣來與大人披上。西門慶笑道：「老公公職事之服，學生何以穿得？何太監道：",
+   "api": "穿的飛魚綠絨褧衣來與大人披上。西門慶笑道：「老公公職事之服，學生何以穿得？」何太監道：",
+   "crop": "tmp_vert/battle8/quote_crops/p1178_37.png",
+   "cell": [
+    349.0,
+    877.9,
+    372.9,
+    897.6
+   ],
+   "feat": {
+    "w": 16.6,
+    "h": 8.3,
+    "fill": 0.31,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1200,
+   "col": [
+    349.0,
+    155.0,
+    372.9,
+    995.1
+   ],
+   "pos": 30,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.944,
+   "exp_len": 43,
+   "text": "且說三分話，未可全拋一片心。」老婆還有個裡外心兒，休說世人！正說，只見玳安來說：「賁四",
+   "api": "且說三分話，未可全拋一片心。——老婆還有個裡外心兒，休說世人！——正說，只見玳安來說：「賁四",
+   "crop": "tmp_vert/battle8/quote_crops/p1200_30.png",
+   "cell": [
+    349.0,
+    727.8,
+    372.9,
+    746.9
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 8.2,
+    "fill": 0.27,
+    "left": 1.0,
+    "right": 0.18,
+    "top": 0.14,
+    "bottom": 0.96,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1215,
+   "col": [
+    396.2,
+    155.0,
+    426.5,
+    1001.6
+   ],
+   "pos": 25,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "「你且休去，在書房中坐坐。等我梳了頭兒，咱每吃飯。說畢，入後邊去了。這伯爵便向李銘道：",
+   "api": "「你且休去，在書房中坐坐。等我梳了頭兒，咱每吃飯。」說畢，入後邊去了。這伯爵便向李銘道：",
+   "crop": "tmp_vert/battle8/quote_crops/p1215_25.png",
+   "cell": [
+    396.2,
+    636.0,
+    426.5,
+    655.3
+   ],
+   "feat": {
+    "w": 16.6,
+    "h": 8.3,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1279,
+   "col": [
+    631.0,
+    145.2,
+    655.6,
+    993.0
+   ],
+   "pos": 37,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "text": "淡，只顧住着怎的？也住了這幾日了。他家中丟着孩子，也沒人看。我教他家去了。玉筲道：「我",
+   "api": "淡，只顧住着怎的？也住了這幾日了。他家中丢着孩子，也没人看。我教他家去了。」玉筲道：「我",
+   "crop": "tmp_vert/battle8/quote_crops/p1279_37.png",
+   "cell": [
+    631.0,
+    858.1,
+    655.6,
+    877.4
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 8.3,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.13,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1320,
+   "col": [
+    351.1,
+    152.8,
+    374.4,
+    988.6
+   ],
+   "pos": 28,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "日聽見洪四兒說，祝麻子又會着王三官兒，大街上請了榮嬌兒。鄭月兒道：「只在榮嬌兒家歇了一",
+   "api": "日聽見洪四兒說，祝麻子又會着王三官兒，大街上請了榮嬌兒。——鄭月兒道：「只在榮嬌兒家歇了一",
+   "crop": "tmp_vert/battle8/quote_crops/p1320_28.png",
+   "cell": [
+    351.1,
+    684.7,
+    374.4,
+    703.7
+   ],
+   "feat": {
+    "w": 15.8,
+    "h": 7.6,
+    "fill": 0.35,
+    "left": 1.0,
+    "right": 0.21,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1355,
+   "col": [
+    303.9,
+    163.7,
+    327.9,
+    1009.2
+   ],
+   "pos": 22,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "得這步田地，他把娘喝過來斷過去，不看一眼兒！如意兒道：「原來五娘從小兒上學來？嗔道恁題",
+   "api": "得這步田地，他把娘喝過來斷過去，不看一眼兒！——如意兒道：「原來五娘從小兒上學來？嗔道恁題",
+   "crop": "tmp_vert/battle8/quote_crops/p1355_22.png",
+   "cell": [
+    303.9,
+    586.5,
+    327.9,
+    605.7
+   ],
+   "feat": {
+    "w": 15.7,
+    "h": 8.3,
+    "fill": 0.37,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1393,
+   "col": [
+    540.8,
+    152.8,
+    564.0,
+    996.2
+   ],
+   "pos": 35,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "傻！常言道：「楊州雖好，不是久戀之家。」不拘多少時，也少不的離他家門。那李嬌兒聽記在心",
+   "api": "傻！常言道：「楊州雖好，不是久戀之家。」不拘多少時，也少不的離他家門。」那李嬌兒聽記在心",
+   "crop": "tmp_vert/battle8/quote_crops/p1393_35.png",
+   "cell": [
+    540.8,
+    823.7,
+    564.0,
+    842.9
+   ],
+   "feat": {
+    "w": 15.7,
+    "h": 8.3,
+    "fill": 0.31,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1418,
+   "col": [
+    7.0,
+    144.2,
+    33.9,
+    990.8
+   ],
+   "pos": 26,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "早是我，你摟便將就罷了！若是別人，你也恁大膽摟起來？經濟吃的半酣兒笑道：「早知摟了你，",
+   "api": "早是我，你摟便將就罷了！若是別人，你也恁大膽摟起來？——經濟吃的半酣兒笑道：「早知摟了你，",
+   "crop": "tmp_vert/battle8/quote_crops/p1418_26.png",
+   "cell": [
+    7.0,
+    644.5,
+    33.9,
+    663.7
+   ],
+   "feat": {
+    "w": 16.6,
+    "h": 8.2,
+    "fill": 0.35,
+    "left": 1.0,
+    "right": 0.26,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1434,
+   "col": [
+    5.7,
+    142.0,
+    31.0,
+    993.0
+   ],
+   "pos": 4,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "text": "在那裡？經濟道：「玳安和平安在那裡生藥舖中睡哩。獨我一個在此受孤恓，挨冷淡，就是小生！",
+   "api": "在那裡？——經濟道：「玳安和平安在那裡生藥鋪中睡哩。獨我一個在此受孤恓，挨冷淡，就是小生！",
+   "crop": "tmp_vert/battle8/quote_crops/p1434_4.png",
+   "cell": [
+    5.7,
+    219.4,
+    31.0,
+    238.7
+   ],
+   "feat": {
+    "w": 17.3,
+    "h": 9.0,
+    "fill": 0.3,
+    "left": 0.92,
+    "right": 0.24,
+    "top": 0.17,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1438,
+   "col": [
+    272.1,
+    153.9,
+    294.0,
+    268.9
+   ],
+   "pos": 2,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.909,
+   "exp_len": 5,
+   "text": "了。正是：",
+   "api": "了。」正是：",
+   "crop": "tmp_vert/battle8/quote_crops/p1438_2.png",
+   "cell": [
+    272.1,
+    192.2,
+    294.0,
+    211.4
+   ],
+   "feat": {
+    "w": 17.3,
+    "h": 9.0,
+    "fill": 0.35,
+    "left": 1.0,
+    "right": 0.24,
+    "top": 0.17,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1444,
+   "col": [
+    5.7,
+    150.7,
+    30.3,
+    1002.7
+   ],
+   "pos": 28,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "聊備粗齋薄饌，倒反勞見賜厚禮，使小道卻之不恭，受之有愧！辭謝再三，方令徒弟收下去。一面",
+   "api": "聊備粗齋薄饌，倒反勞見賜厚禮，使小道卻之不恭，受之有愧！——辭謝再三，方令徒弟收下去。一面",
+   "crop": "tmp_vert/battle8/quote_crops/p1444_28.png",
+   "cell": [
+    5.7,
+    692.9,
+    30.3,
+    712.2
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 7.4,
+    "fill": 0.38,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.13,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1458,
+   "col": [
+    5.7,
+    158.2,
+    31.0,
+    1001.6
+   ],
+   "pos": 24,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "，一來我心裡不自在，二來因些閒話，沒曾往那邊去。春梅道：「都是俺房裡秋菊這奴才，大娘不",
+   "api": "，一來我心裡不自在，二來因些閒話，沒曾往那邊去。——春梅道：「都是俺房裡秋菊這奴才，大娘不",
+   "crop": "tmp_vert/battle8/quote_crops/p1458_24.png",
+   "cell": [
+    5.7,
+    618.2,
+    31.0,
+    637.4
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 9.0,
+    "fill": 0.33,
+    "left": 0.92,
+    "right": 0.33,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1468,
+   "col": [
+    49.4,
+    156.1,
+    74.0,
+    1002.7
+   ],
+   "pos": 16,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.955,
+   "exp_len": 43,
+   "text": "墙有缝，壁有耳，恰似你醉了一般！經濟道：「老夥計，你不知道。我酒在肚裏，事在心頭！俺丈",
+   "api": "墙有縫，壁有耳，恰似你醉了一般！——經濟道：「老夥計，你不知道。我酒在肚裏，事在心頭！俺丈",
+   "crop": "tmp_vert/battle8/quote_crops/p1468_16.png",
+   "cell": [
+    49.4,
+    464.0,
+    74.0,
+    483.2
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 8.3,
+    "fill": 0.43,
+    "left": 1.0,
+    "right": 0.36,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1474,
+   "col": [
+    22.6,
+    148.5,
+    47.2,
+    1001.6
+   ],
+   "pos": 16,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "扎心的，半夜三更耗爆人，不得睡。良久，又聽見動彈，搖的床子格支支響。王婆又問：「那裡響",
+   "api": "扎心的，半夜三更耗爆人，不得睡。」良久，又聽見動彈，搖的床子格支支響。王婆又問：「那裡響",
+   "crop": "tmp_vert/battle8/quote_crops/p1474_16.png",
+   "cell": [
+    22.6,
+    458.7,
+    47.2,
+    478.1
+   ],
+   "feat": {
+    "w": 16.6,
+    "h": 8.3,
+    "fill": 0.37,
+    "left": 1.0,
+    "right": 0.36,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1482,
+   "col": [
+    568.2,
+    152.8,
+    593.6,
+    1000.5
+   ],
+   "pos": 40,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "不過這許多人口來。小的待回南邊去，又沒順便人帶去。這城內尋個人家跟，又沒個門路。伯爵道",
+   "api": "不過這許多人口來。小的待回南邊去，又沒順便人帶去。這城內尋個人家跟，又沒個門路。——伯爵道",
+   "crop": "tmp_vert/battle8/quote_crops/p1482_40.png",
+   "cell": [
+    568.2,
+    923.4,
+    593.6,
+    942.7
+   ],
+   "feat": {
+    "w": 17.3,
+    "h": 9.0,
+    "fill": 0.36,
+    "left": 0.92,
+    "right": 0.33,
+    "top": 0.13,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1486,
+   "col": [
+    22.6,
+    151.8,
+    48.0,
+    1003.8
+   ],
+   "pos": 41,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 43,
+   "text": "和我則定價錢。我今胡亂與他一、二十兩銀子，滿纂的就是了。綁着鬼，也落他多一半養家。一面",
+   "api": "和我則定價錢。我今胡亂與他一、二十兩銀子，滿纂的就是了。綁着鬼，也落他多半養家。——一面",
+   "crop": "tmp_vert/battle8/quote_crops/p1486_41.png",
+   "cell": [
+    22.6,
+    945.7,
+    48.0,
+    965.1
+   ],
+   "feat": {
+    "w": 17.2,
+    "h": 8.3,
+    "fill": 0.32,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.13,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1494,
+   "col": [
+    2.1,
+    143.1,
+    29.6,
+    996.2
+   ],
+   "pos": 30,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "已死，母親押靈車不久就到。我押了兩車行李，先來收拾打掃房屋。他母舅聽說：「既然如此，我",
+   "api": "已死，母親押靈車不久就到。我押了兩車行李，先來收拾打掃房屋。」他母舅聽說：「既然如此，我",
+   "crop": "tmp_vert/battle8/quote_crops/p1494_30.png",
+   "cell": [
+    2.1,
+    724.8,
+    29.6,
+    744.1
+   ],
+   "feat": {
+    "w": 15.7,
+    "h": 7.6,
+    "fill": 0.39,
+    "left": 1.0,
+    "right": 0.4,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1500,
+   "col": [
+    49.4,
+    139.8,
+    74.0,
+    996.2
+   ],
+   "pos": 5,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "佛爺女兒？月娘道：「相這比丘尼姑僧，是佛的女兒。」小玉道：「譬若說相薛姑子、王姑子、太",
+   "api": "佛爺女兒？——月娘道：「相這比丘尼姑僧，是佛的女兒。」小玉道：「譬若說相薛姑子、王姑子、太",
+   "crop": "tmp_vert/battle8/quote_crops/p1500_5.png",
+   "cell": [
+    49.4,
+    237.1,
+    74.0,
+    256.6
+   ],
+   "feat": {
+    "w": 16.6,
+    "h": 8.3,
+    "fill": 0.39,
+    "left": 1.0,
+    "right": 0.28,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1500,
+   "col": [
+    14.8,
+    139.8,
+    39.5,
+    994.0
+   ],
+   "pos": 17,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "師父，都是佛爺女兒。誰是佛爺女婿？月娘忍不住笑罵道：「這賊小淫婦兒，學的油嘴滑舌，見見",
+   "api": "師父，都是佛爺女兒。誰是佛爺女婿？——月娘忍不住笑罵道：「這賊小淫婦兒，學的油嘴滑舌，見見",
+   "crop": "tmp_vert/battle8/quote_crops/p1500_17.png",
+   "cell": [
+    14.8,
+    469.8,
+    39.5,
+    489.2
+   ],
+   "feat": {
+    "w": 16.4,
+    "h": 8.3,
+    "fill": 0.43,
+    "left": 0.9,
+    "right": 0.36,
+    "top": 0.18,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1536,
+   "col": [
+    52.9,
+    139.8,
+    80.3,
+    995.1
+   ],
+   "pos": 11,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "爹下世了，來有甚話說？陶媽媽道：「累及管家進去稟聲，我是本縣官媒人，名喚陶媽媽。奉衙內",
+   "api": "爹下世了，來有甚話說？」陶媽媽道：「累及管家進去稟聲，我是本縣官媒人，名喚陶媽媽。奉衙內",
+   "crop": "tmp_vert/battle8/quote_crops/p1536_11.png",
+   "cell": [
+    52.9,
+    353.6,
+    80.3,
+    373.1
+   ],
+   "feat": {
+    "w": 15.0,
+    "h": 7.4,
+    "fill": 0.41,
+    "left": 1.0,
+    "right": 0.31,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1539,
+   "col": [
+    575.3,
+    149.6,
+    600.6,
+    997.3
+   ],
+   "pos": 8,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "到縣裡任意拶打。玉樓道：「你衙內有兒女沒有？原籍那里人氏？誠恐一時任滿，千山萬水帶去，",
+   "api": "到縣裡任意拶打。——玉樓道：「你衙內有兒女沒有？原籍那里人氏？誠恐一時任滿，千山萬水帶去，",
+   "crop": "tmp_vert/battle8/quote_crops/p1539_8.png",
+   "cell": [
+    575.3,
+    303.7,
+    600.6,
+    323.0
+   ],
+   "feat": {
+    "w": 15.7,
+    "h": 7.4,
+    "fill": 0.36,
+    "left": 1.0,
+    "right": 0.29,
+    "top": 0.19,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1573,
+   "col": [
+    276.4,
+    153.9,
+    301.1,
+    1007.0
+   ],
+   "pos": 19,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "與他箇甜頭兒，且教他在我手內納些敗缺！一面故意聲叫起來。這金宗明恐怕老道士聽見，連忙掩",
+   "api": "與他箇甜頭兒，且教他在我手內納些敗缺！——一面故意聲叫起來。這金宗明恐怕老道士聽見，連忙掩",
+   "crop": "tmp_vert/battle8/quote_crops/p1573_19.png",
+   "cell": [
+    276.4,
+    522.3,
+    301.1,
+    541.7
+   ],
+   "feat": {
+    "w": 15.7,
+    "h": 7.6,
+    "fill": 0.38,
+    "left": 0.89,
+    "right": 0.4,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1588,
+   "col": [
+    494.2,
+    136.6,
+    520.3,
+    986.5
+   ],
+   "pos": 2,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "用？一面請將守備來：「採雪娥出去，當天井跪着！前邊叫將張勝、李安，旋剝褪去衣裳，打三十",
+   "api": "用？——一面請將守備來：「採雪娥出去，當天井跪着！前邊叫將張勝、李安，旋剝褪去衣裳，打三十",
+   "crop": "tmp_vert/battle8/quote_crops/p1588_2.png",
+   "cell": [
+    494.2,
+    175.2,
+    520.3,
+    194.5
+   ],
+   "feat": {
+    "w": 15.0,
+    "h": 8.3,
+    "fill": 0.37,
+    "left": 0.9,
+    "right": 0.36,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1588,
+   "col": [
+    45.1,
+    136.6,
+    69.1,
+    987.5
+   ],
+   "pos": 11,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "頭腦，我去自有飯吃罷！薛嫂道：「他千萬分付，只教我把你送在娼門。我養兒養女，也要天理！",
+   "api": "頭腦，我去自有飯吃罷！——薛嫂道：「他千萬分付，只教我把你送在娼門。我養兒養女，也要天理！",
+   "crop": "tmp_vert/battle8/quote_crops/p1588_11.png",
+   "cell": [
+    45.1,
+    349.3,
+    69.1,
+    368.7
+   ],
+   "feat": {
+    "w": 15.0,
+    "h": 7.6,
+    "fill": 0.4,
+    "left": 1.0,
+    "right": 0.3,
+    "top": 0.15,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1590,
+   "col": [
+    21.9,
+    135.5,
+    50.0,
+    989.7
+   ],
+   "pos": 13,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "的。這潘家玉兒我有些眼熟。因叫他近前，悄悄問他：「你莫不是老爺宅裡雪姑娘麼？怎生到于此",
+   "api": "的。這潘家玉兒我有些眼熟。」因叫他近前，悄悄問他：「你莫不是老爺宅裡雪姑娘麼？怎生到于此",
+   "crop": "tmp_vert/battle8/quote_crops/p1590_13.png",
+   "cell": [
+    21.9,
+    387.9,
+    50.0,
+    407.3
+   ],
+   "feat": {
+    "w": 15.0,
+    "h": 6.8,
+    "fill": 0.42,
+    "left": 1.0,
+    "right": 0.33,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 1610,
+   "col": [
+    35.2,
+    157.2,
+    60.6,
+    1008.1
+   ],
+   "pos": 33,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "姐姐你還不知，奶子與了來興兒做了媳婦兒了。來興兒那媳婦，害病沒了！春梅道：「他一心要在",
+   "api": "姐姐你還不知，奶子與了來興兒做了媳婦兒了。來興兒那媳婦，害病沒了！——春梅道：「他一心要在",
+   "crop": "tmp_vert/battle8/quote_crops/p1610_33.png",
+   "cell": [
+    35.2,
+    795.4,
+    60.6,
+    814.7
+   ],
+   "feat": {
+    "w": 15.7,
+    "h": 8.2,
+    "fill": 0.43,
+    "left": 1.0,
+    "right": 0.37,
+    "top": 0.15,
+    "bottom": 0.95,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "reclass-close"
+  },
+  {
+   "class": "missing_char",
+   "page": 1626,
+   "col": [
+    28.9,
+    126.8,
+    58.5,
+    980.0
+   ],
+   "pos": 23,
+   "ch": "」",
+   "side": "",
+   "source": "api_strip_quote",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "送了禮，莫不白受他的？還等着我這裡人請他去哩！經濟道：「今後不消理那淫婦了，又請他怎的",
+   "api": "送了禮，莫不白受他的？還等着我這裡人請他去哩！」經濟道：「今後不消理那淫婦了，又請他怎的",
+   "crop": "tmp_vert/battle8/quote_crops/p1626_23.png",
+   "cell": [
+    28.9,
+    572.8,
+    58.5,
+    592.2
+   ],
+   "feat": {
+    "w": 15.8,
+    "h": 8.3,
+    "fill": 0.35,
+    "left": 1.0,
+    "right": 0.26,
+    "top": 0.14,
+    "bottom": 1.0,
+    "corner": true,
+    "side": "left",
+    "ends": "bottom"
+   },
+   "verdict": "close-ok"
   }
  ],
  "ring_digit_merge": {
