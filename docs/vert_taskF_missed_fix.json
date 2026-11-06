@@ -14806,6 +14806,279 @@
     "ends": "bottom"
    },
    "verdict": "close-ok"
+  },
+  {
+   "class": "missing_char",
+   "page": 57,
+   "col": [
+    792.0,
+    247.2,
+    866.7,
+    955.6
+   ],
+   "pos": 7,
+   "ch": "——",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.947,
+   "exp_len": 9,
+   "text": "論金瓶梅這部書導讀",
+   "api": "論金瓶梅這部書—導讀",
+   "crop": "tmp_vert/battle9/fix/p57_7.png",
+   "cell": [
+    792.0,
+    424.3,
+    866.7,
+    449.6
+   ],
+   "note": "t38: p57 真破折号一条竖线(79.5pt) -> 两个 — 成组, dash rule 画一条"
+  },
+  {
+   "class": "missing_char",
+   "page": 147,
+   "col": [
+    537.5,
+    208.3,
+    574.4,
+    1332.1
+   ],
+   "pos": 13,
+   "ch": "」，",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.989,
+   "exp_len": 43,
+   "text": "，枕頭邊，你快調來與我吃！那婦人揭起蓆，將那藥抖在盞子裡，把那藥帖安了，將白湯沖在盞裡",
+   "api": "，枕頭邊，你快調來與我吃！，那婦人揭起蓆，將那藥抖在盞子裡，把那藥帖安了，將白湯沖在盞裡",
+   "crop": "tmp_vert/battle9/fix/p147_13.png",
+   "cell": [
+    537.5,
+    540.3,
+    574.4,
+    565.9
+   ],
+   "note": "t38: 本格 ﹂ 18.7x7.7 + 逗号 4.5x6.8 -> 插 」，"
+  },
+  {
+   "class": "missing_char",
+   "page": 186,
+   "col": [
+    143.2,
+    217.0,
+    174.6,
+    1345.0
+   ],
+   "pos": 2,
+   "ch": "」。",
+   "side": "",
+   "source": "api_strip_punct",
+   "confidence": "high",
+   "ratio": 0.976,
+   "exp_len": 41,
+   "text": "餓鬼蘇東坡又云：「不禿不毒，不毒不禿；轉毒轉禿，轉禿轉毒。」此一篇議論，專說這為僧",
+   "api": "餓鬼」。蘇東坡又云：「不禿不毒，不毒不禿；轉毒轉禿，轉禿轉毒。」此一篇議論，專說這爲僧",
+   "crop": "tmp_vert/battle9/fix/p186_2.png",
+   "cell": [
+    143.2,
+    268.3,
+    174.6,
+    293.9
+   ],
+   "note": "t38: 本格 ﹂ 20.2x9.0 + 下一格 。7.5x8.2 -> 插 」。"
+  },
+  {
+   "class": "missing_char",
+   "page": 68,
+   "col": [
+    494.2,
+    222.5,
+    530.1,
+    1224.5
+   ],
+   "pos": 12,
+   "ch": "尚",
+   "side": "",
+   "source": "api_strip_census",
+   "confidence": "high",
+   "ratio": 0.987,
+   "exp_len": 39,
+   "text": "補三人），正五品，後多以書兼攝，凡擔任此大學士職者，謂之「閣臣」。所以稱蔡京爲",
+   "api": "補三人），正五品，後多以尚書兼攝，凡擔任此大學士職者，謂之「閣臣」。所以稱蔡京為",
+   "crop": "tmp_vert/battle9/d_fix/p68_12.png",
+   "cell": [
+    494.2,
+    530.8,
+    530.1,
+    556.5
+   ],
+   "complete": true,
+   "shape": {
+    "w": 22.3,
+    "h": 18.0,
+    "fill": 0.388
+   }
+  },
+  {
+   "class": "missing_char",
+   "page": 932,
+   "col": [
+    87.5,
+    136.2,
+    133.0,
+    1267.5
+   ],
+   "pos": 16,
+   "ch": "人",
+   "side": "",
+   "source": "api_strip_census",
+   "confidence": "high",
+   "ratio": 0.944,
+   "exp_len": 44,
+   "text": "也印不成，沒腳蠏行貨子，藏在那大家，你那裡尋他去？早時我說，叫將賁四來，同他去了。」金：",
+   "api": "也印不成，沒腳蠏行貨子，藏在那大人家，你那裡尋他去？早時我說，叫將賁四來，同他去了。——金",
+   "crop": "tmp_vert/battle9/d_fix/p932_16.png",
+   "cell": [
+    87.5,
+    547.6,
+    133.0,
+    573.3
+   ],
+   "complete": true,
+   "shape": {
+    "w": 22.6,
+    "h": 20.6,
+    "fill": 0.287
+   }
+  },
+  {
+   "class": "missing_char",
+   "page": 1219,
+   "col": [
+    162.2,
+    155.0,
+    188.9,
+    997.3
+   ],
+   "pos": 35,
+   "ch": "纖",
+   "side": "",
+   "source": "api_strip_census",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 44,
+   "text": "兒，三不知走到房裡，拿過針線匣，揀一條白綾兒，用扣針兒親手紙龍帶兒，用手向減粧磁盒兒內傾",
+   "api": "兒，三不知走到房裡，拿過針線匣，揀一條白綾兒，用扣針兒親手紗龍帶兒，用纖手向減粧磁盒兒內傾",
+   "crop": "tmp_vert/battle9/d_fix/p1219_35.png",
+   "cell": [
+    162.2,
+    825.0,
+    188.9,
+    844.2
+   ],
+   "complete": true,
+   "shape": {
+    "w": 16.6,
+    "h": 17.3,
+    "fill": 0.394
+   }
+  },
+  {
+   "class": "missing_char",
+   "page": 1419,
+   "col": [
+    312.3,
+    155.0,
+    344.1,
+    986.5
+   ],
+   "pos": 32,
+   "ch": "慌",
+   "side": "",
+   "source": "api_strip_census",
+   "confidence": "high",
+   "ratio": 0.977,
+   "exp_len": 43,
+   "text": "」兩人雲雨纔畢，只聽得元宵叫門，說：「大姑娘進房中來了。」這經濟的穿衣出門去了。正是：",
+   "api": "兩人雲雨纔畢，只聽得元宵叫門，說：「大姑娘進房中來了。」這經濟慌的穿衣出門去了。正是：",
+   "crop": "tmp_vert/battle9/d_fix/p1419_32.png",
+   "cell": [
+    312.3,
+    773.8,
+    344.1,
+    793.1
+   ],
+   "complete": true,
+   "shape": {
+    "w": 18.0,
+    "h": 16.8,
+    "fill": 0.559
+   }
+  },
+  {
+   "class": "missing_char",
+   "page": 1678,
+   "col": [
+    83.9,
+    145.2,
+    108.5,
+    998.4
+   ],
+   "pos": 21,
+   "ch": "步",
+   "side": "",
+   "source": "api_strip_census",
+   "confidence": "high",
+   "ratio": 0.966,
+   "exp_len": 44,
+   "text": "去了。你不信，跟我來，與你看一看。」於是抄來到方丈內，只見孝哥兒還睡在床。老師將手中禪，",
+   "api": "去了。你不信，跟我來，與你看一看。於是抄步來到方丈內，只見孝哥兒還睡在床。老師將手中禪",
+   "crop": "tmp_vert/battle9/d_fix/p1678_21.png",
+   "cell": [
+    83.9,
+    552.4,
+    108.5,
+    571.8
+   ],
+   "complete": true,
+   "shape": {
+    "w": 18.0,
+    "h": 18.5,
+    "fill": 0.397
+   }
+  },
+  {
+   "class": "missing_char",
+   "page": 1703,
+   "col": [
+    392.0,
+    276.4,
+    419.4,
+    994.0
+   ],
+   "pos": 37,
+   "ch": "四",
+   "side": "",
+   "source": "api_strip_census",
+   "confidence": "high",
+   "ratio": 0.868,
+   "exp_len": 39,
+   "text": "註：該七事是：（）罷科舉取士悉由學校升貢。（）罷講議財利司。（）更鹽鈔法。制錢",
+   "api": "註：該七事是：一罷科舉取士悉由學校升貢。二罷講議財利司。三更鹽鈔法。四制錢",
+   "crop": "tmp_vert/battle9/d_fix/p1703_37.png",
+   "cell": [
+    392.0,
+    957.2,
+    419.4,
+    975.6
+   ],
+   "complete": true,
+   "shape": {
+    "w": 17.0,
+    "h": 13.4,
+    "fill": 0.646
+   }
   }
  ],
  "ring_digit_merge": {
