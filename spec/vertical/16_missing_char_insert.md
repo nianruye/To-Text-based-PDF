@@ -66,24 +66,24 @@
 ## 16.3 插入机制
 
 1. **开关/输入**：`VERT_MISSED_FIX` 未设 → 默认 `docs/vert_taskF_missed_fix.json`（存在才启用）；
-   `=0/off/false` 关闭；文件缺失 → 关闭。见 `build_vert.py` L313–320 `MISSED_FIX`。
-2. **分组与列匹配**（`_apply_missed_fix` L512 起）：按 `(page, tuple(col))` 分组；对每组的每个 missing_char，
+   `=0/off/false` 关闭；文件缺失 → 关闭。见 `build_vert.py` L314–322 `MISSED_FIX`（`VERT_MISSED_FIX_MIN_PAGES` 常量在 L316）。
+2. **分组与列匹配**（`_apply_missed_fix` L514 起）：按 `(page, tuple(col))` 分组；对每组的每个 missing_char，
    在当前页 `sl[k]` 的列框中找 `(min x/2, min y/2, max x/2, max y/2)` 与 `col` 各分量差 ≤ 小容差的列（实现默认见 §16.10）。
    未匹配 → 跳过并打 `[漏识元素] p… 未匹配` 日志。
-3. **排序**：同一列内的 missing_char 按 `pos` 升序（`_miss`，L547），保证多次插入按文本顺序进行。
-4. **重定位**（`_relocate_missing` L480）——插入点按**当前行文本**重算，三步：
+3. **排序**：同一列内的 missing_char 按 `pos` 升序（`_miss`，L549），保证多次插入按文本顺序进行。
+4. **重定位**（`_relocate_missing` L482）——插入点按**当前行文本**重算，三步：
    - ① **上下文子串匹配**：取 `text` 的 `[pos-8, pos)`（左 8）与 `[pos, pos+8)`（右 8）作为上下文；
      先试 `cur.find(左+右)`，再退化为左/右单侧；命中则插入点 = 命中位置 + 左段长度。
      （`text` 是原始 OCR 行；`cur` 是当前行。行首字符未被移走时命中 `pos`，**no-op**。）
    - ② **回退 `pos − shift`**：匹配不到时，用 `shift` = 该行被 `fix_split_brackets` 移走的行首字符数
-     （`_br_shift` L983–988，由 `_br_fix` 按 `(页索引, 行索引)` 汇总）；`0 ≤ pos−shift ≤ len(cur)` 时采用。
+     （`_br_shift` L985–990，由 `_br_fix` 按 `(页索引, 行索引)` 汇总）；`0 ≤ pos−shift ≤ len(cur)` 时采用。
    - ③ **越界 → 跳过并记日志**：`[漏识元素] p… missing_char 重定位失败(pos=… shift=…) -> 跳过`；
      **宁少插一字，不错位插**。
 5. **写入**：`sl[k][idx] = cur[:pos] + ch + cur[pos:]` —— 按 `ch` 原样插入；字符增量 = **`len(ch)`**
    （单字符增量 1、双字符增量 2；**按 `len(ch)` 计**，数据实例见 §16.10）；不改其他字/列位/字号。
    双字符 `ch` 必须连续插入（dash rule 依赖相邻两个 `—` 成组）。
 6. **小书保护**：页数 < **小书阈值**（实现默认见 §16.10 参数默认；换书需参数化）时整类跳过，避免同号页误插；wz6 零回归的硬条件。
-7. **统计**：`[漏识元素] 灌入 … missing_char N / 跳过 M`（L596）。
+7. **统计**：`[漏识元素] 灌入 … missing_char N / 跳过 M`（L598）。
 
 ## 16.4 何时不插（渲染端 + 数据端）
 
@@ -120,10 +120,10 @@
 
 | 机制 | 交互 | 不重复保证 |
 |---|---|---|
-| `fix_split_brackets`（§1.0d，L902–957） | 先归位行首闭括号（行文本变短）→ `_br_shift` 记录移走数；missing_char 后插入并按当前行重定位 | 重定位三步（§16.3）保证行首被移走 1 字时 pos 不变错；实测例见 §16.10 |
-| QSF（§1.998 / taskCM，L6374 起） | missing_char 在 QSF 之前灌入；QSF 只在列尾 `。` 等做 1:1 替换/补字 | QSF 规则未改；决策记录与上一基线逐条相同（实测计数/页码见 §16.10），无新增「闭合还补」；无同位置双引号 |
-| dash rule（§1.0a4，L291–452） | `class=dash` **仅列首前置** `DASH_INS`；`class=missing_char` 的 `——`（punct 族）按 §16.4.1 画一条线；`_dash_runs`/`_dash_ink_seg`/`_dash_rule_tex` 只对文本中相邻 `—` 生效 | battle8 46 个 `——` 无一是 class=dash（43 引号重判、3 no-corner 不插）；battle9 p57 `——` 走 missing_char，dash_segments 1 组、PDF 1 条线；fix JSON 允许 `ch='——'`（p57 1 条）；不重复画线 |
-| ring（§1.0a5 的 ring 分支 + `_ring_put` L460） | `class=ring` 用 `RING_INS`/圈码字形；missing_char 不处理圈码数字 | ring 与 missing_char 分属不同 class（计数见 §16.10）；无 ring 被写成 missing_char |
+| `fix_split_brackets`（§1.0d，L919–957） | 先归位行首闭括号（行文本变短）→ `_br_shift` 记录移走数；missing_char 后插入并按当前行重定位 | 重定位三步（§16.3）保证行首被移走 1 字时 pos 不变错；实测例见 §16.10 |
+| QSF（§1.998 / taskCM，L6394 起） | missing_char 在 QSF 之前灌入；QSF 只在列尾 `。` 等做 1:1 替换/补字 | QSF 规则未改；决策记录与上一基线逐条相同（实测计数/页码见 §16.10），无新增「闭合还补」；无同位置双引号 |
+| dash rule（§1.0a4；`_dash_runs` L349 / `_dash_ink_seg` L367 / `_dash_rule_tex` L435） | `class=dash` **仅列首前置** `DASH_INS`；`class=missing_char` 的 `——`（punct 族）按 §16.4.1 画一条线；`_dash_runs`/`_dash_ink_seg`/`_dash_rule_tex` 只对文本中相邻 `—` 生效 | battle8 46 个 `——` 无一是 class=dash（43 引号重判、3 no-corner 不插）；battle9 p57 `——` 走 missing_char，dash_segments 1 组、PDF 1 条线；fix JSON 允许 `ch='——'`（p57 1 条）；不重复画线 |
+| ring（§1.0a5 的 ring 分支 + `_ring_put` L462） | `class=ring` 用 `RING_INS`/圈码字形；missing_char 不处理圈码数字 | ring 与 missing_char 分属不同 class（计数见 §16.10）；无 ring 被写成 missing_char |
 | punct/census 族 | census（shape/complete）+ punct（crop/cell/note）与汉字/引号同 class，用 `source` 区分 | 无 other/nonchar 条被写成 missing_char；误判/重复项不落（实例见 §16.10） |
 | 去重 | 数据端按 `(page, col±2pt, pos, ch)` 去重；渲染端同列按 pos 排序 | 同 page/pos 异字 = 0；同 ch 同 pos 重复 = 0；`target-at-pos`/`dup-existing` 跳过；ch 长度 1–2 |
 
@@ -152,13 +152,13 @@
 
 | 项 | 当前行 |
 |---|---|
-| `MISSED_FIX`（默认路径/关闭/缺失处理） | L313–320 |
-| `_relocate_missing`（重定位三步） | L480 |
-| `_apply_missed_fix`（分组/列匹配/插入） | L512 |
-| `missing_char` 排序 | L547 |
-| `missing_char` 分支（插入 + 重定位失败日志；`len(ch)` 增量） | L556–570 |
-| `_br_fix` 汇总 / `_br_shift` | L969–988 |
-| `_MISSED_ST` 调用点 | L988 |
+| `MISSED_FIX`（默认路径/关闭/缺失处理） | L314–322 |
+| `_relocate_missing`（重定位三步） | L482 |
+| `_apply_missed_fix`（分组/列匹配/插入） | L514 |
+| `missing_char` 排序 | L549 |
+| `missing_char` 分支（插入 + 重定位失败日志；`len(ch)` 增量） | L558–572 |
+| `_br_fix` 汇总 / `_br_shift` | L971–990 |
+| `_MISSED_ST` 调用点 | L990 |
 | 灌入统计日志 | L596 |
 | `DASH_CHARS` / `DASH_*` 常量 | L321–332 |
 | `_dash_rule_on` / `_dash_runs` / `_dash_ink_seg` / `_dash_rule_tex` / `_fg_origin_shift` | L336 / L347 / L365 / L433 / L445 |
@@ -191,7 +191,7 @@
 |---|---|---|
 | 列框匹配容差 | 0.6 pt | 运行时匹配；换书可参数化 |
 | 重定位上下文长度 | 左 8 + 右 8 字 | 子串匹配窗口；可参数化 |
-| 小书保护阈值 | 1000 页 | 小于该页数整类跳过；换书需参数化 |
+| 小书保护阈值 | `VERT_MISSED_FIX_MIN_PAGES`（环境变量，默认 **1000** 页） | 小于该页数整类跳过；**显式 0 关闭保护**（t56 去魔法数；默认值与旧行为逐字节一致） |
 | 完整字块门槛 | 0.55 × 步进 | `complete` 判定；应由源图/字步进自标定 |
 | 裁片倍率 | 8×（或 ≥600dpi） | 取证建议倍率，不是判据 |
 | 去重列框容差 | ±2 pt | 数据端去重键；可参数化 |
