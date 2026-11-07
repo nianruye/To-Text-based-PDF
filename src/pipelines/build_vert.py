@@ -979,6 +979,285 @@ def fix_split_brackets(rows):
     return out, fixes
 
 
+# ---------- t70/battle14: 曲牌空括号 + 〕/）后「一」误读为引號 ----------
+_CUV_EMPTY_PAIRS = ('（）', '〔〕', '︵︶', '︹︺')
+_CUV_NAME_RE = re.compile(r'^[\u3400-\u9fff]{2,6}$')
+_CUV_PAGENUM = set('〇一二三四五六七八九十百千０１２３４５６７８９')
+
+
+def _is_cuv_name(t):
+    """短裸曲牌名：2-6 个汉字，无标点/括号/数字。"""
+    t = (t or '').strip()
+    if not _CUV_NAME_RE.match(t):
+        return False
+    if all(c in _CUV_PAGENUM for c in t):   # 页码行「一四」等不是曲牌名
+        return False
+    return not any(c in t for c in '〔〕（）「」『』：；，。！？、·')
+
+
+def _fix_cuv_brackets(rows, page, log):
+    """空括号对：前一列是裸曲牌名 -> 移到名两侧；否则删除并登记。返回 (rows, log)。"""
+    out = list(rows)
+    for i, t in enumerate(out):
+        for pair in _CUV_EMPTY_PAIRS:
+            a, b = pair
+            while pair in t:
+                pos = t.find(pair)
+                prev = out[i - 1] if i > 0 else ''
+                if _is_cuv_name(prev) and pos <= 2:   # 曲牌括号对只在列首（或首字标点后）
+                    out[i - 1] = '〔' + prev + '〕'   # 曲牌固定用 〔〕（源图逐名核对；OCR 有读成（）的）
+                    t = t[:pos] + t[pos + 2:]
+                    if pos <= 1 and t[:1] in ('」', '﹂'):
+                        t = t[1:]                    # 源图无名后闭引号：OCR 残字，清掉（p727）
+                    log.append(dict(page=page, row=i, pos=pos, kind='move', pair=pair,
+                                    prev=prev, before=out[i][:40]))
+                else:
+                    ctx = t[max(0, pos - 8):pos + 12]
+                    t = t[:pos] + t[pos + 2:]
+                    log.append(dict(page=page, row=i, pos=pos, kind='del', pair=pair, ctx=ctx))
+        _t2 = _collapse_quote_noise(t)
+        if _t2 != t:
+            log.append(dict(page=page, row=i, pos=0, kind='inline_quote', pair='',
+                            ctx=t[:24], after=_t2[:24]))
+            t = _t2
+        out[i] = t
+    # 名后孤引：上一行已带 〔名〕 -> 行首「」「」「…」引号串收敛为单个 「（源图单角）
+    for i in range(1, len(out)):
+        if not out[i - 1].endswith(('〕', '︺')):
+            continue
+        t = out[i]
+        j = 0
+        while j < len(t) and t[j] in '「」﹁﹂':
+            j += 1
+        run = t[:j]
+        if len(run) >= 2 and ('「' in run or '﹁' in run):
+            head = '「'
+            log.append(dict(page=page, row=i, pos=0, kind='drop_quote', pair=run,
+                            ctx=t[:12], dropped=len(run) - 1))
+            out[i] = head + t[j:]
+    return out, log
+
+
+_CUV_CHAPTER_RE = re.compile(r'^第[一二三四五六七八九十百千0-9０-９]+[回章節]$')
+
+
+def _collapse_quote_noise(t):
+    """空引号对收敛（合法配对 ﹂﹁ 不动）：
+    - 空对后接引号/名括号（「﹁〔︹） -> 留**闭号**（名前的 」）；
+    - 空对前是句末标点（。！？；：）且后接文字 -> 交换为 **」「**（两句相接）；
+    - 其余 -> 留开号「；重复同号 ﹁﹁/﹂﹂ 收敛。"""
+    for a in ('「」', '﹁﹂'):
+        i = t.find(a)
+        while i >= 0:
+            nxt = t[i + 2:i + 3]
+            prv = t[i - 1:i] if i > 0 else ''
+            if nxt in ('「', '﹁', '〔', '︹', '「'):
+                rep = '」'
+            elif prv in ('。', '！', '？', '；', '：'):
+                rep = '」「'
+            else:
+                rep = '「'
+            t = t[:i] + rep + t[i + 2:]
+            i = t.find(a, i + len(rep))
+    for a in ('「「', '」」', '﹁﹁', '﹂﹂'):
+        while a in t:
+            t = t.replace(a, a[0])
+    return t
+
+
+def _fix_bare_cuv_names(rows, page, log):
+    """裸曲牌名（2-6 汉字、非页码/章节标题、相邻列含唱：/引号）-> 名两侧补 〔〕。"""
+    out = list(rows)
+    for i, t in enumerate(out):
+        _mq = re.fullmatch('[「﹁]([\u3400-\u9fff]{2,4})[」﹂]', t or '')
+        if _mq:
+            out[i] = '〔' + _mq.group(1) + '〕'   # 名被引号包（源图为〔名〕）：p692 感皇恩/針線廂
+            log.append(dict(page=page, row=i, pos=0, kind='name_in_quotes', pair='',
+                            ctx=t, after=out[i]))
+            continue
+        if not _is_cuv_name(t):
+            continue
+        if _CUV_CHAPTER_RE.match(t):
+            continue
+        if len(t) > 4 or t.startswith('一') or t in ('右夏', '右秋', '右春', '右冬') or '頓首' in t:
+            continue                                  # 非曲牌（书信/季节/「一恭維」等）
+        prev = out[i - 1] if i > 0 else ''
+        nxt = out[i + 1] if i + 1 < len(out) else ''
+        if prev.endswith('一') and len(prev) > 1 and i > 0:
+            # OCR 把下一列名的 〔 读成「一」：名补括号，删该残「一」（p692 東甌令）
+            out[i] = '〔' + t + '〕'
+            out[i - 1] = prev[:-1]
+            log.append(dict(page=page, row=i, pos=0, kind='name_after_yi', pair='',
+                            prev=prev[-8:], ctx=t))
+            continue
+        if nxt and all(c in _CUV_PAGENUM for c in nxt.strip()):
+            continue                                  # 页码行（书眉「金瓶梅」+「一四五」）
+        ctx = (prev.rstrip().endswith(('唱：', '唱:'))
+               or nxt.lstrip().startswith(('「', '﹁', '：', '」', '﹂')))
+        if not ctx:
+            continue
+        out[i] = '〔' + t + '〕'
+        log.append(dict(page=page, row=i, pos=0, kind='barewrap', pair='〔〕',
+                        prev=prev[:14], ctx=t))
+    return out, log
+
+
+_YI_LEGIT_WORDS = ('一壁厢', '一壁', '一到', '一個', '一時', '一面', '一向', '一來', '一起',
+                   '一日', '一連', '一齊', '一同', '一發', '一逕', '一些', '一步', '一頭',
+                   '一件', '一頓', '一番', '一遭', '一應', '一則', '一者', '一就', '一心')
+
+
+def _yi_name_text_mode(t):
+    """名后「一」+词首合法词 -> insert（保留一）；否则 replace（OCR 的一就是角形）。"""
+    return 'insert' if t[:2] == '一壁' or any(t.startswith(w) for w in _YI_LEGIT_WORDS) else 'replace'
+
+
+def _yi_name_action(comps):
+    """comps=[(w_pt,h_pt)] 单元内墨块: 角形+横线 -> 'insert'（源 ﹁一，保留一）；仅角形 -> 'replace'。"""
+    has_corner = any(8 <= w <= 26 and 4 <= h <= 18 for w, h in comps)
+    has_bar = any(w >= 8 and h <= 4.2 for w, h in comps)
+    if has_corner and has_bar:
+        return 'insert'
+    return 'replace' if has_corner else 'none'
+
+
+def _yi_cell_comps(src_doc, page, rect):
+    """单元内显著连通域 (w_pt,h_pt) 列表（600dpi）。"""
+    import numpy as np
+    from scipy import ndimage
+    pm = src_doc[page - 1].get_pixmap(clip=rect, dpi=600)
+    a = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)[:, :, :3].mean(axis=2).astype(np.float32)
+    m = a < (np.median(a) - 25)
+    lab, n = ndimage.label(m)
+    out = []
+    for j, sl_ in enumerate(ndimage.find_objects(lab), 1):
+        if sl_ is None:
+            continue
+        hh = (sl_[0].stop - sl_[0].start) * 72.0 / 600.0
+        ww = (sl_[1].stop - sl_[1].start) * 72.0 / 600.0
+        if hh >= 2 and ww >= 2:
+            out.append((ww, hh))
+    return out
+
+
+def _fix_yi_after_name(rows, co, page, src_doc, log):
+    """曲牌名单列 + 下一列首字「一」 -> 源墨角形则 ﹁（角形+横线=插入保留一；仅角形=1:1 替换）。"""
+    out = list(rows)
+    for i in range(1, len(out)):
+        t = out[i]
+        if not t or t[0] != '一':
+            continue
+        if all(c in _CUV_PAGENUM for c in t):
+            continue                                  # 页码行「一四」不是引號（p148/188/230/1306）
+        prev = out[i - 1].strip('〔〕')
+        if not _is_cuv_name(prev) or i >= len(co) or not co[i]:
+            continue
+        b = co[i]
+        xs = [q[0] / 2.0 for q in b]; ys = [q[1] / 2.0 for q in b]
+        x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+        step = (y1 - y0) / len(t)
+        rect = fitz.Rect(x0 - 2, y0 - 1, x1 + 2, y0 + step + 1)
+        if src_doc is None:
+            continue
+        try:
+            _ink_ok = _yi_name_action(_yi_cell_comps(src_doc, page, rect)) != 'none'
+        except Exception:
+            _ink_ok = False
+        mode = _yi_name_text_mode(t) if _ink_ok else 'none'
+        if mode == 'insert':
+            out[i] = '﹁' + t                      # 插入 ﹁，保留合法「一」
+            log.append(dict(page=page, row=i, pos=0, kind='name_yi_ins', ctx=t[:14]))
+        elif mode == 'replace':
+            out[i] = '﹁' + t[1:]
+            log.append(dict(page=page, row=i, pos=0, kind='name_yi', ctx=t[:14]))
+    return out, log
+
+
+def _ink_quote_corner(src_doc, page, rect):
+    """源图该格墨迹是否为引號角形（battle8 角形判据：10-24×5-16pt、fill 0.15-0.7、端臂）。"""
+    if src_doc is None:
+        return False
+    try:
+        import numpy as np
+        from scipy import ndimage
+        pm = src_doc[page - 1].get_pixmap(clip=rect, dpi=600)
+        a = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)[:, :, :3].mean(axis=2).astype(np.float32)
+        m = a < (np.median(a) - 25)
+        lab, _n = ndimage.label(m)
+        best = None
+        for j, sl_ in enumerate(ndimage.find_objects(lab), 1):
+            if sl_ is None:
+                continue
+            hh = sl_[0].stop - sl_[0].start; ww = sl_[1].stop - sl_[1].start
+            if hh < 4 or ww < 4:
+                continue
+            if best is None or hh * ww > best[0]:
+                best = (hh * ww, hh, ww, sl_, j)
+        if best is None:
+            return False
+        _, hh, ww, sl_, j = best
+        sub = (lab[sl_] == j)
+        H, W = sub.shape
+        def vspan(cols):
+            b = sub[:, cols]; ys = np.where(b.any(axis=1))[0]
+            return (ys.max() - ys.min() + 1) / H if len(ys) else 0.0
+        def hspan(rows_):
+            b = sub[rows_, :]; xs = np.where(b.any(axis=0))[0]
+            return (xs.max() - xs.min() + 1) / W if len(xs) else 0.0
+        left = vspan(slice(0, max(1, int(W * 0.2)))); right = vspan(slice(W - max(1, int(W * 0.2)), W))
+        top = hspan(slice(0, max(1, int(H * 0.25)))); bot = hspan(slice(H - max(1, int(H * 0.25)), H))
+        wpt = ww * 72.0 / 600.0; hpt = hh * 72.0 / 600.0
+        fill = float(sub.mean())
+        # 角形 = 一条竖臂 + 一条横臂交于一角（对边臂必须短）；横线「一」左右臂都满 -> 排除
+        return bool(8 <= wpt <= 26 and 4 <= hpt <= 18 and 0.08 <= fill <= 0.80
+                    and max(left, right) >= 0.55 and max(top, bot) >= 0.55
+                    and min(left, right) <= 0.50 and min(top, bot) <= 0.50)
+    except Exception:
+        return False
+
+
+def _fix_yi_after_bracket(rows, co, page, src_doc, log):
+    """〕/）后紧跟「一」且源墨为角形 -> ﹁（1:1 替换，字符量不变）。返回 (rows, log)。"""
+    out = list(rows)
+    for i, t in enumerate(out):
+        if not t or i >= len(co) or not co[i]:
+            continue
+        b = co[i]
+        xs = [q[0] / 2.0 for q in b]; ys = [q[1] / 2.0 for q in b]
+        x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+        if len(t) == 0 or (y1 - y0) < 2:
+            continue
+        step = (y1 - y0) / len(t)
+        for m in re.finditer('〕一', t):   # 只处理曲牌闭括号后（「）一」经源图核对均为合法「一」）
+            pos = m.start() + 1
+            rect = fitz.Rect(x0 - 2, y0 + pos * step - 1, x1 + 2, y0 + (pos + 1) * step + 1)
+            if _ink_quote_corner(src_doc, page, rect):
+                t = t[:pos] + '﹁' + t[pos + 1:]
+                log.append(dict(page=page, row=i, pos=pos, kind='yi2quote',
+                                ctx=t[max(0, pos - 8):pos + 10]))
+        _t2 = _collapse_quote_noise(t)
+        if _t2 != t:
+            log.append(dict(page=page, row=i, pos=0, kind='inline_quote', pair='',
+                            ctx=t[:24], after=_t2[:24]))
+            t = _t2
+        out[i] = t
+    # 名后孤引：上一行已带 〔名〕 -> 行首「」「」「…」引号串收敛为单个 「（源图单角）
+    for i in range(1, len(out)):
+        if not out[i - 1].endswith(('〕', '︺')):
+            continue
+        t = out[i]
+        j = 0
+        while j < len(t) and t[j] in '「」﹁﹂':
+            j += 1
+        run = t[:j]
+        if len(run) >= 2 and ('「' in run or '﹁' in run):
+            head = '「'
+            log.append(dict(page=page, row=i, pos=0, kind='drop_quote', pair=run,
+                            ctx=t[:12], dropped=len(run) - 1))
+            out[i] = head + t[j:]
+    return out, log
+
+
 # ---------- 1) 参数拟合 ----------
 def col_stats(k):
     """每列: (x0,x1,y0,y1,t)"""
@@ -991,12 +1270,45 @@ def col_stats(k):
 
 # §1.0d 应用: 行首闭括号归位上一列(只改文本, 几何/OCR 盒不动; 全书 9 例, 见 §1.0d)
 _br_fix = []
+_cuv_log = []
+_yi2_log = []
+# t70 开关：默认 0（wz6/其它书逐字节不变）；wz7 battle14 构建脚本显式 VERT_CUV_FIX=1
+_CUV_ON = os.environ.get('VERT_CUV_FIX', '0') not in ('0', 'false', 'False')
 for _pi, _k in enumerate(keys):
+    # t70: ① 〕后「一」->「﹁」（源墨角形判据，1:1）；② 曲牌空括号对（移名侧/删除）
+    if _CUV_ON:
+        _rows0, _yi2_log = _fix_yi_after_bracket(list(sl.get(_k, [])), co.get(_k, []) or [],
+                                                 _pi + 1, src_doc, _yi2_log)
+        _rows0, _cuv_log = _fix_bare_cuv_names(_rows0, _pi + 1, _cuv_log)
+        _rows0, _yi2_log = _fix_yi_after_name(_rows0, co.get(_k, []) or [], _pi + 1, src_doc, _yi2_log)
+        # 空对必须在 fix_split 之前（否则 fix_split 先把 」 归位到名行，_is_cuv_name 失败 -> p727）
+        _rows0, _cuv_log = _fix_cuv_brackets(_rows0, _pi + 1, _cuv_log)
+        if _rows0 != sl.get(_k, []):
+            sl[_k] = _rows0
     _rows2, _fx = fix_split_brackets(sl.get(_k, []))
     if _fx:
         sl[_k] = _rows2
         for _ri, _c in _fx:
             _br_fix.append((_pi + 1, _ri + 1, _c))
+if _cuv_log:
+    _kc = {}
+    for e in _cuv_log:
+        _kc[e['kind']] = _kc.get(e['kind'], 0) + 1
+    print('[曲牌列] 处置 %d 处: 裸名补括号 %d / 移名侧 %d / 删空对 %d / 删孤引 %d' % (
+        len(_cuv_log), _kc.get('barewrap', 0), _kc.get('move', 0),
+        _kc.get('del', 0), _kc.get('drop_quote', 0)))
+    for e in _cuv_log[:40]:
+        print('    p%d r%d pos%d %s %s prev=%r ctx=%r' % (
+            e['page'], e['row'], e['pos'], e['kind'], e['pair'],
+            e.get('prev', ''), e.get('ctx', e.get('before', ''))))
+if _yi2_log:
+    _ky = {}
+    for e in _yi2_log:
+        _ky[e['kind']] = _ky.get(e['kind'], 0) + 1
+    print('[引號判别·曲牌] 一->﹁ %d 处: 曲牌后 %d / 名后 %d' % (
+        len(_yi2_log), _ky.get('yi2quote', 0), _ky.get('name_yi', 0)))
+    for e in _yi2_log:
+        print('    p%d r%d pos%d %r' % (e['page'], e['row'], e['pos'], e['ctx']))
 if _br_fix:
     print('[禁则归位] 行首闭括号回上一列 %d 处: %s' % (
         len(_br_fix), ', '.join('p%d行%d「%s」' % f for f in _br_fix)))
