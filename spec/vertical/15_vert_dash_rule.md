@@ -1,9 +1,9 @@
 # 15. 竖排破折号 = 源图墨迹实测的一条连续竖线（taskD / R2）
 
 状态：**implemented**
-实现：`src/pipelines/build_vert.py` §1.0a4（L291-452：常量 L321-332 / `_dash_rule_on` L336 / `_dash_runs` L347 /
-`_dash_ink_seg` L365 / `_dash_rule_tex` L433 / `_fg_origin_shift` L445）+ `_put_tex` L601 /
-`col_puts` L3997（逐组实测，`_rule_h` L4116）
+实现：`src/pipelines/build_vert.py` §1.0a4（L291–474：常量 L323–341 / `_dash_rule_on` L353 / `_dash_runs` L364 /
+`_dash_ink_seg` L382 / `_dash_rule_tex` L455 / `_fg_origin_shift` L469）+ `_put_tex` L625 /
+`col_puts` L4021（逐组实测，`_rule_h` L4140）
 测试：`src/test/unit/test_vert_dash_rule.py`（32 项）；报告 [docs/vert_dash_rule_report.md](../../docs/vert_dash_rule_report.md)
 
 ## 1. 目标（用户反馈）
@@ -97,7 +97,7 @@
 | 产物线 | **80.00pt = 1.255 step**（∈[1.20,1.32]） |
 | 线位 | 产物 rule y **736.50–816.50** vs 源图 **736.50–816.75** → Δy0 **0.00** / Δy1 **−0.25** / 线心 Δ **0.19pt** |
 | 连续性 | 沿 y 每 0.5pt **最大空隙 0.00pt**（≤0.5） |
-| 线宽 | 源图 **5.25pt**（0.075×F）；产物 **2.78pt**（0.040×F，R2「先不动」） |
+| 线宽 | 源图 **5.25pt**（0.075×F，t42/阈值 110；阈值相关实测 4.56–5.28）；代码 `_dash_ink_seg` 源墨实测 **5.0pt**；产物 **v42 2.78pt**（0.040×F）→ **v44 5.0pt**（`VERT_DASH_RULE_W=src` + `VERT_DASH_RULE_W_PAGES=57` 按页启用；仅 p57 变，见 §9.2） |
 | FG 原点偏移 | p57：1437×0.003735 = **5.37pt**（实测 rule put y 与落点差 **5.38**） |
 | 邻字间隙 | 源图邻字 **8.25/6.00**（0.129/0.094 step，与源书同值）；产物邻字 **38.87/14.50**（0.610/0.228，标题列均摊） |
 
@@ -123,13 +123,16 @@ md5sum /tmp/wz6_dash/vert.tex    # ae9d2f52…
 | wz6 默认 | 全书构建 | `vert.tex` md5 **ae9d2f5259e12cff19e680b2a771b37d**（= 改动前基线） |
 | wz6 `all` | 同上 + `VERT_DASH_RULE=all` | 6 组实测（线长/step **1.85–1.98**，wz6 自己的墨线，非 wz7 的 1.26）+ 3 组兜底；文本层 231/231 页相同；`verify_vert` PASS（231=231 / 97.2% / 越界 0/0） |
 | wz7 300 页 | `verify_vert --expect-low <影印页>` | **PASS**（300=300 / 128671÷130732=98.4% / 越界 span 0+矢量 0 / 整页丢失 0）；文本层与 R1 版 300/300 页相同 |
-| 测试 | `pytest src/test/unit src/test/invariants -q` | **506 passed**（474 + 32 新增） |
+| 测试 | `pytest src/test/unit src/test/invariants -q` | **506 passed**（474 + 32 新增；2026-11-07 全量 **603 passed**） |
+| v43（全局 `src`，**作废**） | `VERT_DASH_RULE_W=src`（旧全局口径） | 影响 8 页（31/37/39/57/62/1157/1683/1742）；p1742 22 组变宽 1.5–13.0pt，风险不可接受 → 不交付（见 `docs/battle13_dash_width.md`） |
+| **v44（按页启用，交付）** | `VERT_DASH_RULE_W=src VERT_DASH_RULE_W_PAGES=57`；`bash tmp_vert/battle13b/build44.sh` | p57 线宽 **2.784→5.0pt**（y 736.5–816.5 / 长 80.0 / x 830.0 不变）；**v44 vs v42 内容流/绘图逐页 diff 仅 p57**（其余 1747 页 content-stream 逐字节相同）；`verify_vert` **PASS**（1748=1748 / 931,200 与 v42 同 / 18 预期 / 0 / 0+0）；wz6 默认 `ae9d2f52…`；pytest 603 |
 
 ### 9.3 参数默认（参考值，非判据）
 
 | 参数 | 默认/参考 | 说明 |
 |---|---|---|
-| `VERT_DASH_RULE_W` | **0.040×F** | 兜底线宽；`src` 时用源图实测宽度（p57 0.075×F / 300 页中位 0.0559×F） |
+| `VERT_DASH_RULE_W` | **0.040×F** | 兜底线宽；`src` 时用源图实测宽度（p57 实测 **5.0pt**，0.0718×F；t42 外部实测 5.25pt=0.075×F（阈值相关）；300 页中位 0.0559×F）。**默认不变** |
+| `VERT_DASH_RULE_W_PAGES` | **空**（= 全局行为） | 逗号分隔页号（如 `57,1683`）：仅这些页在 `src` 模式下用源墨实测宽度，其余页仍 `0.040×F`。wz7 构建脚本 `tmp_vert/battle13b/build44.sh` 用 `VERT_DASH_RULE_W=src VERT_DASH_RULE_W_PAGES=57`（只动 p57） |
 | `VERT_DASH_LEN_RATIO` | **1.26** | 参考比值（日志/验收对照，不参与画线） |
 | `VERT_DASH_SEG_LO/HI/OVL` | 0.45 / 1.70 / 0.75 | 墨段判据（无量纲比值） |
 | `VERT_DASH_X_TOL` / `DASH_W_MAX` | 0.25 / 0.35 | 线心/线宽判据（无量纲比值） |
@@ -145,8 +148,10 @@ md5sum /tmp/wz6_dash/vert.tex    # ae9d2f52…
    根因是标题列把 11 个 OCR 字符**均摊**（产物書比源书高 30.6pt），属 §1.995 标题署名行的既有版式，
    不在本任务范围。本实现把线放在**源图绝对位置**（Δ≤0.25pt）——与源图墨块逐点一致、且不压字。
    若要同时满足间隙，需把标题列改成逐字源图定位（另一项版式任务）。
-2. **线宽**：源图实测 5.25pt（p57，0.075×F）/ 0.0559×F（300 页中位），产物按 R2「先不动」仍用 0.040×F
-   （2.78pt）。`VERT_DASH_RULE_W='src'` 可直接用源图实测宽度（已实现 + 单测）。
+2. **线宽**：源图 t42 实测 5.25pt（p57，0.075×F，阈值 110）/ 0.0559×F（300 页中位），代码 `_dash_ink_seg` 自测 **5.0pt**；
+   默认仍 0.040×F（2.78pt，行为不变）。**v44 起 wz7 构建脚本用 `VERT_DASH_RULE_W=src` + `VERT_DASH_RULE_W_PAGES=57`**
+   → 仅 p57 线宽 **5.0pt**（= src 实测值；t42 的 5.25 为阈值 110 外部测量，本机阈值 90–150 得 4.56–5.28，
+   按 5.0±0.3 接受）；其余 14 个 dash 页保持 0.040×F。换书按本书源墨重测，并按页列出需要 `src` 的页。
 3. **数据侧误读**：patched 数据仍有 88 对 `——` + 87 个单 `—`；其中「闭引号/句号后紧跟」的
    与 p59/p118 实测源图无破折号（引号 ﹂ 的笔画被读成 `—`），与已删的 1019 处同类。
    这类位置源图测不到合格竖线 -> 走兜底并登记；建议单独做数据审计。

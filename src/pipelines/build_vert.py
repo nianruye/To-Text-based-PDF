@@ -323,6 +323,21 @@ elif MISSED_FIX in ('0', 'off', 'false', 'False'):
 DASH_CHARS = '—―–' + DASH_INS          # 破折号类(插入占位也走同一套成组/实测/画线)
 DASH_RULE_W_RAW = os.environ.get('VERT_DASH_RULE_W') or '0.040'    # 线宽/字号; 'src' = 用源图实测线宽
 DASH_RULE_W = (float(DASH_RULE_W_RAW) if DASH_RULE_W_RAW.replace('.', '', 1).isdigit() else 0.040)
+
+
+def _parse_page_csv(s):
+    """'57,1683' -> {57,1683}（容忍中文逗号/空白/非法项跳过）。"""
+    out = set()
+    for p in str(s or '').replace('，', ',').split(','):
+        p = p.strip()
+        if p.isdigit():
+            out.add(int(p))
+    return out
+
+
+# 按页启用 src 线宽：VERT_DASH_RULE_W_PAGES=57,1683 -> 仅这些页用源墨实测宽度；
+# 默认空 = 维持原行为（src 时全局生效；非 src 时无影响）。
+DASH_RULE_W_PAGES = _parse_page_csv(os.environ.get('VERT_DASH_RULE_W_PAGES') or '')
 DASH_RULE_MODE = os.environ.get('VERT_DASH_RULE', 'nf')            # 0=关 / nf=仅无版框页(默认) / all=全部
 # 以下全部是**比值**(相对本列 step / 每组字符数), 只用于「这段墨是不是破折号线」的判据与日志;
 # 线的几何本身来自源图墨迹实测, 不由这些常数推算。wz7 实测: 线长/step = 1.26(两个字符一组)。
@@ -432,13 +447,20 @@ def _dash_ink_seg(pi, g, xc, step, yc0, yc1, nd):
     y1 = (yw0 + b + 1) / 2.0
     return {'y0': y0, 'y1': y1, 'xc': xcm, 'w': w, 'ratio': (y1 - y0) / step}
 
-def _dash_rule_tex(seg, F):
+def _dash_w_src_for(page):
+    """按页启用判断: 空 DASH_RULE_W_PAGES = 所有页（全局行为）; 非空 = 仅列出的页。"""
+    return (not DASH_RULE_W_PAGES) or (int(page) in DASH_RULE_W_PAGES)
+
+
+def _dash_rule_tex(seg, F, page=None):
     """源图实测墨段 -> 一条矢量竖线的 put 片段。高度/位置/线心取 seg(源图实测);
-    线宽默认 DASH_RULE_W×F(VERT_DASH_RULE_W 可覆盖; ='src' 时直接用源图实测线宽)。
+    线宽默认 DASH_RULE_W×F(VERT_DASH_RULE_W 可覆盖; ='src' 时用源图实测线宽;
+    VERT_DASH_RULE_W_PAGES 非空时仅列出的页用 src，其余页仍默认)。
     put y 要减掉 FG 原点的系统性偏移(见 _fg_origin_shift 注释), 否则整条线比源图高 5.4pt
     (p57 实测: 修正前 y 731.1-811.1, 源图 736.5-816.5)。"""
     raw = str(globals().get('DASH_RULE_W_RAW', '0.040')).lower()
-    w = seg['w'] if raw == 'src' else float(globals().get('DASH_RULE_W', 0.040)) * F
+    use_src = raw == 'src' and (page is None or _dash_w_src_for(page))
+    w = seg['w'] if use_src else float(globals().get('DASH_RULE_W', 0.040)) * F
     h = seg['y1'] - seg['y0']
     y = (page_h - seg['y1'] - _fg_origin_shift()) * PT2BP
     return (r'\put(%.2f,%.2f){\rule{%.4fpt}{%.4fpt}}'
@@ -4197,7 +4219,7 @@ def col_puts(t, xc, m, sl=None, prev_bot=None, pi=None):
             _seg = _dseg.get(_ci0)
             if _seg is not None:
                 if ci == _ci0:                # 每组只在首字画一条源图实测竖线
-                    out.append(_dash_rule_tex(_seg, F))
+                    out.append(_dash_rule_tex(_seg, F, page=_dpg))
                 out.append(_put_tex(ch, x_put, y_put, F, clamp=_pv_clamp_on(m), invisible=True,
                                     no_text=(ch == DASH_INS)))
             else:                             # 未标定 -> 兜底: 每字 1.0 step(R1 行为)
