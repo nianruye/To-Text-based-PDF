@@ -123,3 +123,197 @@ cd /opt/test
 | `src/tools/ocr_book.py` | `2a45cfa88538408237dab391ad95dd90be0f12a4ffe68b7095a4a0f384561077` |
 | `docs/scan2pdf_design.md` | §2.2 + §10（t159 回填） |
 | HEAD | `84d6b95`（未 commit） |
+
+---
+
+# 附：#37 横排修复终审（t165 round-2）
+
+> 审查人：质量审查员　日期：2026-11-09 02:44–03:05
+> 对象：t163（#37 修复）+ t164 验收 + t166 交付 + t167/t168 修复与验收
+> 依据：`AGENTS.md` #37、`docs/scan2pdf_v1.md` §14–§16、`docs/scan2pdf_acceptance.md`
+> **结论：PASS（有条件）** —— 根因（geom 分支直调 build_geom 单趟）已由「geom→fit_positional 两趟」关闭；verify_geom 带 `--src-pdf` 接入、floor=85；wz4 全量 677 页 PASS（pitch 99.6%）、wz2 6 页 PASS；无书专属分支；失败码语义未变；AGENTS #37=implemented、docs 已记录。残留 1 条 medium（横排分支未走多纸型 review_required）+ 3 条 low。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out tmp_vert/scan2pdf/review_wz4_fix.pdf --data-dir data/wz4 --skip-ocr
+# [scan2pdf] 书型: vertical, has_frame=False, size=[418.4, 631.9], multi_format=False
+# [scan2pdf] 书型修正（OCR 框长宽比）: horizontal
+# [scan2pdf] 构建: fit_positional.py (pipeline=geom, VERT_MISSED_FIX=0)
+# [scan2pdf] wz4: pipeline=geom gate=PASS exit=0
+# 实际 exit=0（全量 677 页构建，约 3–4 分钟）
+```
+
+- 门禁（`review_wz4_fix.pdf.gate.json`）：tool=verify_geom、verdict=**PASS**、reasons=[]、pitch_floor=85、**pitch 99.6%**、pages **677=677**、split 0、missing 0、blank 32、overflow 6、exit 0；`.gate.md` 可读。
+- 独立复跑 `verify_geom --src-pdf`（不走 scan2pdf）：`VERIFY_PITCH_FLOOR=85 … --src-pdf source_pdf/wz4.pdf` → **rc=0 PASS**（与 gate 一致）。
+- report：pipeline=geom、fix source=none（VERT_MISSED_FIX=0）、steps=[data,fix_guard,book_type,build(rc=0),publish,gate(PASS)]、input_sha256 记录。
+
+## 1. 根因与实现对照（#37）
+
+| #37 根因/验收点 | 实现 | 结论 |
+|---|---|---|
+| geom 分支直调 build_geom **单趟**→无高度校准 | `build_pdf` geom 分支改调 `src/calibration/fit_positional.py`：pass1 `fill=99` 渲染测高 → ratio 表 → pass2 `fill=0.95` 重渲（`fit_common.main('build_geom')`） | ✓ 两趟 |
+| fit_positional argv/env | cmd `[lines, coords, out_tmp, src_pdf]`，与 fit_common `SL=argv1,CO=argv2,OUT=argv3,SRC=argv4` **一致**；env 仅设 VERT_*（geom 不读），无污染 | ✓ |
+| 无书专属分支 | `grep 'wz4\|wz2\|wz6\|wz7\|book ==' src/tools/scan2pdf.py` **0 命中**；wz4 走 build_type 修正 + fit_positional，wz2 同路径 | ✓ |
+| verify_geom 接入 + 阈值来自 floor/契约 | `run_verify_geom(pdf,coords,lines,floor=None,src_pdf=...)`：floor 默认 `VERIFY_PITCH_FLOOR`=85，env 传递；**带 `--src-pdf`**（DPI 自适应）；usage/help 已标「必须带」 | ✓ |
+| 失败码语义不变 | EXIT={ok:0,usage:2,out_exists:2,data_missing:3,ocr:3,book:4,build:5,verify:6,reject:7,partial:8,manual:8}，与设计 §2.2 一致；页数不 1:1→verify(6)、构建失败→5、数据→3；geom 分支 verify fail→6 | ✓ |
+| gate 横排判定与竖排对齐 | 写 `<out>.gate.json/.md`：version/book/mode/tool/verdict/reasons/metrics{pitch_floor,pitch_ok_pct,pages,pages_src,split,missing,blank_pages,overflow_pages,exit}+gate；**与竖排 quality_gate 的 schema_version/pdf_sha256/thresholds_source/expect_low/verdict 词表不完全相同**（见 R2） | 部分（R2） |
+
+## 2. 独立抽样
+
+### 2.1 wz4 3 页对照（源图/历史产物/新产物）
+`tmp_vert/scan2pdf/t165_wz4_compare.png`（p1/p100/p677 × src/hist/new）：
+- p1：源为封面图；hist/new 均无封面图（文本层重建），属 #37 已知残留（t166 已登记「封面图未贴回」）；new 文本位置正常。
+- p100：源正文页；new 文本完整、行距与页幅正常、无跨页/出界；与 hist 行宽/断行略有差异（200dpi→144dpi 的预期，t166/t168 waiver）。
+- p677：后记；new 与 hist 文本一致（difflib ratio 1.000）。
+- 文本量（fitz get_text）：new 603,844 vs hist 634,103 = **0.9523**；p100 页 ratio 0.964、p677 1.000、p1 0.813（封面文本差异）——与 t166/t168 登记的 DPI 变更口径一致。
+
+### 2.2 wz2 6 页回归
+`scan2pdf --book wz2 --data-dir data/wz2 --skip-ocr --pages 1-6` → **exit 0**、书型修正 horizontal、fit_positional 构建、gate **PASS**（pitch 100%、6/6、blank 0、overflow 0）。
+
+### 2.3 文档/状态
+- `AGENTS.md` #37 状态 = **implemented**（含 t163 根因与验收描述）；§3 verify_geom 行已标「必须带 --src-pdf（wz4=144dpi）」。
+- `docs/scan2pdf_v1.md` §14 横排修复、§15 交付结论、§16 契约同步 + gate sidecar 均已记录。
+
+## 3. 残留 findings
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **R1** | **medium** | **geom 分支未走多纸型/effective_verdict**：`if args.pipeline_resolved == 'geom'` 直接写 gate 并返回 PASS/REJECT，未调用 `multi_format_clause`/`effective_verdict`（竖排路径有）。多纸型横排书会得到 PASS 而无 `review_required=true`/`auto_pass_forbidden`（设计 §10.2 要求所有书） | geom 分支也应用 `multi_format_clause`：review_required/auto_pass_forbidden 写入 report/gate；AUTO→MANUAL、REJECT 保持 |
+| **R2** | low | 横排 gate JSON 与竖排 quality_gate schema 仅**部分**对齐：缺 `schema_version/pdf_sha256/thresholds_source/expect_low`，metric 键名 `blank_pages/overflow_pages` vs 竖排 `blank/overflow`，verdict 词表 PASS/REJECT vs AUTO_PASS/MANUAL_ONLY/REJECT | 统一 gate schema（或加 `mode` 分支说明）；t167「与竖排对齐」表述宜改为「核心字段对齐」 |
+| **R3** | low | 书型初始按宽高比把 wz4（418×632 肖像）判 vertical，再由「OCR 框长宽比」修正为 horizontal；无 OCR 数据的横排书可能误判 | fallback 记录 low confidence + preflight；建议对「竖排但 OCR 框宽≈1.5×高」的修正加单测说明 |
+| **R4** | low | 文本量与历史产物 0.9523（t166/t168 已裁定 200→144dpi 预期，登记 waiver） | 保持登记；若未来要求逐页文本一致，另起 issue |
+| **R5** | low | `verify_geom` 缺省 DPI=200 仍存在（scan2pdf 已正确传 --src-pdf；但外部直接调用仍易踩坑） | 保持 usage/README 的「必须带」提示；可考虑缺省改为 auto（需 spec 变更） |
+
+## 4. 结论
+
+**#37 终审 verdict：PASS（有条件）**。
+
+- **通过**：根因关闭（geom→fit_positional 两趟）；verify_geom 接入且 floor/`--src-pdf` 来自契约；wz4 全量 677 页 gate PASS（pitch 99.6%、677=677、split 0）、独立 verify_geom rc=0；wz2 6 页 PASS；无书专属分支；失败码语义未变；AGENTS #37=implemented；docs §14–§16 记录完整；与历史产物/源图 3 页对照无跨页溢出（封面图缺失为已知残留）。
+- **条件**：R1（横排多纸型未应用 review_required，medium）建议在 v1 收口前修；R2–R5 为低风险/登记项。
+- 建议：修 R1 后用一本多纸型横排书验证 report/gate 的 review_required；并以 `verify_geom --src-pdf` 作为 PR 门禁命令（AGENTS §3 已更新）。
+
+## 5. 复现
+
+```bash
+cd /opt/test
+# 任务给定
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out tmp_vert/scan2pdf/review_wz4_fix.pdf --data-dir data/wz4 --skip-ocr   # exit 0
+# 独立 verify（不进 scan2pdf）
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py \
+  tmp_vert/scan2pdf/review_wz4_fix.pdf data/wz4/wz4_spotting_coords.json \
+  data/wz4/wz4_spotting_lines.json --src-pdf source_pdf/wz4.pdf               # rc 0 PASS
+# wz2 6 页
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz2.pdf --book wz2 \
+  --out /tmp/wz2_6p.pdf --data-dir data/wz2 --skip-ocr --pages 1-6             # exit 0
+# 对照图
+# tmp_vert/scan2pdf/t165_wz4_compare.png（p1/p100/p677 × src/hist/new）
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `src/tools/scan2pdf.py` | `34750bd6bc7ee77ff9e2974233921b60170ee8c8c74ed4cb377729eb9a38ade1` |
+| `src/test/verify_geom.py` | `834ff6f499d35f72ca681d1ac487dabe4862c00f47fc12dc94ebc777d021c865` |
+| `tmp_vert/scan2pdf/review_wz4_fix.pdf` | 2,597,505 B / 677 页（本终审产物） |
+| `tmp_vert/scan2pdf/review_wz4_fix.pdf.gate.json` | 1,102 B / PASS（pitch 99.6%） |
+| HEAD | `56bcaeb`（未 commit） |
+
+---
+
+# 附：geom 分支多纸型语义终审（t171 round-3，R1/R2）
+
+> 审查人：质量审查员　日期：2026-11-09 03:02–03:25
+> 对象：t169（#37 R1/R2 修复）+ t170 验收
+> 依据：t165 附章 R1/R2、`docs/scan2pdf_v1.md` §16.2/§17、`docs/scan2pdf_acceptance.md`
+> **结论：PASS（有条件）** —— geom 分支已与竖排同语义（多纸型 PASS→MANUAL_ONLY、REJECT 保持、review_required/auto_pass_forbidden/分布 note 写入 report 与 sidecar）；单纸型 wz4 行为不变；wz2 构建正常；30 单测通过；无书专属分支。残留为低风险：多纸型横排无真实书 E2E、schema 仍非全对齐（已登记）、geom 的 AUTO_PASS 分支为死代码、跨轴 REJECT 退出码 6 vs 7 属轴语义差异。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out tmp_vert/scan2pdf/review_wz4_r1.pdf --data-dir data/wz4 --skip-ocr
+# [scan2pdf] 书型修正（OCR 框长宽比）: horizontal
+# [scan2pdf] 构建: fit_positional.py (pipeline=geom, VERT_MISSED_FIX=0)
+# [scan2pdf] wz4: pipeline=geom gate=PASS exit=0
+# 实际 exit=0（全量 677 页）
+```
+
+- `report.json`：exit 0、`review_required=false`、`auto_pass_forbidden=false`、`multi_format=null`、gate PASS（pitch 99.6%、677=677、split 0、blank 32、overflow 6）。
+- `gate.json` keys：version/book/mode/tool/**verdict/verdict_effective/review_required/auto_pass_forbidden/multi_format/multi_format_note**/reasons/metrics/gate/note；**PASS / PASS / false / false / null**。
+- `gate.md`：首行「结论：PASS（effective=PASS，review_required=False）」+ pitch/pages/split/overflow + 「multi_format：无（单纸型）」可读。
+- 单测：`pytest src/test/unit/test_scan2pdf.py -q` → **30 passed**。
+
+## 1. 与竖排语义对照（t165 R1）
+
+| 场景 | 竖排（quality_gate 路径） | geom（本次） | 一致 |
+|---|---|---|---|
+| 单纸型 PASS | exit 0 | exit 0（wz4/wz2 实测） | ✓ |
+| 多纸型 AUTO/PASS | AUTO_PASS→MANUAL_ONLY；PASS 不存在于竖排（quality 三档） | `effective_verdict('PASS',True)` → **MANUAL_ONLY**（实测） | ✓ |
+| 多纸型 REJECT | 保持 REJECT（exit 7） | **保持 REJECT**（`('REJECT',True)`→REJECT） | ✓（exit 轴语义见 R4） |
+| review_required / auto_pass_forbidden | true（多纸型） | true（多纸型）；`multi_format_clause` 实测含 `paper_distribution='300x500:7页, 250x450:3页'`、severity、acceptance_wording、note | ✓ |
+| note 分布 | multi_format_note 含分布 | 同（report + sidecar 均写） | ✓ |
+| 单纸型多纸型块 | None | `multi_format_clause(...,False)=None`（实测） | ✓ |
+
+## 2. 代码审查
+
+- **无书专属分支**：`grep -c 'wz4\|wz2\|wz6\|wz7' src/tools/scan2pdf.py` = **0**。
+- **单纸型行为不变**：geom 分支单纸型仍 `verdict=PASS`、exit 0（wz4 677 页、wz2 6 页实测）；`effective_verdict(v,False)` 原样返回（实测 PASS/REJECT 均不变）。
+- **多纸型分支**：`verdict_effective` 用于 exit 码——`not v_ok`→verify(6)、`ve=='MANUAL_ONLY'`→manual(8)、否则 ok(0)（代码 L602-612）；sidecar 写入 `review_required/auto_pass_forbidden/multi_format/multi_format_note/verdict_effective`，`gate` 子块也含 effective/review_required（L642-648）。
+- **单测**：30 passed，含 `effective_verdict('PASS',True)=MANUAL_ONLY`、合成多纸型（300x500/250x450）`review_required=true`+note 含分布、多纸型 REJECT 保持、单纸型 None、md 字段断言（t169/t170 描述一致）。
+- **R2 措辞**：`docs/scan2pdf_v1.md` L178/L204 为「**核心字段对齐（非全 schema）**」，列明横排缺 `schema_version/pdf_sha256/thresholds_source/expect_low`、verdict 词表差异；`grep '完全对齐'` = 0。
+
+## 3. 独立抽样
+
+| # | 场景 | 实测 |
+|---|---|---|
+| 1 | wz4 全量（任务命令） | exit 0、677 页、gate PASS（pitch 99.6%、677=677）、review_required=false、sidecar 可读 |
+| 2 | wz2 6 页 | exit 0、6=6、gate PASS（pitch 100%）、review_required=false、sidecar 含新字段 |
+| 3 | 多纸型语义（函数级） | `effective_verdict('PASS',True)='MANUAL_ONLY'`、`('REJECT',True)='REJECT'`、单纸型不变；`multi_format_clause` → review_required/auto_pass_forbidden=true、分布串正确 |
+| 4 | 单测 | 30 passed |
+
+## 4. 残留 findings（低）
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **R1** | low | 多纸型横排**无真实书 E2E**（repo 无多纸型横排源 PDF）；现为合成 book_type + 函数级/单测验证，geom 分支「多纸型→exit 8/6」路径未端到端跑过 | heldout 补一本多纸型横排（或合成 PDF 改名）跑 scan2pdf E2E，断言 exit/review_required/note |
+| **R2** | low | 横排 sidecar 与竖排仍非全 schema 对齐（缺 schema_version/pdf_sha256/thresholds_source/expect_low；verdict 词表不同） | 已在 docs §17 登记「核心字段对齐」；如需统一另起 schema 版本 |
+| **R3** | low | `effective_verdict` 中 `AUTO_PASS→MANUAL_ONLY` 分支对 geom 为死代码（geom 只产 PASS/REJECT） | 保留兼容（竖排可复用）；注释说明 |
+| **R4** | low | 跨轴 REJECT 退出码不同：geom verify 失败=6、竖排 quality REJECT=7 | 属轴语义（verify vs quality）；上层按 tool/verdict 判定即可，文档可补一句 |
+
+## 5. 结论
+
+**t171 终审 verdict：PASS（有条件）**。
+
+- **通过**：t165 R1 关闭（geom 分支与竖排同多纸型语义：PASS→MANUAL_ONLY、REJECT 保持、review_required/auto_pass_forbidden/分布 note 落入 report+sidecar）；R2 措辞已按「核心字段对齐（非全 schema）」修正并登记差异；单纸型 wz4/wz2 行为不变；30 单测通过；无书专属分支。
+- **条件**：R1（多纸型横排 E2E 缺失）建议在 v1 收口前用 heldout/合成多纸型 PDF 补一次端到端；R2–R4 为登记/注释级。
+- 建议：把「多纸型横排 E2E」列入 heldout 验收清单；后续若统一 gate schema，同步 `docs/scan2pdf_v1.md §17` 与 quality_gate 版本号。
+
+## 6. 复现
+
+```bash
+cd /opt/test
+# 任务给定（wz4 单纸型）
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out tmp_vert/scan2pdf/review_wz4_r1.pdf --data-dir data/wz4 --skip-ocr      # exit 0
+# wz2 6 页
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz2.pdf --book wz2 \
+  --out /tmp/t171_wz2_6p.pdf --data-dir data/wz2 --skip-ocr --pages 1-6          # exit 0
+# 多纸型语义（函数级）
+/usr/bin/python3 - <<'PY'
+import sys; sys.path.insert(0,'src/tools'); import scan2pdf as s
+print(s.effective_verdict('PASS',True)); print(s.effective_verdict('REJECT',True))
+print(s.multi_format_clause('PASS','MANUAL_ONLY',True,[{'size':[300,500],'pages':7},{'size':[250,450],'pages':3}]))
+PY
+# 单测
+/usr/bin/python3 -m pytest src/test/unit/test_scan2pdf.py -q    # 30 passed
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `src/tools/scan2pdf.py` | `1eb40a86fd4e83c1fb611578befb521cedda57883357bd92332f67c54e150773` |
+| `src/test/unit/test_scan2pdf.py` | `b611cc5051bd9d3e13fc68fb4e6b0ae87f0d7bfd132020a507433e3e65c7cf01` |
+| `tmp_vert/scan2pdf/review_wz4_r1.pdf` | 2,597,500 B / 677 页（本终审产物） |
+| `tmp_vert/scan2pdf/review_wz4_r1.pdf.gate.json` | 1,349 B / PASS / review_required=false |
+| HEAD | `56bcaeb`（未 commit） |
