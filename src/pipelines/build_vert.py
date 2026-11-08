@@ -533,7 +533,7 @@ def _relocate_missing(cur, pos, ch, ctx, shift):
     return None
 
 
-def _apply_missed_fix(path, br_shift=None):
+def _apply_missed_fix(path, br_shift=None, classes=None):
     """任务F: 把任务E普查的漏识元素灌进**内存 sl**(不改数据文件; 有版框书/别的书页号越界 -> 跳过)。
     br_shift: {(k, row_idx): n} —— 该行被 fix_split_brackets 移走的行首字符数（t32/F1 重定位回退用）。
     · dash: 列首插 `insert_dash` 个 DASH_INS(占格, 由 §1.0a4 的 R2 机制测源图墨线并画线; 不进文本层);
@@ -546,10 +546,12 @@ def _apply_missed_fix(path, br_shift=None):
         print('[漏识元素] 读取失败(%s) -> 跳过' % e)
         return None
     items = d.get('items') or []
+    if classes is not None:
+        items = [it for it in items if it.get('class') in classes]
     groups = {}
     for it in items:
         groups.setdefault((int(it['page']), tuple(it['col'])), []).append(it)
-    st = {'dash': 0, 'ring1': 0, 'ring2': 0, 'comp': 0, 'skip': 0, 'miss': 0}
+    st = {'dash': 0, 'ring1': 0, 'ring2': 0, 'comp': 0, 'skip': 0, 'miss': 0, 'ins': 0, 'rep': 0}
     for (pg, col), its in sorted(groups.items()):
         if pg < 1 or pg > len(keys):
             st['skip'] += len(its)
@@ -570,7 +572,10 @@ def _apply_missed_fix(path, br_shift=None):
             continue
         _miss = sorted([x for x in its if x.get('class') == 'missing_char'],
                        key=lambda x: int(x.get('pos') or 0))
-        its = _miss + [x for x in its if x.get('class') != 'missing_char']
+        # insert/replace 按 pos 降序处理（同列多条插入时，先高后低避免位置偏移）
+        _ir = sorted([x for x in its if x.get('class') in ('insert', 'replace')],
+                     key=lambda x: -int(x.get('pos') or 0))
+        its = _miss + _ir + [x for x in its if x.get('class') not in ('missing_char', 'insert', 'replace')]
         for it in its:
             if it.get('class') == 'dash':
                 n_ins = max(1, int(it.get('insert_dash') or 2))
@@ -595,6 +600,53 @@ def _apply_missed_fix(path, br_shift=None):
                 sl[k][idx] = cur[:pos] + ch + cur[pos:]
                 st['miss'] += 1
                 continue
+            if it.get('class') == 'insert':
+                # battle19b/23：融合候选「补开号/补闭号」——按 pos 插入 1 字（源墨角形；大书守卫同 missing_char）
+                if len(keys) < MISSED_FIX_MIN_PAGES:
+                    st['skip'] += 1
+                    continue
+                ch = it.get('ch') or ''
+                cur = sl[k][idx]
+                pos = int(it.get('pos') or 0)
+                # battle23 M1：闭号族守卫（」』﹂﹄）+「源图闭号墨块数 vs 产物局部闭号数」闸门
+                CLOSE_FAMILY = '」』﹂﹄'
+                if ch in CLOSE_FAMILY:
+                    _win = cur[max(0, pos - 1):min(len(cur), pos + 2)]
+                    _prod_n = sum(1 for c in _win if c in CLOSE_FAMILY)
+                    _src_n = it.get('src_ink_quotes')
+                    if _prod_n >= 1 and ch in _win:
+                        print('[漏识元素] p%d insert 拒绝：相邻已有闭号(%r) cur=%r'
+                              % (pg, _win, cur[max(0, pos - 4):pos + 6]))
+                        st['skip'] += 1
+                        continue
+                    if _src_n is not None and _prod_n >= int(_src_n):
+                        print('[漏识元素] p%d insert 拒绝：产物局部闭号数 %d >= 源墨闭号数 %s（防重复）'
+                              % (pg, _prod_n, _src_n))
+                        st['skip'] += 1
+                        continue
+                if 0 <= pos <= len(cur):
+                    sl[k][idx] = cur[:pos] + ch + cur[pos:]
+                    st['ins'] += 1
+                else:
+                    st['skip'] += 1
+                continue
+            if it.get('class') == 'replace':
+                # battle19b：同位置替换（可审计：current 必须匹配；不匹配 -> 跳过并计数）
+                if len(keys) < MISSED_FIX_MIN_PAGES:
+                    st['skip'] += 1
+                    continue
+                cur = sl[k][idx]
+                pos = int(it.get('pos') or 0)
+                old = it.get('current') or ''
+                new = it.get('new') or ''
+                if old and cur[pos:pos + len(old)] == old:
+                    sl[k][idx] = cur[:pos] + new + cur[pos + len(old):]
+                    st['rep'] += 1
+                else:
+                    print('[漏识元素] p%d x%.1f replace 不匹配(pos=%d cur=%r) -> 跳过'
+                          % (pg, it.get('source_x') or 0, pos, cur[max(0, pos - 4):pos + 8]))
+                    st['skip'] += 1
+                continue
             if it.get('class') != 'ring':
                 continue
             n = int(it['number'])
@@ -617,9 +669,11 @@ def _apply_missed_fix(path, br_shift=None):
                 st['ring2'] += 1
             if n > 50:
                 st['comp'] += 1
-    print('[漏识元素] 灌入 %d 处: dash %d / ring① %d / ring② %d(其中 >50 合成圈 %d) / missing_char %d / 跳过 %d'
-          % (st['dash'] + st['ring1'] + st['ring2'] + st.get('miss', 0), st['dash'], st['ring1'],
-             st['ring2'], st['comp'], st.get('miss', 0), st['skip']))
+    print('[漏识元素] 灌入 %d 处: dash %d / ring① %d / ring② %d(其中 >50 合成圈 %d) / missing_char %d / '
+          'insert %d / replace %d / 跳过 %d'
+          % (st['dash'] + st['ring1'] + st['ring2'] + st.get('miss', 0) + st.get('ins', 0) + st.get('rep', 0),
+             st['dash'], st['ring1'], st['ring2'], st['comp'], st.get('miss', 0),
+             st.get('ins', 0), st.get('rep', 0), st['skip']))
     return st
 
 def _put_tex(ch, x_pt, y_pt, F, xs=None, clamp=False, rule_h=None, invisible=False,
@@ -1321,7 +1375,13 @@ for _pi, _ri, _c in _br_fix:
     _br_shift[(str(_pi - 1), _ri - 1)] = _br_shift.get((str(_pi - 1), _ri - 1), 0) + 1
 
 # §1.0a5 任务F: 灌入任务E普查的 37 处漏识元素(dash 2 格占位 + 句末圈码占位)
-_MISSED_ST = _apply_missed_fix(MISSED_FIX, _br_shift) if MISSED_FIX else None
+_MISSED_ST = _apply_missed_fix(MISSED_FIX, _br_shift, classes=('dash', 'ring', 'missing_char')) if MISSED_FIX else None
+# t91：insert/replace 后置应用（battle14–16 的引号清理会误删先插的 」）
+if MISSED_FIX:
+    _MISSED_ST2 = _apply_missed_fix(MISSED_FIX, _br_shift, classes=('insert', 'replace'))
+    if _MISSED_ST2:
+        print('[漏识元素·后置] insert %d / replace %d / 跳过 %d'
+              % (_MISSED_ST2.get('ins', 0), _MISSED_ST2.get('rep', 0), _MISSED_ST2.get('skip', 0)))
 
 all_rows = {k: col_stats(k) for k in keys}
 
