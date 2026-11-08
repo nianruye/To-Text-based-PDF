@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""scan2pdf / ocr_book 单测：书型判断、数据发现、fix 守卫、失败矩阵、--pages 切片。"""
+import json, os, sys, tempfile
+import fitz
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+sys.path.insert(0, os.path.join(ROOT, 'src', 'tools'))
+import scan2pdf as s2p
+import ocr_book as ob
+
+
+def _mk_pdf(path, n=12, w=300, h=500, frame=True, landscape=False):
+    d = fitz.open()
+    for _ in range(n):
+        pg = d.new_page(width=h if landscape else w, height=w if landscape else h)
+        if frame:
+            ww, hh = pg.rect.width, pg.rect.height
+            for a, b in (((10, 10), (10, hh - 10)), ((ww - 10, 10), (ww - 10, hh - 10)),
+                         ((10, 10), (ww - 10, 10)), ((10, hh - 10), (ww - 10, hh - 10))):
+                pg.draw_line(fitz.Point(*a), fitz.Point(*b))
+    d.save(path); d.close(); return path
+
+
+def test_detect_vertical_frame():
+    with tempfile.TemporaryDirectory() as tmp:
+        p = _mk_pdf(os.path.join(tmp, 'v.pdf'), frame=True)
+        r = s2p.detect_book_type(p)
+        assert r['axis'] == 'vertical'
+        assert r['has_frame'] is True
+        assert r['multi_format'] is False
+
+
+def test_detect_horizontal():
+    with tempfile.TemporaryDirectory() as tmp:
+        p = _mk_pdf(os.path.join(tmp, 'h.pdf'), landscape=True)
+        r = s2p.detect_book_type(p)
+        assert r['axis'] == 'horizontal'
+
+
+def test_detect_multi_format():
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, 'm.pdf'); d = fitz.open()
+        for i in range(30):
+            if i < 20:
+                d.new_page(width=300, height=500)
+            else:
+                d.new_page(width=250, height=450)
+        d.save(p); d.close()
+        r = s2p.detect_book_type(p)
+        assert r['multi_format'] is True
+        assert len(r['sizes']) >= 2
+
+
+def test_find_data_and_fix():
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, 'x_spotting_coords.json'), 'w').write('{}')
+        open(os.path.join(tmp, 'x_spotting_lines_patched.json'), 'w').write('{}')
+        c, l, meta = s2p.find_data(tmp)
+        assert c and l and 'patched' in l and meta['mode'] in ('spotting', 'unknown')
+        assert s2p.find_fix(tmp, 'x') == ('', 'none', '')
+        open(os.path.join(tmp, 'x_missed_fix.json'), 'w').write('{}')
+        fp, src, sh = s2p.find_fix(tmp, 'x')
+        assert fp.endswith('x_missed_fix.json') and src == 'book_data' and sh
+
+
+def test_parse_pages():
+    assert s2p.parse_pages('1-3,5', 10) == [0, 1, 2, 4]
+    assert s2p.parse_pages('', 4) == [0, 1, 2, 3]
+
+
+def test_out_exists_protection():
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'))
+        out = os.path.join(tmp, 'out.pdf'); open(out, 'w').write('x')
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'b', '--skip-ocr'])
+        assert rc == s2p.EXIT['out_exists']
+
+
+def test_data_missing_exit4():
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'))
+        empty = os.path.join(tmp, 'data'); os.makedirs(empty)
+        rc = s2p.main(['--input', inp, '--out', os.path.join(tmp, 'o.pdf'), '--book', 'b',
+                       '--data-dir', empty, '--skip-ocr'])
+        assert rc == s2p.EXIT['data_missing']
+
+
+def test_ocr_missing_token_exit5():
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'))
+        rc = ob.main(['--book', 'b', '--input', inp, '--out-dir', tmp,
+                      '--token-file', os.path.join(tmp, 'nope')])
+        assert rc == 5
+
+
+def test_build_failure_returns_false():
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'))
+        cp = os.path.join(tmp, 'c.json'); lp = os.path.join(tmp, 'l.json')
+        json.dump({}, open(cp, 'w')); json.dump({}, open(lp, 'w'))
+
+        class A:
+            book = 'b'; pipeline = 'vert'; book_type = dict(axis='vertical')
+        ok, info = s2p.build_pdf(A(), cp, lp, inp, os.path.join(tmp, 'o.pdf'), '')
+        assert ok is False and info['returncode'] != 0
+
+
+def test_slice_inputs():
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=6)
+        cp = os.path.join(tmp, 'c.json'); lp = os.path.join(tmp, 'l.json')
+        json.dump({str(i): [[[10, 10]]] for i in range(6)}, open(cp, 'w'))
+        json.dump({str(i): ['x'] for i in range(6)}, open(lp, 'w'))
+        c2, l2, sp = s2p.slice_inputs(cp, lp, inp, [0, 1], tmp)
+        assert sorted(json.load(open(c2))) == ['0', '1']
+        assert len(fitz.open(sp)) == 2
+
+
+def test_page_mismatch_exit6(monkeypatch):
+    """失败矩阵：构建产物页数与源不一致 -> exit 6，且不落 out。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=6)
+        ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+        cp = os.path.join(ddir, 'x_spotting_coords.json')
+        lp = os.path.join(ddir, 'x_spotting_lines.json')
+        json.dump({str(i): [[[10, 10]]] for i in range(6)}, open(cp, 'w'))
+        json.dump({str(i): ['x'] for i in range(6)}, open(lp, 'w'))
+        out = os.path.join(tmp, 'o.pdf')
+
+        def fake_build(args, coords, lines, src, out_tmp, fix):
+            d = fitz.open()
+            for _ in range(3):
+                d.new_page(width=100, height=100)
+            d.save(out_tmp); d.close()
+            return True, dict(pipeline='vert', returncode=0)
+
+        monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir, '--skip-ocr'])
+        assert rc == s2p.EXIT['verify']
+        assert not os.path.exists(out)
+
+
+# ---- t155: 同源配对 / fix canonical / verdict severity ----
+def test_find_data_spotting_priority(tmp_path=None):
+    with tempfile.TemporaryDirectory() as tmp:
+        for n in ('b_layout_coords.json', 'b_layout_lines.json',
+                  'b_spotting_coords.json', 'b_spotting_lines_patched.json'):
+            open(os.path.join(tmp, n), 'w').write('{}')
+        c, l, meta = s2p.find_data(tmp)
+        assert meta['mode'] == 'spotting'
+        assert 'spotting' in c and 'spotting' in l and 'patched' in l
+
+
+def test_find_data_forbids_mixed():
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, 'b_spotting_coords.json'), 'w').write('{}')
+        open(os.path.join(tmp, 'b_layout_lines.json'), 'w').write('{}')
+        c, l, meta = s2p.find_data(tmp)
+        assert c is None and l is None and '禁止' in meta['reason'] or '无同源' in meta['reason']
+
+
+def test_explicit_coords_lines_same_source():
+    with tempfile.TemporaryDirectory() as tmp:
+        cp = os.path.join(tmp, 'b_spotting_coords.json'); lp = os.path.join(tmp, 'b_spotting_lines_patched.json')
+        open(cp, 'w').write('{}'); open(lp, 'w').write('{}')
+        c, l, meta = s2p.find_data('', cp, lp)
+        assert c == cp and meta['mode'] == 'spotting'
+        ll = os.path.join(tmp, 'b_layout_lines.json'); open(ll, 'w').write('{}')
+        c2, l2, meta2 = s2p.find_data('', cp, ll)
+        assert c2 is None and '禁止' in meta2['reason']
+
+
+def test_find_fix_explicit_or_book_data_only():
+    fp, src, sh = s2p.find_fix('', 'brandnew')
+    assert fp == '' and src == 'none' and sh == ''
+    doc = os.path.join(ROOT, 'docs/vert_taskF_missed_fix.json')
+    if os.path.exists(doc):
+        fp2, src2, sh2 = s2p.find_fix('', 'brandnew', explicit_fix=doc)
+        assert fp2 == doc and src2 == 'explicit' and sh2
+    fp3, src3, _ = s2p.find_fix('', 'wz7')
+    assert src3 == 'none'  # 无 data-dir 时不加载 docs 修复（书无关）
+
+
+def test_effective_verdict_severity():
+    assert s2p.effective_verdict('AUTO_PASS', True)[0] == 'MANUAL_ONLY'
+    assert s2p.effective_verdict('AUTO_PASS', False)[0] == 'AUTO_PASS'
+    assert s2p.effective_verdict('REJECT', True)[0] == 'REJECT'
+
+
+# t157：多纸型口径（captain 决定）——禁止 AUTO_PASS、REJECT 不降级、必须 review_required
+def test_multi_format_clause_reject_kept():
+    c = s2p.multi_format_clause('REJECT', 'REJECT', True,
+                                [{'size': [892.5, 1323.0], 'pages': 610}])
+    assert c['review_required'] is True
+    assert c['verdict_effective'] == 'REJECT'
+    assert c['auto_pass_forbidden'] is True
+    assert '需要人工确认版面' in c['note']
+    assert 'REJECT 保持' in c['note']
+
+
+def test_multi_format_clause_auto_downgrade():
+    ve, note = s2p.effective_verdict('AUTO_PASS', True)
+    assert ve == 'MANUAL_ONLY' and 'MANUAL_ONLY' in note
+    c = s2p.multi_format_clause('AUTO_PASS', ve, True, [])
+    assert c['review_required'] is True and c['verdict_effective'] == 'MANUAL_ONLY'
+    assert s2p.multi_format_clause('AUTO_PASS', 'AUTO_PASS', False) is None
+
+
+# t159：OCR 模式契约（模式复用、代码独立）—— A=layout+ocr, B=spotting
+def test_ocr_mode_contract():
+    a = json.loads(ob.payload(True, 'ocr')['optionalPayload'])
+    b = json.loads(ob.payload(False, 'spotting')['optionalPayload'])
+    assert a['useLayoutDetection'] is True and a['promptLabel'] == 'ocr'
+    assert b['useLayoutDetection'] is False and b['promptLabel'] == 'spotting'
+    _, batches = ob.split_batches('source_pdf/wz6.pdf', 50, '1-6')
+    assert len(batches) == 1 and len(batches[0][1]) == 6
+
+
+# ---- t161: 完整复用键（R1） ----
+def test_resume_key_all_fields():
+    k = s2p.resume_key('b', 'i', 'f', 'c', 'l', 'spotting', 'vert', '1-6')
+    assert set(k) == {'book', 'input_sha256', 'fix_sha256', 'coords_sha256',
+                      'lines_sha256', 'mode', 'pipeline', 'pages'}
+    assert k['pages'] == '1-6' and k['pipeline'] == 'vert'
+    k2 = s2p.resume_key('b', 'i', 'f2', 'c', 'l', 'spotting', 'vert', '1-6')
+    assert k != k2  # fix_sha 入键
+    k3 = s2p.resume_key('b', 'i', 'f', 'c', 'l', 'spotting', 'vert', '1-3')
+    assert k != k3  # pages 入键
+
+
+def test_infer_axis_from_coords_wz2():
+    ax = s2p.infer_axis_from_coords(os.path.join(ROOT, 'data/wz2/wz2_spotting_coords.json'))
+    assert ax == 'horizontal'
+
+
+def test_resume_mismatch_exit2_and_no_overwrite():
+    import subprocess
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=6)
+        ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+        cp = os.path.join(ddir, 'x_spotting_coords.json')
+        lp = os.path.join(ddir, 'x_spotting_lines_patched.json')
+        json.dump({str(i): [[[10, 10], [10, 400], [30, 400], [30, 10]]] for i in range(6)},
+                  open(cp, 'w'))
+        json.dump({str(i): ['x'] for i in range(6)}, open(lp, 'w'))
+        out = os.path.join(tmp, 'o.pdf')
+        open(out, 'w').write('OLD')
+        old = os.path.getsize(out)
+        # 伪造本工具产物 report，但 resume_key 的 pages 不同
+        json.dump({'tool': 'scan2pdf', 'book': 'x',
+                   'resume_key': {'book': 'x', 'input_sha256': 'i', 'fix_sha256': '',
+                                  'coords_sha256': 'c', 'lines_sha256': 'l',
+                                  'mode': 'spotting', 'pipeline': 'vert', 'pages': '1-3'}},
+                  open(out + '.report.json', 'w'))
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir,
+                       '--skip-ocr', '--pages', '1-6'])
+        assert rc == s2p.EXIT['usage']
+        assert open(out).read() == 'OLD' and os.path.getsize(out) == old
+        r = json.load(open(out + '.report.json'))
+        assert r['resume_mismatch']['mismatch']
+
+
+def test_resume_match_reuses_without_rebuild(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=6)
+        ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+        cp = os.path.join(ddir, 'x_spotting_coords.json')
+        lp = os.path.join(ddir, 'x_spotting_lines_patched.json')
+        json.dump({str(i): [[[10, 10], [10, 400], [30, 400], [30, 10]]] for i in range(6)},
+                  open(cp, 'w'))
+        json.dump({str(i): ['x'] for i in range(6)}, open(lp, 'w'))
+        out = os.path.join(tmp, 'o.pdf')
+        calls = {'build': 0, 'gate': 0}
+
+        def fake_build(args, coords, lines, src, out_tmp, fix):
+            calls['build'] += 1
+            d = fitz.open()
+            for _ in range(6):
+                d.new_page(width=100, height=100)
+            d.save(out_tmp); d.close()
+            return True, dict(pipeline='vert', returncode=0)
+
+        def fake_gate(args, pdf, coords, lines, src, gate_out):
+            calls['gate'] += 1
+            json.dump({'verdict': 'AUTO_PASS'}, open(gate_out, 'w'))
+            return 0, 'AUTO_PASS', ''
+        monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+        monkeypatch.setattr(s2p, 'call_gate', fake_gate)
+        argv = ['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir,
+                '--skip-ocr', '--pages', '1-6']
+        assert s2p.main(argv) == 0
+        assert calls['build'] == 1
+        assert s2p.main(argv) == 0
+        assert calls['build'] == 1  # 复用，不再构建
+        assert calls['gate'] == 2   # 复用后仍重跑门禁
+        r = json.load(open(out + '.report.json'))
+        assert r['resume'] is True and r['build'].get('skipped') == 'resume_existing'
+        assert 'book+input_sha' in r['resume_note']

@@ -1,6 +1,6 @@
 {
  "source": "docs/vert_taskE_census.json",
- "note": "ring 的 number 由源图裁片人工判读（tmp_vert/taskE/rings_table_*.png）；situation 1=数字已在 OCR 文本尾, 2=整格漏识；来源坐标 source_x/source_y 供对账。",
+ "note": "ring 的 number 由源图裁片人工判读（tmp_vert/taskE/rings_table_*.png）；situation 1=数字已在 OCR 文本尾, 2=整格漏识；来源坐标 source_x/source_y 供对账。 // t88: 3 条 insert（dual_ocr 融合候选，源图角形+合法一） // t91: 23 条闭号 insert（源墨角形复核） // t91: 21 条闭号 insert 中 8 条在产物文本层未生效，已移除（登记 battle20 报告）",
  "items": [
   {
    "page": 1682,
@@ -15349,6 +15349,810 @@
     779.4
    ],
    "note": "t52: 复审补落（p1178 pos38/39、p1291 pos31）"
+  },
+  {
+   "class": "insert",
+   "page": 308,
+   "col": [
+    705.25,
+    296.55,
+    733.75,
+    804.7
+   ],
+   "pos": 0,
+   "ch": "「",
+   "side": "",
+   "source": "dual_ocr",
+   "confidence": "high",
+   "text": "一窪死水全無浪，也有春風擺動時。",
+   "crop": "/opt/test/tmp_vert/battle23/crops/hist_p0308_r04.png",
+   "note": "源图角形+合法一 -> 插入「保留一（t88）"
+  },
+  {
+   "class": "insert",
+   "page": 967,
+   "col": [
+    816.65,
+    226.25,
+    847.0,
+    474.95
+   ],
+   "pos": 0,
+   "ch": "「",
+   "side": "",
+   "source": "dual_ocr",
+   "confidence": "high",
+   "text": "一百萬軍中捲白旗，",
+   "crop": "/opt/test/tmp_vert/battle23/crops/hist_p0967_r00.png",
+   "note": "源图角形+合法一 -> 插入「保留一（t88）"
+  },
+  {
+   "class": "insert",
+   "page": 1625,
+   "col": [
+    616.9,
+    207.05,
+    640.85,
+    340.4
+   ],
+   "pos": 0,
+   "ch": "「",
+   "side": "",
+   "source": "dual_ocr",
+   "confidence": "high",
+   "text": "一朝時運至，",
+   "crop": "/opt/test/tmp_vert/battle23/crops/hist_p1625_r01.png",
+   "note": "源图角形+合法一 -> 插入「保留一（t88）"
+  },
+  {
+   "class": "insert",
+   "page": 230,
+   "col": [
+    67.3,
+    209.8,
+    101.4,
+    1343.6
+   ],
+   "pos": 22,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "不依我，只顧說去。等住回亂將起來，我不管你。二人",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p0230_r18_insert.png",
+   "ink": {
+    "w": 20.3,
+    "h": 9.0,
+    "fill": 0.33
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 358,
+   "col": [
+    647.35,
+    220.25,
+    686.85,
+    1335.85
+   ],
+   "pos": 14,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "都為我的心，倒還是正經夫妻。一面從粉壁前，杈步走",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p0358_r05_insert.png",
+   "ink": {
+    "w": 21.0,
+    "h": 9.0,
+    "fill": 0.34
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 358,
+   "col": [
+    112.2,
+    221.7,
+    148.95,
+    1331.55
+   ],
+   "pos": 42,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "殺雞扯脖，口裡姐姐長，姐姐短。月娘看不上，說道：",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p0358_r17_insert.png",
+   "ink": {
+    "w": 21.8,
+    "h": 9.0,
+    "fill": 0.36
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 898,
+   "col": [
+    55.35,
+    112.45,
+    91.05,
+    1244.95
+   ],
+   "pos": 6,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "直這些銀子。一面收拾箱籠放好，明日去買家活。當日",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p0898_r18_insert.png",
+   "ink": {
+    "w": 21.0,
+    "h": 10.4,
+    "fill": 0.37
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 1122,
+   "col": [
+    58.0,
+    137.6,
+    95.5,
+    1270.1
+   ],
+   "pos": 2,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "來。一面掌起燈籠，西門慶下臺基，鄭家鴉子迎著道萬",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p1122_r18_insert.png",
+   "ink": {
+    "w": 21.7,
+    "h": 10.4,
+    "fill": 0.34
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 1234,
+   "col": [
+    31.0,
+    150.7,
+    56.4,
+    995.1
+   ],
+   "pos": 0,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "婦人于是扯過他袖子來，用手掏他袖子，用手撇著不教",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p1234_r18_insert.png",
+   "ink": {
+    "w": 16.6,
+    "h": 7.7,
+    "fill": 0.31
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 1256,
+   "col": [
+    46.55,
+    221.15,
+    78.95,
+    971.25
+   ],
+   "pos": 37,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "特故里搬弄心腸軟，一似酥蜜果。者麼是誰，休道是我",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p1256_r19_insert.png",
+   "ink": {
+    "w": 16.4,
+    "h": 8.3,
+    "fill": 0.31
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "insert",
+   "page": 1354,
+   "col": [
+    34.55,
+    148.5,
+    58.5,
+    987.5
+   ],
+   "pos": 21,
+   "ch": "」",
+   "side": "",
+   "source": "dual_ocr_ink",
+   "confidence": "high",
+   "text": "春姐，你放小卓兒在炕上，篩甜酒與姥姥吃盃。不一時",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fix_p1354_r18_insert.png",
+   "ink": {
+    "w": 17.3,
+    "h": 16.4,
+    "fill": 0.29
+   },
+   "note": "t95 F1/F2 修复后保留",
+   "src_ink_quotes": 1
+  },
+  {
+   "class": "replace",
+   "page": 450,
+   "col": [
+    344.8,
+    333.95,
+    375.15,
+    1138.65
+   ],
+   "pos": 0,
+   "current": "尾聲",
+   "new": "︹尾聲︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "尾聲光陰迅速如飛電，好良宵，可惜漸閒。拚取歡娛歌",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0450_r12.png"
+  },
+  {
+   "class": "replace",
+   "page": 529,
+   "col": [
+    301.2,
+    221.7,
+    330.8,
+    428.95
+   ],
+   "pos": 1,
+   "current": "山坡羊",
+   "new": "︹山坡羊︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "名山坡羊兒你聽：",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0529_r12.png"
+  },
+  {
+   "class": "replace",
+   "page": 530,
+   "col": [
+    204.15,
+    213.7,
+    234.45,
+    876.5
+   ],
+   "pos": 1,
+   "current": "山坡羊",
+   "new": "︹山坡羊︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "名山坡羊，亦發孝順你老人家罷。」于是頓開喉音，唱",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0530_r15.png"
+  },
+  {
+   "class": "replace",
+   "page": 641,
+   "col": [
+    607.8,
+    128.35,
+    638.15,
+    239.45
+   ],
+   "pos": -1,
+   "current": "「金字經」",
+   "new": "︹金字經︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "金字經",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0641_r05.png"
+  },
+  {
+   "class": "replace",
+   "page": 662,
+   "col": [
+    678.3,
+    202.4,
+    715.8,
+    1227.75
+   ],
+   "pos": 0,
+   "current": "「紫花兒序」",
+   "new": "︹紫花兒序︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "「紫花兒序」「帳前軍，朱衣畫戟；門下士，錦帶吳鈎",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0662_r04.png"
+  },
+  {
+   "class": "replace",
+   "page": 693,
+   "col": [
+    649.75,
+    226.25,
+    685.45,
+    1251.55
+   ],
+   "pos": 0,
+   "current": "烏夜啼",
+   "new": "︹烏夜啼︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "烏夜啼一俺如今相離三月如隔數載，要相逢甚日何年再",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0693_r04.png"
+  },
+  {
+   "class": "replace",
+   "page": 693,
+   "col": [
+    515.85,
+    228.9,
+    547.1,
+    992.25
+   ],
+   "pos": 0,
+   "current": "尾聲",
+   "new": "︹尾聲︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "尾聲一把局兒牢鋪擺，情人終久再歸來，美滿夫妻百歲",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0693_r07.png"
+  },
+  {
+   "class": "replace",
+   "page": 702,
+   "col": [
+    133.0,
+    240.8,
+    171.35,
+    1258.15
+   ],
+   "pos": 0,
+   "current": "山坡羊",
+   "new": "︹山坡羊︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "山坡羊俏冤家，生的出類拔萃。翠衾寒，孤殘獨自。自",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0702_r16.png"
+  },
+  {
+   "class": "replace",
+   "page": 840,
+   "col": [
+    424.85,
+    123.05,
+    454.3,
+    301.65
+   ],
+   "pos": 1,
+   "current": "折桂令",
+   "new": "︹折桂令︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "有折桂令為證：",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0840_r09.png"
+  },
+  {
+   "class": "replace",
+   "page": 921,
+   "col": [
+    272.2,
+    127.0,
+    304.35,
+    1256.85
+   ],
+   "pos": 1,
+   "current": "一封書",
+   "new": "︹一封書︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "寫一封書，使了印色，差一名節級，明日早起身，一同",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0921_r12.png"
+  },
+  {
+   "class": "replace",
+   "page": 985,
+   "col": [
+    764.85,
+    256.65,
+    797.0,
+    1263.45
+   ],
+   "pos": 0,
+   "current": "東甌令",
+   "new": "︹東甌令︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "東甌令菊花綻，桂花零，如今露冷風寒，秋意漸深。驀",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0985_r01.png"
+  },
+  {
+   "class": "replace",
+   "page": 985,
+   "col": [
+    587.25,
+    254.0,
+    618.5,
+    1264.8
+   ],
+   "pos": 0,
+   "current": "東甌令",
+   "new": "︹東甌令︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "東甌令長吁氣，兩三聲，斜倚定幃屏兒，思量那個人。",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0985_r05.png"
+  },
+  {
+   "class": "replace",
+   "page": 985,
+   "col": [
+    498.9,
+    254.0,
+    529.25,
+    1035.9
+   ],
+   "pos": 0,
+   "current": "尾聲",
+   "new": "︹尾聲︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "尾聲爲多情，牽掛心。朝思暮想淚珠傾，恨殺多才不見",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p0985_r07.png"
+  },
+  {
+   "class": "replace",
+   "page": 1160,
+   "col": [
+    706.85,
+    227.55,
+    737.2,
+    1240.95
+   ],
+   "pos": 0,
+   "current": "「滾綉球」",
+   "new": "︹滾綉球︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "「滾綉球」「你有秦趙事，指鹿心；屠岸賈，縱犬機；",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1160_r03.png"
+  },
+  {
+   "class": "replace",
+   "page": 1160,
+   "col": [
+    574.75,
+    227.55,
+    606.0,
+    1242.3
+   ],
+   "pos": 0,
+   "current": "尾聲",
+   "new": "︹尾聲︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "尾聲金甌底下無名姓，青史編中有是非。你那知燮理陰",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1160_r06.png"
+  },
+  {
+   "class": "replace",
+   "page": 1179,
+   "col": [
+    531.55,
+    228.7,
+    555.55,
+    990.8
+   ],
+   "pos": 1,
+   "current": "滾綉毬",
+   "new": "︹滾綉毬︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "」滾綉毬似紛紛蝶翅飛，如漫漫柳絮狂。舞氷花，旋風",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1179_r03.png"
+  },
+  {
+   "class": "replace",
+   "page": 1180,
+   "col": [
+    556.95,
+    230.9,
+    578.1,
+    311.1
+   ],
+   "pos": -1,
+   "current": "「滾綉毬」",
+   "new": "︹滾綉毬︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "滾綉毬",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1180_r03.png"
+  },
+  {
+   "class": "replace",
+   "page": 1180,
+   "col": [
+    456.85,
+    229.8,
+    480.8,
+    986.45
+   ],
+   "pos": 0,
+   "current": "倘秀才",
+   "new": "︹倘秀才︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "倘秀才但歇息呵，論前王後王；恰合眼，慮興邦喪邦。",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1180_r07.png"
+  },
+  {
+   "class": "replace",
+   "page": 1180,
+   "col": [
+    388.45,
+    230.9,
+    410.3,
+    311.1
+   ],
+   "pos": -1,
+   "current": "「滾綉毬」",
+   "new": "︹滾綉毬︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "滾綉毬",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1180_r09.png"
+  },
+  {
+   "class": "replace",
+   "page": 1180,
+   "col": [
+    255.9,
+    229.8,
+    279.9,
+    988.6
+   ],
+   "pos": 0,
+   "current": "倘秀才",
+   "new": "︹倘秀才︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "倘秀才憂的是百姓苦，向御榻心勞意攘。害的是不小可",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1180_r14.png"
+  },
+  {
+   "class": "replace",
+   "page": 1180,
+   "col": [
+    189.65,
+    229.8,
+    212.9,
+    988.6
+   ],
+   "pos": 0,
+   "current": "滾綉毬",
+   "new": "︹滾綉毬︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "滾綉毬卿道是錢王共李王，劉鋹與孟杲。他每多無仁政",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1180_r16.png"
+  },
+  {
+   "class": "replace",
+   "page": 1222,
+   "col": [
+    345.45,
+    238.5,
+    370.85,
+    996.2
+   ],
+   "pos": 1,
+   "current": "後庭花",
+   "new": "︹後庭花︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "」後庭花「夢了些，虛飄飄，枕上蝴蝶。聽了些，咭叮",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1222_r10.png"
+  },
+  {
+   "class": "replace",
+   "page": 1233,
+   "col": [
+    478.7,
+    236.3,
+    505.5,
+    829.25
+   ],
+   "pos": -1,
+   "current": "「尾聲」",
+   "new": "︹尾聲︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "尾聲」「流蘇錦帳同歡會，錦被里鴛鴦成對，永遠團圓",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1233_r05.png"
+  },
+  {
+   "class": "replace",
+   "page": 1247,
+   "col": [
+    267.2,
+    239.55,
+    290.45,
+    997.3
+   ],
+   "pos": 0,
+   "current": "「玉降鶯」",
+   "new": "︹玉降鶯︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "「玉降鶯」「今宵歡慶，我鶯娘何曾慣經。你須索要歇",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1247_r11.png"
+  },
+  {
+   "class": "replace",
+   "page": 1254,
+   "col": [
+    537.2,
+    230.9,
+    570.35,
+    986.45
+   ],
+   "pos": 1,
+   "current": "山坡羊",
+   "new": "︹山坡羊︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "(山坡羊）)「黄氏到了那森羅寶殿，有童子先奏說，",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1254_r03.png"
+  },
+  {
+   "class": "replace",
+   "page": 1271,
+   "col": [
+    442.05,
+    164.75,
+    466.0,
+    1005.95
+   ],
+   "pos": 27,
+   "current": "山坡羊",
+   "new": "︹山坡羊︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "。」這郁大姐拿過琵琶來，說道：「等我唱個「鶯鶯鬧",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1271_r06.png"
+  },
+  {
+   "class": "replace",
+   "page": 1420,
+   "col": [
+    193.15,
+    157.2,
+    215.75,
+    292.7
+   ],
+   "pos": 1,
+   "current": "紅繡鞋",
+   "new": "︹紅繡鞋︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "有紅繡鞋為證：",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1420_r13.png"
+  },
+  {
+   "class": "replace",
+   "page": 1470,
+   "col": [
+    91.65,
+    150.7,
+    115.6,
+    1000.55
+   ],
+   "pos": 1,
+   "current": "賺",
+   "new": "︹賺︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "哄賺進後邊，老實打與他一頓，即時趕了離門，教他家",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1470_r16.png"
+  },
+  {
+   "class": "replace",
+   "page": 1510,
+   "col": [
+    338.4,
+    157.2,
+    360.95,
+    290.5
+   ],
+   "pos": 1,
+   "current": "山坡羊",
+   "new": "︹山坡羊︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "哭山坡羊為證：",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1510_r09.png"
+  },
+  {
+   "class": "replace",
+   "page": 1567,
+   "col": [
+    618.3,
+    227.65,
+    646.5,
+    999.45
+   ],
+   "pos": 2,
+   "current": "要孩兒",
+   "new": "︹要孩兒︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "」「要孩兒一煞」「不覺撞昏鍾，昏鍾人初定。是誰人",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1567_r01.png"
+  },
+  {
+   "class": "replace",
+   "page": 1567,
+   "col": [
+    281.3,
+    224.4,
+    309.5,
+    1001.6
+   ],
+   "pos": 2,
+   "current": "六煞",
+   "new": "︹六煞︺",
+   "source": "dual_ocr_bracket",
+   "confidence": "high",
+   "text": "（「六煞）」「先亡了打我的爹，後亡了我父親。我孃",
+   "note": "t107 全量扫描（strict）",
+   "crop": "/opt/test/tmp_vert/battle23/crops/fs_p1567_r11.png"
   }
  ],
  "ring_digit_merge": {
