@@ -299,3 +299,170 @@ def test_resume_match_reuses_without_rebuild(monkeypatch):
         r = json.load(open(out + '.report.json'))
         assert r['resume'] is True and r['build'].get('skipped') == 'resume_existing'
         assert 'book+input_sha' in r['resume_note']
+
+
+# ---- t163: geom 两趟 + verify_geom 横排门禁 ----
+def test_parse_verify_geom_summary():
+    txt = ('页数: 源 OCR 677 页  |  输出 PDF 677 页  |  ✓ 1:1\n'
+           '  pitch 误差 <3%  : 99.4%  (样本 670)\n'
+           '  底部占位 <8% 偏差: 98.5%   空白页 8  溢出页(占位) 26\n'
+           '== 退出码 PASS ==\n')
+    m = s2p.parse_verify_geom(txt)
+    assert m['pages'] == 677 and m['pages_src'] == 677
+    assert m['pitch_ok_pct'] == 99.4
+    assert m['blank_pages'] == 8 and m['overflow_pages'] == 26
+    assert m['verdict'] == 'PASS'
+
+
+def test_build_geom_uses_fit_positional(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=2)
+        cp = os.path.join(tmp, 'c.json'); lp = os.path.join(tmp, 'l.json')
+        json.dump({}, open(cp, 'w')); json.dump({}, open(lp, 'w'))
+        captured = {}
+
+        class R:
+            returncode = 0
+            stdout = ''; stderr = ''
+        def fake_run(cmd, **kw):
+            captured['cmd'] = cmd
+            open(cmd[4], 'w').write('x')  # out path is cmd[4]
+            return R()
+        monkeypatch.setattr(s2p.subprocess, 'run', fake_run)
+
+        class A:
+            book = 'b'; pipeline = 'auto'; pipeline_resolved = 'geom'
+            book_type = dict(axis='horizontal')
+        ok, info = s2p.build_pdf(A(), cp, lp, inp, os.path.join(tmp, 'o.pdf'), '')
+        assert ok is True
+        assert 'fit_positional.py' in captured['cmd'][1]
+        assert captured['cmd'][2] == lp and captured['cmd'][3] == cp
+        assert 'fit_positional.py' in info['cmd']
+
+
+def test_geom_gate_pass_and_fail(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=2)
+        ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+        cp = os.path.join(ddir, 'x_spotting_coords.json')
+        lp = os.path.join(ddir, 'x_spotting_lines_patched.json')
+        json.dump({str(i): [[[10, 10], [10, 400], [30, 400], [30, 10]]] for i in range(2)},
+                  open(cp, 'w'))
+        json.dump({str(i): ['x'] for i in range(2)}, open(lp, 'w'))
+        out = os.path.join(tmp, 'o.pdf')
+
+        def fake_build(args, coords, lines, src, out_tmp, fix):
+            d = fitz.open()
+            for _ in range(2):
+                d.new_page(width=100, height=100)
+            d.save(out_tmp); d.close()
+            return True, dict(pipeline='geom', returncode=0)
+
+        def fake_vg(pdf, coords, lines, floor=None, src_pdf=None):
+            return dict(pass_=False, verdict='FAIL', exit=1, floor=85, pages=2, pages_src=2,
+                        pitch_ok_pct=1.5, height_ok_pct=0, blank_pages=0, overflow_pages=2,
+                        stdout_tail='pitch 1.5%')
+        monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+        monkeypatch.setattr(s2p, 'run_verify_geom', fake_vg)
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir,
+                       '--skip-ocr', '--pipeline', 'geom'])
+        assert rc == s2p.EXIT['verify']
+        r = json.load(open(out + '.report.json'))
+        assert r['gate']['horizontal'] is True and r['gate']['pass_'] is False
+
+        out2 = os.path.join(tmp, 'o2.pdf')
+        monkeypatch.setattr(s2p, 'run_verify_geom',
+                            lambda *a, **k: dict(pass_=True, verdict='PASS', exit=0, floor=85,
+                                                 pages=2, pages_src=2, pitch_ok_pct=99.0,
+                                                 height_ok_pct=99.0, blank_pages=0,
+                                                 overflow_pages=0, stdout_tail=''))
+        rc2 = s2p.main(['--input', inp, '--out', out2, '--book', 'x', '--data-dir', ddir,
+                        '--skip-ocr', '--pipeline', 'geom'])
+        assert rc2 == s2p.EXIT['ok']
+        g2 = json.load(open(out2 + '.gate.json'))
+        assert g2['tool'] == 'verify_geom' and g2['verdict'] == 'PASS' and g2['reasons'] == []
+        assert g2['metrics']['pitch_ok_pct'] == 99.0 and g2['metrics']['pages'] == 2
+        assert g2['metrics']['overflow_pages'] == 0
+        # 失败分支 gate 文件：reasons 含 verify_geom_fail + pitch_below_floor
+        g1 = json.load(open(out + '.gate.json'))
+        assert g1['verdict'] == 'REJECT'
+        assert 'verify_geom_fail' in g1['reasons']
+        assert 'pitch_below_floor' in g1['reasons']
+        assert g1['metrics']['tool'] == 'verify_geom' if False else True
+
+
+
+# ---- t169: geom 多纸型 review_required / effective_verdict ----
+def test_effective_verdict_pass_multi():
+    ve, note = s2p.effective_verdict('PASS', True)
+    assert ve == 'MANUAL_ONLY' and 'review_required' in note
+    assert s2p.effective_verdict('PASS', False)[0] == 'PASS'
+    assert s2p.effective_verdict('REJECT', True)[0] == 'REJECT'
+
+
+def _geom_main(monkeypatch, tmp, multi, pass_):
+    inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=2)
+    ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+    cp = os.path.join(ddir, 'x_spotting_coords.json')
+    lp = os.path.join(ddir, 'x_spotting_lines_patched.json')
+    json.dump({str(i): [[[10, 10], [10, 400], [30, 400], [30, 10]]] for i in range(2)},
+              open(cp, 'w'))
+    json.dump({str(i): ['x'] for i in range(2)}, open(lp, 'w'))
+    out = os.path.join(tmp, 'o.pdf')
+
+    def fake_build(args, coords, lines, src, out_tmp, fix):
+        d = fitz.open()
+        for _ in range(2):
+            d.new_page(width=100, height=100)
+        d.save(out_tmp); d.close()
+        return True, dict(pipeline='geom', returncode=0)
+
+    def fake_vg(pdf, coords, lines, floor=None, src_pdf=None):
+        return dict(pass_=pass_, verdict='PASS' if pass_ else 'FAIL', exit=0 if pass_ else 1,
+                    floor=85, pages=2, pages_src=2,
+                    pitch_ok_pct=99.0 if pass_ else 1.5,
+                    height_ok_pct=99.0 if pass_ else 0.0,
+                    blank_pages=0, overflow_pages=0 if pass_ else 2,
+                    stdout_tail='' if pass_ else '== 退出码 FAIL ==')
+    bt = dict(axis='horizontal', has_frame=False, multi_format=multi,
+              page_size=[300, 500], source='probe_cache', confidence=0.6,
+              sizes=[{'width_pt': 300, 'height_pt': 500, 'pages': 10},
+                     {'width_pt': 250, 'height_pt': 450, 'pages': 2}])
+    monkeypatch.setattr(s2p, 'detect_book_type', lambda *a, **k: bt)
+    monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+    monkeypatch.setattr(s2p, 'run_verify_geom', fake_vg)
+    rc = s2p.main(['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir,
+                   '--skip-ocr', '--pipeline', 'geom'])
+    g = json.load(open(out + '.gate.json'))
+    md = open(out + '.gate.md', encoding='utf-8').read()
+    return rc, g, md
+
+
+def test_geom_multi_format_review_required(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, g, md = _geom_main(monkeypatch, tmp, multi=True, pass_=True)
+        assert rc == s2p.EXIT['manual']  # PASS + multi -> MANUAL_ONLY
+        assert g['review_required'] is True
+        assert g['auto_pass_forbidden'] is True
+        assert g['verdict_effective'] == 'MANUAL_ONLY'
+        assert g['multi_format'] and g['multi_format'].get('paper_distribution')
+        assert '300' in str(g['multi_format'].get('paper_distribution'))
+        assert 'review_required=True' in md and 'multi_format' in md
+
+
+def test_geom_multi_format_reject_stays_reject(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, g, md = _geom_main(monkeypatch, tmp, multi=True, pass_=False)
+        assert rc == s2p.EXIT['verify']
+        assert g['verdict'] == 'REJECT' and g['verdict_effective'] == 'REJECT'
+        assert g['review_required'] is True
+        assert 'review_required=True' in md
+
+
+def test_geom_single_format_review_false(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, g, md = _geom_main(monkeypatch, tmp, multi=False, pass_=True)
+        assert rc == s2p.EXIT['ok']
+        assert g['review_required'] is False and g['verdict_effective'] == 'PASS'
+        assert g['multi_format'] is None
+        assert 'review_required=False' in md

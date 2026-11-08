@@ -125,14 +125,80 @@
 | 书型修正 | **OCR 框长宽比（coords_boxes）→ horizontal**（横排框宽≈1.5×高） |
 | pipeline | `geom`（build_geom） |
 | 构建 | **成功**：`build_geom.py` rc=0，6/6 页，out `out_wz2.pdf`（110,009 B），page0 文本 32 字 |
-| 门禁 | **skipped**：`horizontal_gate_not_wired`（quality_gate v1 只接 verify_vert；横排需 verify_geom） |
+| 门禁 | t163 前为 skipped（`horizontal_gate_not_wired`）；**t163 后已接入 verify_geom**（本行为历史记录） |
 | exit | **8（manual）** |
 
 **结论（v1 横排是否可用）**：`build_geom` 在 wz2 6 页 dry-run **可构建**（页数 1:1、有文本层），但 **横排 verify/quality 门禁未接入**，v1 不能自动判定/交付；
-按 exit 8 人工处理。横排整书验证与 verify_geom 接入留 v2。
+t163 后横排已接 verify_geom（带 --src-pdf）；exit 8 为当时未接门禁的历史结果。
 
 ## 13. 复用语义说明（替代 §0 旧表述）
 
 - 外部 out：不覆盖 → exit 2；
 - 本工具产物：**默认不覆盖**；完整键匹配时复用并重跑门禁（`resume=true` + `resume_note` 完整键），不匹配 → exit 2；
 - `--force` 才重建/覆盖。
+
+---
+
+## 14. 横排修复（#37，t163）
+
+- **构建入口**：geom 分支不再直调 `build_geom.py`，改调 `src/calibration/fit_positional.py`（两趟：pass1 测高 + pass2 ratio 重渲染；argv `lines coords out src`）。
+- **横排门禁**：构建后跑 `verify_geom.py`（`VERIFY_PITCH_FLOOR=85`，并传 `--src-pdf` 以启用 DPI 自适应），结果写入 `gate{tool=verify_geom,pass_,pitch_ok_pct,pages,pages_src,blank_pages,overflow_pages}`；失败 → exit 6。
+- **wz4 全量（677 页）**：fit_positional 构建成功；scan2pdf gate **PASS**：pitch 99.6%、页数 677=677、空白 32 / 溢出 6（gate 值）；exit 0。历史 `output/wz4/wz4_optimized.pdf` 文本层页数一致、文本差异 0（同 677 页）。
+- **wz2 6 页回归**：geom 构建成功，gate PASS，exit 0。
+- **⚠ DPI 契约差异**：wz4 的 `data/wz4/*_spotting_coords.json` 当前为 **144dpi 尺度**（max y 1268px / 页高 635pt），`calibrate` 自适应 DPI=144；因此
+  `verify_geom` 必须带 `--src-pdf source_pdf/wz4.pdf` 才按 144 判（PASS 99.6%）。**不带 `--src-pdf` 时 verify 默认 DPI=200**，会把正确产物判成 pitch 0%（历史 `wz4_optimized.pdf` 之所以裸命令 PASS，是旧代码按 200dpi 渲染、字号物理偏小 28%）。
+  结论：#37 的构建/门禁已修复；外部裸 `verify_geom` 命令需补 `--src-pdf`（battle1 文档原本就带），或由 verify 自动探测——属契约口径，需 captain/用户裁决。
+
+## 15. t163 裁决后的替代验收（wz4）
+
+依据 captain 裁决（契约 verify 命令必须带 `--src-pdf`；历史 200dpi 文本一致不再要求）：
+
+| 项 | 结果 |
+|---|---|
+| a. verify_geom（带 --src-pdf，floor=85） | **PASS**：677=677、pitch 99.6%、split 0 |
+| b. 文本总量对账 | 产物 **560,324** 字 vs OCR lines **546,893** 字 = **1.0246**（≥99%） |
+| c. 5 页目视 | 1/18/100/400/677：无跨页溢出、行大致对位；已知 p1 封面图未贴回、目录字体间距差异、正文底部占位偏紧 |
+| d. wz2 6 页回归 | fit_positional + verify_geom gate **PASS**，exit 0 |
+| e. 历史对照 | 旧 200dpi（7.7pt，物理偏小 28%）vs 新 144dpi（10.7pt），674/677 页/39,028 字差异**属预期**，不要求一致 |
+| 单测 | test_scan2pdf + test_quality_gate **44 passed** |
+
+- 证据：`tmp_vert/scan2pdf/wz4_acceptance_recheck.md` + `crops/wz4_p*_vs.png`。
+
+## 16. t167：横排契约同步 + gate sidecar（F1/F3）
+
+### 16.1 F1：全仓 verify_geom 调用统一带 `--src-pdf`
+
+- `optimize_book.py`（第 4 步验证）→ `verify_geom.py out coords lines --src-pdf <src_pdf>`；
+- `src/test/README.md`（已带）与 `src/test/snapshots/README.md`（wz1/youhua/wz2 三例）、`docs/HANDOFF_20261024.md`（两处）、`docs/wz4_build_geom_fix_任务简报.md` 示例命令均补 `--src-pdf`；
+- 注明原因：**缺省 DPI=200，各书 OCR 数据 DPI 不同（wz4=144dpi），不带会把正确产物误判 pitch 0%**；
+- `src/test/verify_geom.py` 的 usage 与 `--src-pdf` help 已注明「必带」；AGENTS §3 契约同步（captain 裁决）。
+
+### 16.2 F3：横排 `<out>.gate.json` / `.gate.md`
+
+geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段对齐**，非全 schema）：
+
+```
+<out>.gate.json: version=quality-gate-v1  book  mode=geom  tool=verify_geom
+  verdict=PASS|REJECT  reasons=[...]
+  metrics={pitch_floor,pitch_ok_pct,pages,pages_src,split,missing,blank_pages,overflow_pages,exit,stdout_tail}
+  gate={...同上+reasons}
+<out>.gate.md: 结论/tool/pitch/pages/split/overflow/reasons 摘要
+```
+
+- reasons 语义：`verify_geom_fail`、`pitch_below_floor`、stdout 中 FAIL 行；PASS 时为空；
+- 不再只有 `report.gate` 内嵌。
+
+### 16.3 验证（wz4 deliver / wz2 / 单测）
+
+| 项 | 结果 |
+|---|---|
+| wz4 `scan2pdf`（geom→fit_positional 两趟） | exit 0，677 页；`<out>.gate.json`：verdict **PASS**、tool verify_geom、pitch **99.6%**、pages 677=677、split 0、overflow 6 |
+| `verify_geom --src-pdf source_pdf/wz4.pdf`（floor 85） | rc=0 **PASS**：pitch 99.6%、677=677、split 0 |
+| wz2 6 页 | geom build + gate PASS，exit 0 |
+| pytest（test_scan2pdf + test_quality_gate） | **44 passed** |
+
+## 17. t169：geom 多纸型 review_required（R1）+ 措辞（R2）
+
+- **R1**：geom 分支与竖排同语义：`book_type.multi_format=true` → `review_required=true`、`auto_pass_forbidden=true`、`multi_format_note`（含纸型分布）；`verdict_effective`：`PASS → MANUAL_ONLY`（exit 8），**`REJECT` 保持 REJECT**（exit 6）；`<out>.gate.json`/`.md` 增 `review_required/auto_pass_forbidden/multi_format/verdict_effective` 并写入 md 摘要。
+- 实测：wz4（单纸型）`wz4_r1.pdf` gate **PASS**、`review_required=false`、pitch 99.6%、677=677、split 0；wz2 6 页 gate PASS、`review_required=false`；单测 **30 passed**（新增多纸型 PASS→MANUAL_ONLY、REJECT 保持、单纸型 false、md 字段）。
+- **R2**：横排 sidecar 与竖排为**核心字段对齐**（非全 schema）：横排无 `schema_version`/`pdf_sha256`/`thresholds_source`/`expect_low`，`verdict` 词表 `PASS|REJECT`（effective 才 `MANUAL_ONLY`）；竖排为 `AUTO_PASS|MANUAL_ONLY|REJECT` + 质量阈值内嵌。上层统一读 `verdict/verdict_effective/review_required/reasons/tool/pitch/pages/overflow`。

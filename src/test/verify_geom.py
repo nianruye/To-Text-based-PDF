@@ -14,7 +14,10 @@ verify_geom.py — 版面还原验证 harness。
 判据(默认): 抽样页 行数 100% 相等、页高误差 <5%、pitch 误差 <3% → 通过。
 
 用法:
-  python3 verify_geom.py <out.pdf> <src_spotting_coords.json> [src_spotting_lines.json] [--src-pdf wz1.pdf] [--dpi 200] [--sample N] [--json 报告.json]
+  python3 verify_geom.py <out.pdf> <src_spotting_coords.json> [src_spotting_lines.json] --src-pdf source_pdf/<book>.pdf [--dpi 200] [--sample N] [--json 报告.json]
+
+  注意：--src-pdf **必须带**（DPI 自适应）；缺省按 200dpi 推算，各书 OCR 数据 DPI 不同（如 wz4 实测 144dpi），
+  不带会把正确产物误判 pitch 0%。
 
 指标口径对 src / out 完全对称:同一套「正文行」过滤(去页眉页码带 + 行高≈页中位)。
 输出 PDF 用 bbox 几何(不依赖文字可复制),CJK 字体无 ToUnicode 也能量。
@@ -125,7 +128,7 @@ def main():
     ap.add_argument("out_pdf")
     ap.add_argument("src_coords")
     ap.add_argument("src_lines", nargs="?", default="")
-    ap.add_argument("--src-pdf", default="")
+    ap.add_argument("--src-pdf", default="", help="必带：源 PDF，用于 DPI 自适应（缺省按 200dpi 可能误判）")
     ap.add_argument("--dpi", type=int, default=0, help="0=自动从 coords P95 y 与 --src-pdf 页高反推(coords 尺度随 API 批次漂移 200/142), 显式传值则用该值")
     ap.add_argument("--sample", type=int, default=0, help="只抽前 N 页(0=全书)")
     ap.add_argument("--json", default="")

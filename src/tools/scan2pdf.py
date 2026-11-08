@@ -296,15 +296,55 @@ def slice_inputs(coords_path, lines_path, src_pdf, idxs, tmpdir):
     return cp, lp, sp
 
 
+def parse_verify_geom(stdout):
+    import re
+    out = dict(pages=None, pages_src=None, pitch_ok_pct=None, height_ok_pct=None,
+               blank_pages=None, overflow_pages=None, verdict=None)
+    t = stdout or ''
+    m = re.search(r'页数:\s*源 OCR\s*(\d+)\s*页\s*\|\s*输出 PDF\s*(\d+)\s*页', t)
+    if m:
+        out['pages_src'] = int(m.group(1)); out['pages'] = int(m.group(2))
+    m = re.search(r'pitch 误差 <3%\s*:\s*([0-9.]+)%', t)
+    if m: out['pitch_ok_pct'] = float(m.group(1))
+    m = re.search(r'底层占位|底部占位 <8% 偏差:\s*([0-9.]+)%', t)
+    if m: out['height_ok_pct'] = float(m.group(1))
+    m = re.search(r'空白页\s*(\d+)\s*溢出页\(占位\)\s*(\d+)', t)
+    if m:
+        out['blank_pages'] = int(m.group(1)); out['overflow_pages'] = int(m.group(2))
+    m = re.search(r'== 退出码 (PASS|FAIL) ==', t)
+    if m: out['verdict'] = m.group(1)
+    return out
+
+
+def run_verify_geom(pdf, coords, lines, floor=None, src_pdf=None):
+    import os
+    floor = floor if floor is not None else float(os.environ.get('VERIFY_PITCH_FLOOR', '85'))
+    env = dict(os.environ); env['VERIFY_PITCH_FLOOR'] = str(floor)
+    cmd = ['/usr/bin/python3', os.path.join(ROOT, 'src/test/verify_geom.py'), pdf, coords, lines]
+    if src_pdf and os.path.exists(src_pdf):
+        cmd += ['--src-pdf', src_pdf]
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=ROOT, env=env)
+    m = parse_verify_geom(p.stdout + '\n' + p.stderr)
+    m.update(exit=p.returncode, floor=floor,
+             stdout_tail='\n'.join((p.stdout or '').strip().splitlines()[-4:]))
+    m['pass_'] = bool(p.returncode == 0 and m.get('verdict') == 'PASS')
+    return m
+
+
 def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
     pipeline = getattr(args, 'pipeline_resolved', None) or args.pipeline
     if pipeline == 'auto':
         pipeline = 'vert' if args.book_type['axis'] == 'vertical' else 'geom'
-    script = os.path.join(ROOT, 'src/pipelines/build_vert.py' if pipeline == 'vert' else 'src/pipelines/build_geom.py')
+    if pipeline == 'vert':
+        script = os.path.join(ROOT, 'src/pipelines/build_vert.py')
+        cmd = ['/usr/bin/python3', script, lines, coords, out_tmp, src_pdf]
+    else:
+        # 横排 canonical：#37 —— fit_positional 两趟（pass1 测高 + pass2 ratio 重渲染）
+        script = os.path.join(ROOT, 'src/calibration/fit_positional.py')
+        cmd = ['/usr/bin/python3', script, lines, coords, out_tmp, src_pdf]
     env = dict(os.environ)
     env['VERT_TMP'] = os.path.join(tempfile.gettempdir(), 'scan2pdf_%s' % args.book)
     env['VERT_MISSED_FIX'] = fix_path if fix_path else '0'
-    cmd = ['/usr/bin/python3', script, lines, coords, out_tmp, src_pdf]
     log('构建: %s (pipeline=%s, VERT_MISSED_FIX=%s)' % (os.path.basename(script), pipeline,
                                                        fix_path or '0'))
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, cwd=ROOT, env=env)
@@ -321,6 +361,9 @@ def effective_verdict(verdict, multi_format):
         return verdict, ''
     if verdict == 'AUTO_PASS':
         return 'MANUAL_ONLY', ('多纸型：AUTO_PASS 降为 MANUAL_ONLY（severity ≥ MANUAL_ONLY；'
+                               '不静默按主导纸型）')
+    if verdict == 'PASS':
+        return 'MANUAL_ONLY', ('多纸型：横排 PASS 降为 MANUAL_ONLY（review_required=true；'
                                '不静默按主导纸型）')
     if verdict == 'MANUAL_ONLY':
         return verdict, '多纸型：维持 MANUAL_ONLY（severity ≥ MANUAL_ONLY）'
@@ -542,16 +585,86 @@ def main(argv=None):
         # 步骤 8：原子落盘（构建+页数通过后）
         shutil.move(out_tmp, args.out)
         step('publish')
-    # 步骤 9：门禁（竖向 verify_vert；横排 verify_geom 尚未接入 -> 跳过并标注）
+    # 步骤 9：门禁（竖向 verify_vert / 横排 verify_geom）
     if args.pipeline_resolved == 'geom':
-        report['gate'] = dict(skipped=True, reason='horizontal_gate_not_wired',
-                              note='v1 quality_gate 仅接 verify_vert；geom 输出需人工/后续接 verify_geom')
-        step('gate', skipped='horizontal_gate_not_wired')
-        code = EXIT['manual']
+        vm = run_verify_geom(args.out, coords, lines, src_pdf=args.input)
+        report['gate'] = dict(horizontal=True, tool='verify_geom',
+                              pitch_floor=vm.get('floor'), pass_=vm.get('pass_'),
+                              exit=vm.get('exit'), pages=vm.get('pages'),
+                              pages_src=vm.get('pages_src'),
+                              pitch_ok_pct=vm.get('pitch_ok_pct'),
+                              height_ok_pct=vm.get('height_ok_pct'),
+                              blank_pages=vm.get('blank_pages'),
+                              overflow_pages=vm.get('overflow_pages'),
+                              stdout_tail=vm.get('stdout_tail'))
+        v_ok = bool(vm.get('pass_'))
+        report['gate']['verdict'] = 'PASS' if v_ok else 'REJECT'
+        ve, vnote = effective_verdict(report['gate']['verdict'], bt['multi_format'])
+        report['gate']['verdict_effective'] = ve
+        report['review_required'] = bool(bt['multi_format'])
+        report['auto_pass_forbidden'] = bool(bt['multi_format'])
+        report['multi_format'] = multi_format_clause(report['gate']['verdict'], ve,
+                                                     bt['multi_format'], bt.get('sizes'))
+        if bt['multi_format']:
+            report['multi_format_note'] = ((vnote + '；') if vnote else '') + \
+                (report['multi_format'] or {}).get('note', '')
+        if not v_ok:
+            code = EXIT['verify']
+        elif ve == 'MANUAL_ONLY':
+            code = EXIT['manual']
+        else:
+            code = EXIT['ok']
+        report['gate']['exit'] = code
+        report['verdict_effective'] = ve
         report['exit'] = code
+        step('gate', verdict=ve, exit=code)
+        # 横排 gate JSON/markdown（与竖排 quality_gate 输出对齐：reasons/tool/pitch/pages/overflow）
+        pages_n = vm.get('pages') or 0; pages_src = vm.get('pages_src') or 0
+        reasons = []
+        if not v_ok:
+            reasons.append('verify_geom_fail')
+            if vm.get('pitch_ok_pct') is not None and vm.get('floor') is not None:
+                if float(vm['pitch_ok_pct']) < float(vm['floor']):
+                    reasons.append('pitch_below_floor')
+            for line in (vm.get('stdout_tail') or '').splitlines():
+                if 'FAIL' in line:
+                    reasons.append(line.strip()[:160])
+        gm = dict(book=args.book, mode='geom', tool='verify_geom',
+                  pitch_floor=vm.get('floor'), pitch_ok_pct=vm.get('pitch_ok_pct'),
+                  pages=pages_n, pages_src=pages_src,
+                  split=(0 if pages_n == pages_src else max(0, pages_n - pages_src)),
+                  missing=0 if v_ok else None,
+                  blank_pages=vm.get('blank_pages'), overflow_pages=vm.get('overflow_pages'),
+                  exit=vm.get('exit'), stdout_tail=vm.get('stdout_tail'))
+        gate_doc = dict(version='quality-gate-v1', book=args.book, mode='geom',
+                        tool='verify_geom', verdict=report['gate']['verdict'],
+                        verdict_effective=ve,
+                        review_required=bool(bt['multi_format']),
+                        auto_pass_forbidden=bool(bt['multi_format']),
+                        multi_format=report.get('multi_format'),
+                        multi_format_note=report.get('multi_format_note'),
+                        reasons=reasons, metrics=gm, gate=dict(**gm, reasons=reasons,
+                                                             verdict_effective=ve,
+                                                             review_required=bool(bt['multi_format'])),
+                        note='横排门禁：verify_geom（必须带 --src-pdf 自适应 DPI）；核心字段与竖排对齐（非全 schema）')
+        gp = args.out + '.gate.json'
+        json.dump(gate_doc, open(gp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        md = ['# 横排质量门禁 · %s' % args.book, '',
+              '- 结论：**%s**（effective=%s，review_required=%s）' % (
+                  report['gate']['verdict'], ve, bool(bt['multi_format'])),
+              '- tool：verify_geom（--src-pdf 自适应 DPI，pitch floor=%s）' % vm.get('floor'),
+              '- pitch：%s%% / pages：%s=%s / split：%s / overflow：%s' % (
+                  vm.get('pitch_ok_pct'), pages_n, pages_src, gate_doc['metrics']['split'],
+                  vm.get('overflow_pages')),
+              '- reasons：%s' % (', '.join(reasons) if reasons else '（无）'),
+              '- multi_format：%s' % (report.get('multi_format_note') or '无（单纸型）')]
+        open(os.path.splitext(gp)[0] + '.md', 'w', encoding='utf-8').write('\n'.join(md) + '\n')
+        report['gate']['json'] = gp
+        report['gate']['reasons'] = reasons
         rp = args.report or (args.out + '.report.json')
         json.dump(report, open(rp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-        print('[scan2pdf] %s: pipeline=geom gate=SKIPPED exit=%d report=%s' % (args.book, code, rp))
+        print('[scan2pdf] %s: pipeline=geom gate=%s exit=%d report=%s' %
+              (args.book, report['gate']['verdict'], code, rp))
         return code
     gate_out = args.out + '.gate.json'
     rc, verdict, tail = call_gate(args, args.out, coords, lines, src_for_verify, gate_out)

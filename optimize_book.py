@@ -145,7 +145,7 @@ json.dump(nc, open("{coords_ll}", "w"), ensure_ascii=False, indent=2)
     # ── 4. 验证 ──
     print("[4/5] 验证...")
     print("\n--- verify_geom (页数/pitch 硬约束) ---")
-    vr = subprocess.run([PY, 'src/test/verify_geom.py', out_pdf, use_coords, use_lines],
+    vr = subprocess.run([PY, 'src/test/verify_geom.py', out_pdf, use_coords, use_lines, '--src-pdf', src_pdf],
                         cwd=ROOT, env=dict(os.environ, VERIFY_PITCH_FLOOR='85'))
     print(f"verify_geom 退出码: {vr.returncode} ({'PASS' if vr.returncode == 0 else 'FAIL — 看上面明细'})")
     print("\n--- check_overlap (字符重叠) ---")
