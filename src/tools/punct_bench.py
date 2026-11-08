@@ -6,7 +6,14 @@
 书名号（双/单）、圈码（extension）、段落边界（v2 预留，v1 不计分）；兼容 v1 旧 gold。
 只读评测；不联网/不调 API；不改产物。
 """
-import argparse, csv, hashlib, json, os, re, sys, unicodedata
+import argparse
+import csv
+import hashlib
+import json
+import os
+import re
+import sys
+import unicodedata
 import difflib
 
 # ---------------- 类与形态 ----------------

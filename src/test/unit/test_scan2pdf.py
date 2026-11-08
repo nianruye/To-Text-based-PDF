@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """scan2pdf / ocr_book 单测：书型判断、数据发现、fix 守卫、失败矩阵、--pages 切片。"""
-import json, os, sys, tempfile
+import json
+import os
+import sys
+import tempfile
 import fitz
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'src', 'tools'))
-import scan2pdf as s2p
-import ocr_book as ob
+import scan2pdf as s2p  # noqa: E402
+import ocr_book as ob  # noqa: E402
 
 
 def _mk_pdf(path, n=12, w=300, h=500, frame=True, landscape=False):
@@ -235,7 +238,6 @@ def test_infer_axis_from_coords_wz2():
 
 
 def test_resume_mismatch_exit2_and_no_overwrite():
-    import subprocess
     with tempfile.TemporaryDirectory() as tmp:
         inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=6)
         ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """quality_gate 单测：三档判定、verify 解析、合成逻辑（薄封装，不跑真实 PDF）。"""
-import json, os, sys
+import json
+import os
+import sys
 import fitz
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools')))
 import quality_gate as qg
@@ -115,7 +117,7 @@ def test_detect_data_missing(tmp_path=None):
 
 
 def test_main_top_level_fields(tmp_path=None):
-    import subprocess, tempfile
+    import subprocess
     # 用真实 wz6 跑一次（较快）；检查 version/metrics/verdict/reasons/expect_low
     out = 'tmp_vert/gate/_test_gate_wz6.json'
     rc = subprocess.run(['/usr/bin/python3', 'src/tools/quality_gate.py', '--book', 'wz6',
