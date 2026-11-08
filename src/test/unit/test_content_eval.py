@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """content_eval v1.1 单测：两栏 CER、归一化、must-pass 64+54、diagnostic 不影响 verdict。"""
-import json, os, sys, tempfile
+import json
+import os
+import sys
+import tempfile
 import fitz
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'src', 'tools'))
-import content_eval as ce
+import content_eval as ce  # noqa: E402
 
 COLBOX = [5, 5, 15, 200]
 

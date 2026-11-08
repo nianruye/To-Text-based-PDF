@@ -6,7 +6,13 @@
 输出：JSON（分项指标 + 判定 + 失败明细 top-N）与 markdown 摘要；三档 AUTO_PASS / MANUAL_ONLY / REJECT。
 阈值全部来自 spec（书无关），wz6/wz7 同一套；不改 verify_vert.py / punct_eval.py 判据；只读评测。
 """
-import argparse, hashlib, json, os, re, subprocess, sys, tempfile
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'src', 'tools'))
@@ -118,7 +124,6 @@ def judge_content(metrics):
 
 def combine(v_ok, p_verdict, c_verdict, p_reasons=None, c_reasons=None):
     """三档合成：verify FAIL -> REJECT；任一 REJECT -> REJECT；任一 MANUAL/UNSCORED -> MANUAL_ONLY；全 AUTO -> AUTO_PASS。"""
-    reasons = []
     if not v_ok:
         return 'REJECT', ['verify_fail']
     if p_verdict == 'REJECT' or c_verdict == 'REJECT':
@@ -186,7 +191,8 @@ def run_verify_vert(pdf, coords, lines, book, src_pdf='', expect_low=''):
 
 def _run_tool(py_func, args):
     """调用同进程评测器，捕获 stdout（评测器 print 到 stdout）。"""
-    import io, contextlib
+    import io
+    import contextlib
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
         rc = py_func(args)
@@ -249,7 +255,6 @@ def detect_data_missing(content_gold, pdf, book, lines=None):
 
 def locate_first_diff(page, gold_items, pdf, lines):
     """定位超限页第一个差异：返回 column/char_pos（gold 字符序位）与两侧字符。"""
-    import difflib
     it = next((x for x in gold_items if int(x['page']) == int(page)), None)
     if not it:
         return dict(column=None, char_pos=None)

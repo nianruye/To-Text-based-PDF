@@ -6,7 +6,13 @@
 --skip-ocr + --data-dir：直接复用现有 coords/lines（不调 API）。
 新书默认 VERT_MISSED_FIX=0；仅 data/<book>/ 或 --data-dir 内存在 fix JSON 时才启用。
 """
-import argparse, json, os, shutil, subprocess, sys, tempfile
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 PUNCT_GOLD = os.path.join(ROOT, 'data/punct_eval/punct_gold_v1.json')

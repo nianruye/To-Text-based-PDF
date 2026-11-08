@@ -5,7 +5,11 @@
 设计见 docs/scan2pdf_design.md §5：--book/--input/--out-dir/--token-file/--mode/--pages-per-batch/
 --workers/--resume。只读 token（不写文件/不打印）；网络调用仅在真实 OCR 时发生。
 """
-import argparse, json, os, sys, time
+import argparse
+import json
+import os
+import sys
+import time
 
 JOB = 'https://paddleocr.aistudio-app.com/api/v2/ocr/jobs'
 DEFAULT_TOKEN = '/tmp/paddle_token'

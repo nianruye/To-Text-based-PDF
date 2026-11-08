@@ -9,7 +9,14 @@
 - t97 4/118 只诊断（i=26 假项剔除）。
 只读评测；不联网/不调 API；不改产物。
 """
-import argparse, csv, hashlib, json, os, re, sys, unicodedata
+import argparse
+import csv
+import hashlib
+import json
+import os
+import re
+import sys
+import unicodedata
 
 VARIANT = {'爲': '為', '裏': '裡', '綉': '繡', '毬': '球', '徧': '遍', '儘': '盡',
            '纔': '才', '於': '于', '麼': '么', '盃': '杯', '喫': '吃', '牠': '它',

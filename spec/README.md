@@ -10,6 +10,8 @@
 |---|---|
 | [governance/PIPELINE_BEHAVIOR.md](governance/PIPELINE_BEHAVIOR.md) | 管线行为契约：**横排**（契约 1-6 = argv / env / JSON / GMPG / DPI / 命名）+ **竖排**（「竖排管线（build_vert.py）」章节 = V1-V9 argv/env/JSON/GMPG-N.A./坐标页幅/产物/差异对照/验收/锚点/实测基线）+ 验收标准 + 实现锚点 + 兼容影响矩阵（含竖排行）+ CI 结论 |
 | [governance/PUNCTUATION.md](governance/PUNCTUATION.md) | 标点符号用法与禁则（GB/T 15834—2011 可执行规则表，**v2**）：配对集合（17 类 + 2 半角变体 = 工具 19 条；含竖排形态与条款归属）/ 行首·行末禁则条款号 / **破折号（——，行首合法 §4.10.3.9/4.10.3.10）与连接号（§5.1.6）分离** / 破折号·省略号不跨行 / 行末全角标点压缩 / 竖排继承 / 多段引文（§4.8.3.5）合法性与「源图墨迹优先」两条边界；审计口径（**F1 源位置闸门**、**F3 carry 对偶延续验证**）+ 归因（A 源书自身/B 产物引入/C OCR 漏识/C_fixed/K/K_weak/K_invalid/O/D）+ 门禁建议。工具 `src/tools/punct_audit.py`（分类器 `tmp_vert/battle2/punct_classify.py` 随证据目录交付），报告 `docs/battle2_punct_audit.md`（v2） |
+| [governance/PUNCT_EVAL.md](governance/PUNCT_EVAL.md) | 标点/结构识别能力评测契约（**v1.3**）：GB/T 16 类映射（12 in-scope / 4 out-of-scope）/ 阅读序重建（竖排右→左、横排上→下，家具剔除书无关）/ 文本锚点对齐（不做标点序列硬配对）/ 口径 A cell（provisional）+ 口径 B sequence（能力主指标）/ 阈值与跨书门禁（wz6/wz7/heldout）/ 基准集构成（20 页最小 + dash 专项扩展 2 页 = 22 页）/ 输出字段契约。实现 `src/tools/punct_bench.py`（`punct_eval.py` 入口），基准集 `src/test/bench/`（heldout 密封本地），报告 `docs/punct_eval_sequence.md` |
+| [governance/CONTENT_EVAL.md](governance/CONTENT_EVAL.md) | 内容准确率评测契约（**v1.1**）：CER=(I+D+S)/N、两栏（with_punct / han_only）、N0 归一化口径、回归清单（64 确认缺字 + 54 ring 为 must-pass；118 t97 外推 + 4 样本为 diagnostic）、阈值与跨书门禁、dataset/gold 格式。实现 `src/tools/content_eval.py`，报告 `docs/content_eval_v1.md` |
 
 ### planned（已规划，待实现）
 

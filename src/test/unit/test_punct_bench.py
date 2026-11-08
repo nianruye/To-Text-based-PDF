@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """punct_bench v1.1 指标单测（≥8 例：GB/T 全类、竖排形态、多段引文、句读值错、旧 gold 兼容）。"""
-import json, os, sys, tempfile
+import json
+import os
+import sys
+import tempfile
 import fitz
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'src', 'tools'))
-import punct_bench as pb
+import punct_bench as pb  # noqa: E402
 
 
 def _coords_lines(texts):
