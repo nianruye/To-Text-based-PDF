@@ -41,9 +41,11 @@ def fc():
     return _load_fit_common()
 
 
-def _fake_render(seen):
-    """模拟 render：pass1 写 est.json，pass2 写产物；记录两次用的临时目录。"""
-    def render(out_pdf, est_log=None, ratio_table=None, fill=None, build_name='build_geom'):
+def _fake_render(seen, marks=None):
+    """模拟 render：pass1 写 est.json，pass2 写产物；记录两次用的临时目录和 verify_mark。"""
+    def render(out_pdf, est_log=None, ratio_table=None, fill=None, build_name='build_geom', verify_mark=True):
+        if marks is not None:
+            marks.append(verify_mark)
         if est_log:                                    # pass1: 导出估高
             seen.append(os.path.dirname(est_log))
             with open(est_log, 'w', encoding='utf-8') as f:
@@ -58,12 +60,13 @@ def _fake_render(seen):
 
 def test_tmp_cleanup_on_success(fc, monkeypatch, tmp_path):
     """成功返回后临时目录已被删除（两趟共用同一目录）。"""
-    seen = []
+    seen = []; marks = []
     monkeypatch.setattr(fc, 'OUT', str(tmp_path / 'out.pdf'))   # 不让 pass2 写仓库根的 OUT
-    monkeypatch.setattr(fc, 'render', _fake_render(seen))
+    monkeypatch.setattr(fc, 'render', _fake_render(seen, marks))
     monkeypatch.setattr(fc, 'measure_heights', lambda pdf: {})
     fc.main('build_geom')
     assert len(seen) == 2 and seen[0] == seen[1], f'两趟未共用同一临时目录: {seen}'
+    assert marks == [True, False], f'verify_mark 两趟必须 1/0: {marks}'
     assert not os.path.exists(seen[0]), f'tempdir 泄漏: {seen[0]}'
 
 
@@ -72,7 +75,7 @@ def test_tmp_cleanup_on_exception(fc, monkeypatch, tmp_path):
     monkeypatch.setattr(fc, 'OUT', str(tmp_path / 'out.pdf'))
     created = {}
 
-    def boom(out_pdf, est_log=None, **kw):
+    def boom(out_pdf, est_log=None, verify_mark=True, **kw):
         created['dir'] = os.path.dirname(est_log)
         raise RuntimeError('render boom')
 

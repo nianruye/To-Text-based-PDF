@@ -68,7 +68,7 @@
 | PAGENUM_OFFSET | `'0'` | geom L37 | offset=0 |
 | TOC_HEADING_MAP | `''`->`/tmp/toc_map.json` | geom L63 | 两级回退+自动扫描 |
 | POS_FILL | `'1.08'`(管线) / `'0.95'`(fit) | geom L756 / fit_common L89 | 单趟 1.08，校准 0.95 |
-| VERIFY_MARK | `''` | geom L524 | 不注入 GMPG（fit_common 强制 '1'） |
+| VERIFY_MARK | `''` | geom L524 | 不注入 GMPG；fit_common **pass1 强制 '1'**（测高用），**pass2 交付不设**（产物无标记，#42） |
 | POS_EST_LOG | `''` | geom L926 | 不导出估高（fit_common 设） |
 
 ### v13 独立 env
@@ -110,6 +110,8 @@
 ## 契约 4：GMPG 标记格式
 
 - **格式**：`GMPG<数字>ZZ`，数字 = 0-based 源页 key
+- **交付产物不含 GMPG**（#42）：`fit_common` pass1 设 `VERIFY_MARK=1` 供 `measure_heights()` 测高；pass2（交付 PDF）不设（并 `env.pop('VERIFY_MARK')`，继承 shell 也不泄漏）。
+  `verify_geom` 对无标记产物按序号 **1:1 回退**（页数 1:1 时正确；溢出页本应 FAIL）。
 - **写入**：geom L525/L612、classic L546/L633（VERIFY_MARK=1 时 `\put(1,1){...GMPG<key>ZZ}`）
 - **解析**：verify_geom L25 `re.compile(r'GMPG(\d+)ZZ')`、fit_common L38 `re.search(r'GMPG(\d+)ZZ', ...)`
 - **契约**：渲染端写，校验/校准端按此归组物理页到源页。一源页对多物理页 = 溢出 = 校准失效。
