@@ -202,3 +202,51 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
 - **R1**：geom 分支与竖排同语义：`book_type.multi_format=true` → `review_required=true`、`auto_pass_forbidden=true`、`multi_format_note`（含纸型分布）；`verdict_effective`：`PASS → MANUAL_ONLY`（exit 8），**`REJECT` 保持 REJECT**（exit 6）；`<out>.gate.json`/`.md` 增 `review_required/auto_pass_forbidden/multi_format/verdict_effective` 并写入 md 摘要。
 - 实测：wz4（单纸型）`wz4_r1.pdf` gate **PASS**、`review_required=false`、pitch 99.6%、677=677、split 0；wz2 6 页 gate PASS、`review_required=false`；单测 **30 passed**（新增多纸型 PASS→MANUAL_ONLY、REJECT 保持、单纸型 false、md 字段）。
 - **R2**：横排 sidecar 与竖排为**核心字段对齐**（非全 schema）：横排无 `schema_version`/`pdf_sha256`/`thresholds_source`/`expect_low`，`verdict` 词表 `PASS|REJECT`（effective 才 `MANUAL_ONLY`）；竖排为 `AUTO_PASS|MANUAL_ONLY|REJECT` + 质量阈值内嵌。上层统一读 `verdict/verdict_effective/review_required/reasons/tool/pitch/pages/overflow`。
+
+## 18. t172：OCR raw→coords/lines 转换 + ghbq 真 OCR E2E
+
+### 18.1 转换（ocr_book.convert_raw_dir）
+
+- 输入：`<out-dir>/raw/spotting_*.json`（`result.layoutParsingResults[].prunedResult.spotting_res`）；
+- `rec_texts/rec_polys` → `coords[<global_page>]` / `lines[<global_page>]`，key 为 **0-based 字符串**；
+- 坐标按 **legacy 2×pt**：`scale_x = 2*pdf_page_w/pruned_w`、`scale_y = 2*pdf_page_h/pruned_h`（页尺寸取源 PDF 对应页；缺源时回退 dataInfo）；
+- 页序：每批 `jobs[key].pages` 记录全局页号（0-based），转换按该列表对页；无记录时按批内顺序回退；
+- 输出 `<out-dir>/<book>_spotting_coords.json` 与 `<book>_spotting_lines.json`；layout raw 只保留，不参与构建。
+
+### 18.2 页号 manifest
+
+- `jobs.json` 每批写 `pages`（全局 0-based 列表）；另写 `<out-dir>/manifest.json`（batches: key/state/jobId/pages + source_pages）；
+- 断点续跑/已有 raw 重跑时也补写 pages，保证「批次切片→全局页」可追溯。
+
+### 18.3 scan2pdf 接线
+
+- OCR 完成后先在 `--data-dir`（若给）找 coords/lines，找不到则回退 `<out-dir>/_ocr_<book>/`（转换产物），不再报「缺 coords/lines」；
+- `data.mode/reason/coords_sha256/lines_sha256` 记录来源。
+
+### 18.4 ghbq 真 OCR E2E（20–23 页）
+
+命令：`scan2pdf --input source_pdf/ghbq.pdf --book ghbq --out output/test_ghbq/ghbq_pilot4.pdf --pages 20-23 --token-file /tmp/paddle_token`
+
+| 项 | 结果 |
+|---|---|
+| OCR | A(layout)+B(spotting) 各 1 批 4 页；jobs/manifest pages=[19,20,21,22] |
+| 书型 | 初判 vertical（aspect）→ **coords_boxes 修正 horizontal** |
+| 构建 | geom→fit_positional 两趟，4 页，exit 0 |
+| scan2pdf gate | verify_geom **PASS**：4=4、pitch **100%**、review_required=false（单纸型） |
+| 独立 verify_geom --src-pdf | rc=0 PASS（DPI 自适应 138；pitch 100%，页高误差 6.1%） |
+| raw vs 产物文本 | 80 行中 **79 行**原样出现在产物文本层（抽样 6 行见报告） |
+
+### 18.5 repetitionPenalty bug（记录）
+
+- 现象：`ocr_book.payload()` 曾把 `repetitionPenalty` 写成 **0**（PaddleOCR 有效范围/语义异常），导致输出重复/异常；
+- 修复（captain 热修）：改为 **1**；本任务转换/E2E 均在该修复后验证。
+
+## 19. t175：OCR raw JSONL 解析（大 batch）
+
+- **现象**：ghbq 全书 104 页 OCR（50 页/批）的 raw 响应是 **JSONL**：每批 13 行 × 每行 4 页（最后一行 2 页），`convert_raw_dir` 只按单 JSON 解析 → 转换失败。
+- **修复**：`ocr_book._load_json_objects(path)`：先尝试单 JSON（dict/list，兼容旧文件）；`JSONDecodeError` 时逐行 `json.loads`，按**文件内顺序**拼接各对象的 `result.layoutParsingResults`。`convert_raw_dir` 使用拼接后的 results，页序仍由 `jobs[key].pages` 决定。
+- **单测**：合成 JSONL（2 对象 / 共 3 页 / jobs.pages=[5,6,7]）→ coords/lines keys 5/6/7、文本顺序正确、scale=1.2；同一内容单 JSON 与 JSONL 转换结果**逐值相等**。
+- **全书回归（ghbq 104 页）**：
+  - `output/ghbq_full/_ocr_ghbq` raw = 3 批（50+50+4 页，spotting_000/001/002，JSONL 13/13/1 行（50 页批 = 13 行×4 页；4 页批 = 1 行））+ jobs.pages 0..103 + manifest.source_pages=104；
+  - 重转换：coords/lines **各 104 页**（keys 0..103）；
+  - `scan2pdf --skip-ocr --data-dir output/ghbq_full/_ocr_ghbq --force` → exit 0、geom 构建 104 页、gate **PASS**（**104=104、pitch 96.8%**、split 0、review_required=false）。

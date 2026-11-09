@@ -52,9 +52,97 @@ def split_batches(input_pdf, pages_per_batch=50, pages=None):
 def payload(layout, prompt):
     return {"model": "PaddleOCR-VL-1.6", "optionalPayload": json.dumps({
         "useLayoutDetection": layout, "promptLabel": prompt, "temperature": 0,
-        "minPixels": 147384, "maxPixels": 2822400, "repetitionPenalty": 0,
+        "minPixels": 147384, "maxPixels": 2822400, "repetitionPenalty": 1,
         "topP": 1, "layoutShapeMode": "auto", "useDocUnwarping": False,
         "useDocOrientationClassify": False})}
+
+
+
+def _load_json_objects(path):
+    """读取 raw 响应：单 JSON 或 JSONL（服务对大 batch 会返回多个 JSON 行）。"""
+    try:
+        with open(path, encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, list) else [d]
+    except json.JSONDecodeError:
+        objs = []
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    objs.append(json.loads(line))
+        return objs
+
+
+def convert_raw_dir(out_dir, src_pdf, book, jobs=None):
+    """raw JSON（spotting）→ legacy 2×pt coords/lines（0-based 全局页 key）。
+
+    - spotting_res.rec_texts/rec_polys；每页 pruned width/height → 源 PDF 页尺寸；
+    - scale_x = 2*pdf_page_w/pruned_w, scale_y = 2*pdf_page_h/pruned_h（legacy coords = 2×pt）；
+    - 全局页号来自 jobs[key].pages（0-based）；页序对齐源 PDF；
+    - 输出 <out_dir>/<book>_spotting_coords.json / _lines.json。
+    """
+    import glob
+    jobs = jobs if jobs is not None else (
+        json.load(open(os.path.join(out_dir, 'jobs.json'), encoding='utf-8'))
+        if os.path.exists(os.path.join(out_dir, 'jobs.json')) else {})
+    raw_paths = sorted(glob.glob(os.path.join(out_dir, 'raw', 'spotting_*.json')))
+    if not raw_paths:
+        return None, None
+    import fitz
+    src = fitz.open(src_pdf) if src_pdf and os.path.exists(src_pdf) else None
+    coords, lines = {}, {}
+    used_pages = set()
+    for rp in raw_paths:
+        key = os.path.splitext(os.path.basename(rp))[0]
+        pages = list((jobs.get(key) or {}).get('pages') or [])
+        objs = _load_json_objects(rp)
+        results = []
+        for d in objs:
+            results += ((d.get('result') or {}).get('layoutParsingResults') or [])
+        if not pages:
+            pages = list(range(len(results)))
+        for i, pg in enumerate(results):
+            if i >= len(pages):
+                break
+            gpage = int(pages[i])
+            pr = pg.get('prunedResult') or {}
+            sr = pr.get('spotting_res') or {}
+            texts = list(sr.get('rec_texts') or [])
+            polys = list(sr.get('rec_polys') or [])
+            pw = float(pr.get('width') or 0); ph = float(pr.get('height') or 0)
+            pdf_w = pdf_h = None
+            if src is not None and 0 <= gpage < len(src):
+                pdf_w, pdf_h = src[gpage].rect.width, src[gpage].rect.height
+            if not pdf_w or not pdf_h:
+                di = []
+                for d in objs:
+                    di += (((d.get('result') or {}).get('dataInfo') or {}).get('pages') or [])
+                if i < len(di):
+                    pdf_w, pdf_h = di[i].get('width'), di[i].get('height')
+            sx = (2.0 * pdf_w / pw) if (pdf_w and pw) else 1.0
+            sy = (2.0 * pdf_h / ph) if (pdf_h and ph) else 1.0
+            k = str(gpage)
+            coords[k] = [[[round(x * sx, 2), round(y * sy, 2)] for x, y in poly] for poly in polys]
+            lines[k] = texts
+            used_pages.add(gpage)
+    cp = os.path.join(out_dir, '%s_spotting_coords.json' % book)
+    lp = os.path.join(out_dir, '%s_spotting_lines.json' % book)
+    json.dump(coords, open(cp, 'w', encoding='utf-8'), ensure_ascii=False)
+    json.dump(lines, open(lp, 'w', encoding='utf-8'), ensure_ascii=False)
+    return cp, lp
+
+
+def write_manifest(out_dir, jobs, batches, src_pages):
+    man = dict(batches=[], source_pages=src_pages)
+    for mode_key, info in sorted(jobs.items()):
+        if not isinstance(info, dict):
+            continue
+        man['batches'].append(dict(key=mode_key, state=info.get('state'),
+                                   jobId=info.get('jobId'), pages=info.get('pages')))
+    json.dump(man, open(os.path.join(out_dir, 'manifest.json'), 'w', encoding='utf-8'),
+              ensure_ascii=False, indent=1)
+    return man
 
 
 def run(args):
@@ -85,8 +173,13 @@ def run(args):
             key = '%s_%03d' % (mode, bi)
             raw_path = os.path.join(args.out_dir, 'raw', key + '.json')
             if args.resume and os.path.exists(raw_path):
+                jobs.setdefault(key, {})
+                jobs[key]['pages'] = idxs
+                json.dump(jobs, open(jobs_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
                 continue
             if key in jobs and jobs[key].get('state') == 'done' and os.path.exists(raw_path):
+                jobs[key]['pages'] = idxs
+                json.dump(jobs, open(jobs_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
                 continue
             batch_pdf = os.path.join(args.out_dir, 'batches', key + '.pdf')
             if not os.path.exists(batch_pdf):
@@ -121,7 +214,7 @@ def run(args):
                     raw = requests.get(url, timeout=600)
                     raw.raise_for_status()
                     open(raw_path, 'w', encoding='utf-8').write(raw.text)
-                    jobs[key] = dict(state='done', jobId=jid)
+                    jobs[key] = dict(state='done', jobId=jid, pages=idxs)
                     break
                 if state == 'failed':
                     jobs[key] = dict(state='failed', jobId=jid, error=str(d.get('errorMsg'))[:200])
@@ -131,6 +224,11 @@ def run(args):
             else:
                 jobs[key] = dict(state='timeout', jobId=jid); failed += 1
             json.dump(jobs, open(jobs_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    write_manifest(args.out_dir, jobs, batches, n)
+    cp = lp = None
+    if args.mode in ('spotting', 'both'):
+        cp, lp = convert_raw_dir(args.out_dir, args.input, args.book, jobs)
+        print('[ocr_book] coords=%s lines=%s' % (cp, lp))
     print('[ocr_book] batches=%d modes=%d failed=%d raw=%s' %
           (len(batches), len(modes), failed, os.path.join(args.out_dir, 'raw')))
     return 0 if failed == 0 else 5
