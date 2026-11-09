@@ -250,3 +250,39 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
   - `output/ghbq_full/_ocr_ghbq` raw = 3 批（50+50+4 页，spotting_000/001/002，JSONL 13/13/1 行（50 页批 = 13 行×4 页；4 页批 = 1 行））+ jobs.pages 0..103 + manifest.source_pages=104；
   - 重转换：coords/lines **各 104 页**（keys 0..103）；
   - `scan2pdf --skip-ocr --data-dir output/ghbq_full/_ocr_ghbq --force` → exit 0、geom 构建 104 页、gate **PASS**（**104=104、pitch 96.8%**、split 0、review_required=false）。
+
+## 20. t179：横排标定审计（calib.json + 自检 warnings）
+
+- **build_geom**：`calibrate()` 新增审计字段（DPI 残差/coverage/source_of_page_size/cw 样本/full 样本/pitch 样本/font&baseline source），并在 TOC 校准后写 `<out>.calib.json`（`CALIB_OUT` 可覆盖路径、`CALIB_BOOK` 给 book slug；默认路径 `<out>.calib.json`）。
+- **JSON**：schema `horizontal-calib-v1`，字段含 book/src_pdf/sha256/pages/dpi/page_size/cw/measure/font/baseline/margin/toc_params/coverage/source_of_page_size/warnings/selfcheck/env；字段规则见 spec §4。
+- **自检**：spec §3 清单落地；warnings 形如 `{code,severity,detail,source}`，同时 stderr 打印 `[calib] WARN ...`；`selfcheck.verdict = pass|warn|fail`；默认不阻断构建（`HORIZ_CALIB_STRICT` 预留未强制）。
+- **scan2pdf**：报告含 `calib` 块（读取 `<out>.calib.json`）；gate 侧车带 `calib` 摘要 + `calib_warnings`（作为非阻断 reasons `calib_warn:<code>`），不改变 gate 结论/退出码。
+- **单测**：`test_horizontal_calib.py` 4 例（schema、warn 分支、pages fail、写盘 roundtrip）→ 4 passed。
+- **E2E**：
+  - ghbq 4 页：dpi=138、page 595×868（src_pdf）、font=16.6、baseline/font=2.072（warn）；gate PASS，calib_warn=3。
+  - ghbq 104 页：dpi=139、page 603×870（coords）、font=16.5、warn=baseline_font_ratio_out；gate PASS。
+  - wz4 677 页：dpi=144（残差 0.09）、page 418×634、font=10.7、warnings=[]、selfcheck=pass；gate PASS pitch 99.6%。
+- **已知**：wz4 首 20 页子集构建 gate pitch 83.3% REJECT（TOC 页占位；非 calib 问题），全书 PASS；spec 参考基线 wz4 DPI 144（任务描述的 ≈138 为 ghbq 实测值）。
+
+### 20.1 t182 修复（render 回填 / bp 单位 / 验收文字）
+
+- **render 回填**：`geometry.product_render()` 从产物 PDF 取 `page_pt/font_pt/pitch_pt`；`build_geom` 末尾回填（单趟也描述真实渲染）；scan2pdf 再回填 `render.pass` 与 `selfcheck.pitch_error_pct=100-verify_geom.pitch_ok_pct`（`pitch_error_source=verify_geom`）。
+- **单位**：`page_size.unit=bp`、`render.unit=bp`（PDF bp；与源 PDF pt 差 ×0.996264）；spec §4 已同步。
+- **spec §2.2**：补「coverage>1 允许至 1.02，属 DPI 估计/坐标边界误差」。
+- **验收文字更正**：docs/scan2pdf_acceptance.md 增 t182 节：wz4 full **144/coords/10.7**；ghbq 4p **138/src/16.6**；ghbq full **139/coords/16.5**（两书 full 与 spec §5 一致）。
+- **E2E fixture**：`FONT_SCALE=3` → build rc=0 不阻断，calib `font_out_of_range` 报警，render 段存在。
+- 实测 ghbq full：render `600.75×866.75bp / font 16.44 / pitch 34.21 / pass=true`；`selfcheck.pitch_error_pct=3.2`（verify_geom 96.8%）。
+
+### 20.2 t184：TOC 自检 + FAIL 兜底 + sidecar 措辞
+
+- **TOC 自检**：新增 `toc_low_sample`（`toc_samples<3`）、`toc_foot_x_out`（`foot_x` 桶对须 0≤x0<x1≤1）、`toc_title_max_out`（`title_max∈[10,80]`）；均 warn，写 `calib.warnings`。
+- **FAIL 兜底（按 captain 裁决，不改 build 退出码）**：spec §3.2 改为「FAIL 项 = stderr + calib.warnings + selfcheck.verdict=fail；**构建不阻断（exit 0）**，由 scan2pdf/gate 兜底」；scan2pdf 读 calib 后把 FAIL 项写 gate reasons `calib_fail:<code>`，不自动 PASS（PASS→MANUAL_ONLY，review_required=true）。
+- **sidecar 措辞（F5）**：gate 侧车顶层是 `calib` 块（含 `warnings`/`warnings_codes` 与 `calib_warnings`/`calib_fail` code 列表）；`report.gate.calib_warnings` 为 report 内列表；sidecar 不再声称“只带 calib_warnings”。
+- **spec §4.2** 删除示例 `date_local`（§4.1 要求无时间戳）；字段表同步删除。
+- 验证：ghbq 104 页 toc_samples=1 → 新增 `toc_low_sample` warn；渲染不变性（逐页文本/字符/关键页像素）与 gate 数字另行复跑记录。
+
+### 20.3 单测口径更正（t186）
+
+- 实测：`test_horizontal_calib.py` **6 passed**、`test_scan2pdf.py` **30 passed**（t185 时点）；两者合计 **36 passed**。
+- t184 报告写「6 passed（+scan2pdf **35** passed）」有误：35 = `test_ocr_book 5 + test_scan2pdf 30`（旧合并口径），并不含 calib 6；按本书口径应为 **6 / 30 / 36**。
+- t186 新增 F2 单测 `test_geom_calib_fail_forces_manual` 后：test_scan2pdf **31 passed**，与 calib 6 合计 **37 passed**。

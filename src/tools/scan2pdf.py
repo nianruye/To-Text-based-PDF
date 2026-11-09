@@ -15,6 +15,7 @@ import sys
 import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(ROOT, 'src'))
 PUNCT_GOLD = os.path.join(ROOT, 'data/punct_eval/punct_gold_v1.json')
 CONTENT_GOLD = os.path.join(ROOT, 'data/punct_eval/content_gold_v1.json')
 
@@ -345,6 +346,12 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
     env = dict(os.environ)
     env['VERT_TMP'] = os.path.join(tempfile.gettempdir(), 'scan2pdf_%s' % args.book)
     env['VERT_MISSED_FIX'] = fix_path if fix_path else '0'
+    # 横排标定审计：build_geom 写 <out>.calib.json（fit_positional 两趟共用最终路径）
+    if pipeline == 'geom':
+        _o = getattr(args, 'out', None)
+        if _o:
+            env['CALIB_OUT'] = _o + '.calib.json'
+        env['CALIB_BOOK'] = args.book
     log('构建: %s (pipeline=%s, VERT_MISSED_FIX=%s)' % (os.path.basename(script), pipeline,
                                                        fix_path or '0'))
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, cwd=ROOT, env=env)
@@ -639,16 +646,63 @@ def main(argv=None):
                   missing=0 if v_ok else None,
                   blank_pages=vm.get('blank_pages'), overflow_pages=vm.get('overflow_pages'),
                   exit=vm.get('exit'), stdout_tail=vm.get('stdout_tail'))
+        calib = None
+        _cpath = args.out + '.calib.json'
+        if os.path.exists(_cpath):
+            try:
+                calib = json.load(open(_cpath, encoding='utf-8'))
+            except Exception as e:
+                calib = {'error': str(e)}
+        report['calib'] = calib
+        _cw = ([w.get('code') for w in (calib or {}).get('warnings', [])]
+               if isinstance(calib, dict) and not calib.get('error') else [])
+        _cf = ([w.get('code') for w in (calib or {}).get('warnings', [])
+                if w.get('severity') == 'fail']
+               if isinstance(calib, dict) and not calib.get('error') else [])
+        report['gate']['calib_warnings'] = _cw
+        report['gate']['calib_fail'] = _cf
+        if _cw:
+            reasons = reasons + ['calib_warn:%s' % c for c in _cw]
+        if _cf:
+            reasons = reasons + ['calib_fail:%s' % c for c in _cf]
+            # F1（t184）：FAIL 项不静默——不阻断构建，但 gate 不自动 PASS（MANUAL_ONLY 复核）
+            if v_ok:
+                ve = 'MANUAL_ONLY'
+                code = EXIT['manual']
+                report['gate']['verdict_effective'] = ve
+                report['gate']['exit'] = code
+                report['verdict_effective'] = ve
+                report['exit'] = code
+                report['review_required'] = True
+        # F1/F2：render 由产物 PDF 回填；pitch_error_pct 由 verify_geom 回填
+        if isinstance(calib, dict) and not calib.get('error'):
+            try:
+                from utils.geometry import update_calib_render
+                _pe = (100.0 - float(vm['pitch_ok_pct'])) if vm.get('pitch_ok_pct') is not None else None
+                _doc = update_calib_render(_cpath, args.out, pass_=v_ok, pitch_error_pct=_pe)
+                if _doc:
+                    calib = _doc; report['calib'] = calib
+            except Exception as _ce:
+                log('calib render 回填失败（不阻断）: %s' % _ce)
+        _csum = None
+        if isinstance(calib, dict) and not calib.get('error'):
+            _csum = {k: calib.get(k) for k in ('schema_version', 'dpi', 'page_size',
+                                               'font', 'baseline', 'coverage',
+                                               'source_of_page_size', 'selfcheck',
+                                               'warnings')}
+            _csum['warnings_codes'] = _cw
         gate_doc = dict(version='quality-gate-v1', book=args.book, mode='geom',
                         tool='verify_geom', verdict=report['gate']['verdict'],
+                        calib=_csum,
                         verdict_effective=ve,
-                        review_required=bool(bt['multi_format']),
+                        review_required=bool(bt['multi_format']) or bool(_cf),
                         auto_pass_forbidden=bool(bt['multi_format']),
+                        calib_warnings=_cw, calib_fail=_cf,
                         multi_format=report.get('multi_format'),
                         multi_format_note=report.get('multi_format_note'),
                         reasons=reasons, metrics=gm, gate=dict(**gm, reasons=reasons,
                                                              verdict_effective=ve,
-                                                             review_required=bool(bt['multi_format'])),
+                                                             review_required=bool(bt['multi_format']) or bool(_cf)),
                         note='横排门禁：verify_geom（必须带 --src-pdf 自适应 DPI）；核心字段与竖排对齐（非全 schema）')
         gp = args.out + '.gate.json'
         json.dump(gate_doc, open(gp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -660,7 +714,12 @@ def main(argv=None):
                   vm.get('pitch_ok_pct'), pages_n, pages_src, gate_doc['metrics']['split'],
                   vm.get('overflow_pages')),
               '- reasons：%s' % (', '.join(reasons) if reasons else '（无）'),
-              '- multi_format：%s' % (report.get('multi_format_note') or '无（单纸型）')]
+              '- multi_format：%s' % (report.get('multi_format_note') or '无（单纸型）'),
+              '- calib：%s' % (
+                  ('verdict=%s warnings=%s fail=%s' % ((calib or {}).get('selfcheck', {}).get('verdict'),
+                                                       ','.join(_cw) if _cw else '无',
+                                                       ','.join(_cf) if _cf else '无'))
+                  if isinstance(calib, dict) and not calib.get('error') else '缺失')]
         open(os.path.splitext(gp)[0] + '.md', 'w', encoding='utf-8').write('\n'.join(md) + '\n')
         report['gate']['json'] = gp
         report['gate']['reasons'] = reasons

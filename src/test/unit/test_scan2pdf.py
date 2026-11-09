@@ -466,3 +466,46 @@ def test_geom_single_format_review_false(monkeypatch):
         assert g['review_required'] is False and g['verdict_effective'] == 'PASS'
         assert g['multi_format'] is None
         assert 'review_required=False' in md
+
+
+def test_geom_calib_fail_forces_manual(monkeypatch):
+    """t186 F2：calib warnings severity=fail → gate reasons calib_fail:*、PASS→MANUAL_ONLY、exit 8。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=2)
+        ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+        cp = os.path.join(ddir, 'x_spotting_coords.json')
+        lp = os.path.join(ddir, 'x_spotting_lines_patched.json')
+        json.dump({str(i): [[[10, 10], [10, 400], [30, 400], [30, 10]]] for i in range(2)},
+                  open(cp, 'w'))
+        json.dump({str(i): ['x'] for i in range(2)}, open(lp, 'w'))
+        out = os.path.join(tmp, 'o.pdf')
+
+        def fake_build(args, coords, lines, src, out_tmp, fix):
+            d = fitz.open()
+            for _ in range(2):
+                d.new_page(width=100, height=100)
+            d.save(out_tmp); d.close()
+            json.dump({'schema_version': 'horizontal-calib-v1', 'book': 'x',
+                       'warnings': [{'code': 'pages_mismatch', 'severity': 'fail',
+                                     'detail': 'fixture', 'source': 'test'}],
+                       'selfcheck': {'verdict': 'fail'}},
+                      open(args.out + '.calib.json', 'w'))
+            return True, dict(pipeline='geom', returncode=0)
+
+        def fake_vg(pdf, coords, lines, floor=None, src_pdf=None):
+            return dict(pass_=True, verdict='PASS', exit=0, floor=85, pages=2, pages_src=2,
+                        pitch_ok_pct=99.0, height_ok_pct=99.0, blank_pages=0,
+                        overflow_pages=0, stdout_tail='')
+        bt = dict(axis='horizontal', has_frame=False, multi_format=False,
+                  page_size=[300, 500], source='probe_cache', confidence=0.6, sizes=[])
+        monkeypatch.setattr(s2p, 'detect_book_type', lambda *a, **k: bt)
+        monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+        monkeypatch.setattr(s2p, 'run_verify_geom', fake_vg)
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir,
+                       '--skip-ocr', '--pipeline', 'geom'])
+        assert rc == s2p.EXIT['manual']
+        g = json.load(open(out + '.gate.json'))
+        assert 'calib_fail:pages_mismatch' in g['reasons']
+        assert g['verdict_effective'] == 'MANUAL_ONLY'
+        assert g['review_required'] is True
+        assert g.get('calib_fail') == ['pages_mismatch']

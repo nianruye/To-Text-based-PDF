@@ -11,7 +11,7 @@ build_geom.py — seg2 原型:PaddleOCR spotting 行级 → 逐行还原(书风�
 import json, sys, statistics, subprocess, os, shutil, re, opencc
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from utils.tex_escape import escape_latex
-from utils.geometry import calibrate
+from utils.geometry import calibrate, build_calib_doc, calib_selfcheck, write_calib, update_calib_render
 from utils.page_numbers import load_pntab, infer_lay_numbers, PN_RE
 from utils import image_blocks as _img
 from utils import missing_chars as _mc
@@ -538,6 +538,31 @@ try:
     except Exception as _e:
         _TOC_CAL = {'font_line': round(FONT * 1.25, 1), 'foot_x': (0.15, 0.85), 'title_max': 14}
         print('[目录校准] 失败回退默认: %s' % _e)
+    # ── 横排标定审计落盘（HORIZONTAL_CALIB.md v1；warn 不阻断） ──
+    try:
+        _book = os.environ.get('CALIB_BOOK') or os.path.splitext(os.path.basename(OUT))[0].split('_')[0]
+        _calib_doc = build_calib_doc(sl, co, _G, SRC, _book)
+        if _TOC_CAL:
+            _calib_doc['toc_params'] = {
+                'font_line': _TOC_CAL.get('font_line'),
+                'foot_x': list(_TOC_CAL.get('foot_x') or []) or None,
+                'title_max': _TOC_CAL.get('title_max'),
+                'toc_pages': sorted(_TOC_PAGE, key=lambda x: int(x)),
+                'source': 'geom_toc_cal',
+            }
+            _calib_doc['coverage']['toc_samples'] = len(_TOC_PAGE)
+        else:
+            _calib_doc['coverage']['toc_samples'] = 0
+        _sc, _ws = calib_selfcheck(_calib_doc, _G, sl, co)
+        _calib_doc['selfcheck'], _calib_doc['warnings'] = _sc, _ws
+        _calib_path = os.environ.get('CALIB_OUT') or (OUT + '.calib.json')
+        write_calib(_calib_path, _calib_doc)
+        for _w in _ws:
+            print('[calib] WARN %s: %s' % (_w.get('code'), _w.get('detail')), file=sys.stderr, flush=True)
+        print('[calib] %s verdict=%s warnings=%d' % (_calib_path, _sc.get('verdict'), len(_ws)))
+    except Exception as _ce:
+        print('[calib] 落盘失败（不阻断构建）: %s' % _ce, file=sys.stderr, flush=True)
+
     _pn_reg = {}   # 正文页 → 页码 int(底部页脚 或 顶部书眉数字, wz4 页码在页顶角)
     for _k in sl:
         _i = int(_k)
@@ -1350,6 +1375,13 @@ subprocess.run(['xelatex', '-interaction=nonstopmode', '-output-directory=/tmp',
 _src = '/tmp/seg2_line.pdf'
 if os.path.exists(_src):
     if os.path.abspath(_src) != os.path.abspath(OUT): shutil.copy(_src, OUT)
+    # F1 修复：用本产物 PDF 回填 calib.render（单趟/两趟都描述真实渲染）
+    try:
+        _cp = os.environ.get('CALIB_OUT') or (OUT + '.calib.json')
+        if os.path.exists(_cp):
+            update_calib_render(_cp, OUT)
+    except Exception as _re:
+        print('[calib] render 回填失败（不阻断）: %s' % _re, file=sys.stderr, flush=True)
     print(f"[完成] {OUT}")
 else:
     print("[失败] xelatex 未生成 PDF,查 /tmp/seg2_line.log")
