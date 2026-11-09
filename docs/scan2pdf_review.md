@@ -746,3 +746,88 @@ grep -c "退出码" spec/governance/HORIZONTAL_CALIB.md          # 0
 | `src/test/unit/test_scan2pdf.py` | `3c727a5f9e346d37f1407d716d70c3a136c204776a519474c579a9b4b984bb2e` |
 | `src/test/unit/test_horizontal_calib.py` | `3f2ac0e6be6218859040495511848790f7ba70a383a08eab69ccfc700ae25656` |
 | HEAD | `abacb9c`（未 commit） |
+
+---
+
+# 附：GMPG 泄漏修复终审（t190，t188/t189）
+
+> 审查人：质量审查员　日期：2026-11-09 23:43–00:05
+> 对象：t188（fit_common pass2 去 VERIFY_MARK）+ t189 独立验收
+> 依据：`AGENTS.md` #42、`docs/scan2pdf_v1.md` §21、t189 验收报告
+> **结论：PASS（有条件）** —— 根因/修复正确（pass1 带标记、pass2 交付不带），ghbq/wz4 交付 GMPG=0、gate 数字不变、文本/渲染不变；无标记回退在 1:1 下正确，溢出页由「页数 1:1」硬约束兜住。残留：docs §21 的 E2E 字符数与实测不符（low）、PIPELINE_BEHAVIOR 契约待补（low）。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_nomark.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# [scan2pdf] ghbq: pipeline=geom gate=PASS exit=0
+```
+
+- **ghbq**：104 页、**GMPG span = 0**（旧 104）、104=104、gate **PASS pitch 96.8%**、exit 0；calib `render` 600.75×866.75 / font 16.44 / pitch 34.21（与 t187 一致）。
+- **wz4**（补充独立构建）：677 页、**GMPG = 0**（旧 677）、677=677、gate **PASS pitch 99.6%**；calib render 416.44×631.63 / font 10.66 / pitch 17.67（与 t189 一致）。
+- 单测：`test_fit_common_verify_mark` 4 + `test_fit_common_cleanup` 2 + `test_scan2pdf` 31 → **37 passed**。
+
+## 1. 根因与修复核对
+
+| 项 | 实测 |
+|---|---|
+| 根因 | `fit_common.render()` 原两趟都 `env['VERIFY_MARK']='1'`；pass2 即交付物 → 每页 1 处 `GMPG<k>ZZ` 进文本层（ghbq 104、wz4 677、历史 wz4_optimized 677） |
+| 修复 | `render(..., verify_mark=True)`：pass1 `True`（`measure_heights` 归组需要）、pass2 `False` 且 **`env.pop('VERIFY_MARK')`**（继承 shell 也不泄漏）；`main()` 两处调用一致（L88/L105） |
+| classic 路径 | 共用 `fit_common.main`，同一 render → 同源生效；单测 `test_render_verify_mark_env` 断言两趟 `[True, False]`，`test_main_two_passes` 覆盖 build_geom/build_classic |
+| 交付口径 | 交付 PDF `get_text` 无 `GMPG`；pass1 临时 PDF 仍有标记（不交付） |
+
+## 2. 独立抽检（文本/渲染不变性）
+
+- **文本**：删除 `GMPG<k>ZZ` + 空白归一后逐页对比旧产物 → **ghbq 0/104、wz4 0/677 页差异**。
+- **像素**：ghbq p1/p51/p104、wz4 p1/p101/p677 的差异像素仅落在页底标记区（ghbq y≈1800/1806@150dpi、wz4 y≈874/876@150dpi，x 页左缘）→ 标记移除，正文渲染不变。
+- **字符差**：ghbq 旧 raw **49,262** → 新 **48,332**，差 **930 = 826（104×8 字符 GMPG）+104 换行**，可解释（wz4 同构）。
+- **校准值**：两书 calib `render`/page/dpi/font/pitch 与修复前一致；ratio 表未暴露变化，页数/pitch 不变。
+
+## 3. 风险审查（无标记回退）
+
+- `verify_geom`：无标记时走「按序号 1:1」回退（`out_by_key[src_keys[i]] = out[i]`）；页数 1:1 是其**硬约束**（`n_src != n_out` → 退出码 FAIL），因此**溢出页**（一个源页渲成多物理页）会先被页数不 1:1 拦截，不会静默错配。
+- 边界：若「一页溢出 + 另一页丢失」恰好抵消使 n_out==n_src，回退按序号会错位；marked 模式可检出「源页溢成多物理页/缺页」，无标记模式不能。属低风险残留（构建本身按 1 源页 1 页架构，且 gate 的 pitch/页高会异常）；建议后续在 PIPELINE_BEHAVIOR 注明「交付无标记，溢出检测依赖页数 1:1」。
+- 无标记对 gate 数字无影响：ghbq/wz4 的 `verify_geom` 独立跑均 rc=0，数字与带标记时一致（96.8%/99.6%）。
+
+## 4. 文档/AGENTS 一致性
+
+- `AGENTS.md` #42 与实现/实测一致（根因、修复、ghbq 104/wz4 677、历史 wz4_optimized 677）。
+- `docs/scan2pdf_v1.md` §21 与实现一致；**但 E2E 字符数「47,059→46,233」与实测不符**：当前所有 104 页 ghbq 产物 raw 均为 49,262 → 新 48,332（见 F1）。
+- `spec/governance/PIPELINE_BEHAVIOR.md` 尚未补「VERIFY_MARK 仅 pass1 / 交付无 GMPG」契约（t188 已登记后续；属 api-compat 必改项，见 F2）。
+
+## 5. findings
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | low | docs §21 E2E 字符数写「ghbq 47,059→46,233」，实测当前 ghbq 104 页产物为 **49,262→48,332**（差 930=826+104 换行）；数字来源不明/口径不一 | 按实测更正 §21（或注明统计口径） |
+| **F2** | low | PIPELINE_BEHAVIOR 未补「VERIFY_MARK 仅 pass1、交付无 GMPG、无标记时 verify 按序号 1:1 且溢出由页数硬约束兜底」——env/产物文本层属 api-compat 契约 | 后续单开 spec 同步（AGENTS §4 清单要求） |
+| **F3** | low | 无标记回退下「溢出+缺页抵消」边界无法检出（marked 模式可） | 文档注明；如需强保证，可保留「verify 用带标记副本」的选项 |
+
+## 6. 结论
+
+**t190 终审 verdict：PASS（有条件）**。
+
+- **通过**：根因关闭（pass2 不再设 VERIFY_MARK，含 shell 继承）；ghbq/wz4 交付 GMPG=0、gate 数字与页数不变；文本归一后 0 diff、像素差仅标记区；classic 同源生效；verify_geom 1:1 回退正确且溢出由硬约束拦截；37 单测通过。
+- **条件**：F1（docs 数字）、F2（PIPELINE_BEHAVIOR 契约）为低风险跟进；F3 文档注明即可。
+
+## 7. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_nomark.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_nomark.pdf --data-dir data/wz4 --skip-ocr --force
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py output/ghbq_full/review_ghbq_nomark.pdf \
+  output/ghbq_full/_ocr_ghbq/ghbq_spotting_coords.json output/ghbq_full/_ocr_ghbq/ghbq_spotting_lines.json \
+  --src-pdf source_pdf/ghbq.pdf        # rc 0；原文「对齐: 按序号 1:1」
+/usr/bin/python3 -m pytest src/test/unit/test_fit_common_verify_mark.py src/test/unit/test_fit_common_cleanup.py src/test/unit/test_scan2pdf.py -q  # 37 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/calibration/fit_common.py` | `8883395b932f594308f9492efa95b5b23d54acf7863404578a16b68f2280ca0e` |
+| `output/ghbq_full/review_ghbq_nomark.pdf` | md5 `c88d768a7d30fc9d888a09876b33dd0a` / 104 页 / GMPG 0 |
+| `output/wz4/review_wz4_nomark.pdf` | md5 `5a3f0daa3346713cd834edc6f559b300` / 677 页 / GMPG 0 |
+| HEAD | `00a44f7`（未 commit） |
