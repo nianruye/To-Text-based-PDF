@@ -23,6 +23,7 @@ cd /opt/test
 cd /opt/test
 /usr/bin/python3 -m pytest src/test/unit src/test/invariants -q   # 需 201 全过
 VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py \
+  --src-pdf source_pdf/wz4.pdf \
   output/wz4/wz4_geom_optimized.pdf \
   data/wz4/wz4_spotting_coords.json \
   data/wz4/wz4_spotting_lines.json

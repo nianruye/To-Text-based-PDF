@@ -76,16 +76,17 @@ LAYJSON=data/wz2/wz2.pdf_by_PaddleOCR-VL-1.6.json PAGE_FONT=1 PER_PAGE_PITCH=1 L
   data/wz2/wz2_spotting_lines.json data/wz2/wz2_spotting_coords.json \
   src/test/snapshots/_out_wz2_classic.pdf source_pdf/wz2.pdf
 
-# [4] verify_geom 指标（--json 输出原始 JSON）
+# [4] verify_geom 指标（--json 输出原始 JSON；必须带 --src-pdf：
+#     缺省 DPI=200，各书 OCR 数据 DPI 不同——如 wz4=144dpi，不带会误判 pitch 0%）
 /usr/bin/python3 src/test/verify_geom.py src/test/snapshots/_out_wz1_geom.pdf \
   data/wz1/wz1_spotting_coords.json data/wz1/wz1_spotting_lines.json \
-  --json src/test/snapshots/_verify_wz1.json
+  --src-pdf source_pdf/wz1.pdf --json src/test/snapshots/_verify_wz1.json
 /usr/bin/python3 src/test/verify_geom.py src/test/snapshots/_out_youhua_geom.pdf \
   data/legacy/spotting_coords.json data/legacy/spotting_lines.json \
-  --json src/test/snapshots/_verify_youhua.json
+  --src-pdf source_pdf/wz1.pdf --json src/test/snapshots/_verify_youhua.json
 /usr/bin/python3 src/test/verify_geom.py src/test/snapshots/_out_wz2_classic.pdf \
   data/wz2/wz2_spotting_coords.json data/wz2/wz2_spotting_lines.json \
-  --json src/test/snapshots/_verify_wz2.json
+  --src-pdf source_pdf/wz2.pdf --json src/test/snapshots/_verify_wz2.json
 ```
 
 ## 文件清单
