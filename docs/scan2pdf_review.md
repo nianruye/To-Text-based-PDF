@@ -516,3 +516,233 @@ PY
 | `src/test/unit/test_ocr_book.py` | `d5e94c40ec4e8901ab5adeb3daae972d905c7c4a5d9bb1465941b8ad7a326d7f` |
 | `output/ghbq_full/review_ghbq_full.pdf` | 104 页（本终审产物；md5 `b52c14815bf57478218783bbd53af9e6`） |
 | HEAD | `516871f`（未 commit） |
+
+---
+
+# 附：横排标定审计终审（t181，HORIZONTAL_CALIB）
+
+> 审查人：质量审查员　日期：2026-11-09 21:37–22:05
+> 对象：t179（calib.json + 自检 warnings）+ t180 验收 + t182/t183 修复
+> 依据：`spec/governance/HORIZONTAL_CALIB.md`、`docs/scan2pdf_v1.md` §20、`docs/scan2pdf_acceptance.md`（t183）
+> **结论：needs_revision（FAIL）** —— 字段/容差/渲染不变性均实测通过，但**自检与 §3 契约有两处未落地**：§3.2 FAIL 不产生非零退出码（仅记录），§3.1 #10/#11 的 TOC 参数区间与 TOC 样本 <3 未校验（ghbq toc_samples=1 实测无该 warning）；另有 spec 示例 date_local 与实现矛盾、报告措辞「gate.calib_warnings」与实际字段不符。修复面小（补 2 条自检 + 对齐 1 条款/措辞），但当前不能称「契约一致」。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_calib.pdf \
+  --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# [scan2pdf] ghbq: pipeline=geom gate=PASS exit=0
+```
+
+- ghbq 104 页：exit 0、gate **PASS**（pitch **96.8%**、104=104、split 0）、`calib.json` 1970 B、gate sidecar 2514 B；`pytest test_horizontal_calib test_scan2pdf` → **35 passed**。
+- wz4 677 页（补充独立构建）：exit 0、gate **PASS**（pitch **99.6%**、677=677）；独立 `verify_geom --src-pdf` rc=0 PASS；`calib.json` warnings=[]、selfcheck=pass。
+
+## 1. 与 spec 契约对照
+
+| spec | 实现/实测 | 结论 |
+|---|---|---|
+| §2.1 DPI（value/source/residual/expected；残差≤5） | ghbq 139/coords+src/res 0.298；wz4 144/coords+src/res 0.094 | ✓ |
+| §2.2 页面尺寸（coverage_x/y、threshold、source_of_page_size；>1.02 才 warn） | ghbq 603×870（coords，cov 1.013/1.003）；wz4 418×634（cov 0.9991/0.9988）；无 overcoverage warn | ✓ |
+| §2.3–2.6 cw/measure/font/baseline/margin/font_sm/h_body | ghbq：cw25、measure 461/413/1.115、font16.5、baseline34.2(ratio2.073)、margin95；wz4：cw28、font10.7、baseline17.8(1.664)、margin59 | ✓ |
+| §4.2 字段清单 | 23 顶层键齐全（dpi/page_size/render/cw/measure/font/baseline/margin_pt/font_sm_pt/h_body_px/toc_params/coverage/source_of_page_size/warnings/selfcheck/env/created_by…）；`render` page/font/pitch/pass/unit 齐全 | ✓（除 F4 date_local） |
+| §4.1 可复现（sha256+版本，无时间戳） | 无 date_local/时间戳；sha256 记录 | ✓ |
+| §3.1 #1/#2/#12 FAIL 项 | pages_mismatch/empty_input/source_of_page_size_missing → severity=fail（代码审查） | ✓（级别正确） |
+| §3.2 FAIL 不静默（退出码） | **build_geom 无 sys.exit；fail 仅写 warnings/selfcheck + stderr，退出码仍 0** | **✗ F1** |
+| §3.1 #10 TOC 参数（font_line/foot_x/title_max 区间） | 仅校验 font_line（0.9–1.8×font）；foot_x/title_max 未校验 | **✗ F2** |
+| §3.1 #11 样本量（full<5/pitch<10/TOC<3） | full/pitch 已校验；**TOC<3 未校验**——ghbq toc_samples=1 无对应 warning | **✗ F3** |
+| §3.1 #3 pitch<3% | selfcheck pitch_error 3.2%（ghbq，verify_geom 回填）/0.4%（wz4） | ✓ |
+| 书无关 | 无 `if book==`；§5 参考基线仅在 spec/文档，代码无书表 | ✓ |
+
+## 2. 渲染行为不变（关键验收）
+
+- **ghbq 104 页**：新 calib 产物 vs 上一版全量产物 → 逐页文本 **104/104 相同**、总字符 49,262=49,262、p1/p51/p104 **像素相同**；md5 差异仅 PDF 元数据/ID（`8f4d1468` vs `b52c1481`）。
+- **wz4 677 页**：新 calib 产物 vs t165 产物 → 逐页文本 **677/677 相同**、总字符 603,844=603,844、p1/p101/p677 **像素相同**。
+- gate：ghbq PASS 96.8%、wz4 PASS 99.6%，与 calib 前一致 → **calib 输出不改变渲染/门禁结论** ✓。
+
+## 3. warnings 语义
+
+- ghbq：1 条 `baseline_font_ratio_out`（severity=warn，2.073∉[1.2,2.0]）→ selfcheck.verdict=warn；report/gate reasons `calib_warn:baseline_font_ratio_out`，**gate 仍 PASS、exit 0**（非阻断）✓。
+- wz4：warnings=[]、selfcheck=pass、gate reasons=[] ✓。
+- FONT_SCALE=3 fixture：build rc=0 + `font_out_of_range` warn（不阻断）✓（t182 单测）。
+
+## 4. findings（must-fix）
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | **medium** | §3.2「FAIL 不静默：stdout + warnings + **退出码**」未落地：build_geom 对 severity=fail（pages_mismatch/empty_input/source_of_page_size_missing）只打印+写 JSON，进程仍 exit 0；`HORIZ_CALIB_STRICT` 也未实现（spec 标“规划”可接受，但不能替代 §3.2 现行 FAIL 退出码） | 二选一：①fail 时 build_geom 非零退出（或至少 scan2pdf 映射为 exit≠0）；②修订 spec §3.2 为「构建不阻断，由 verify/scan2pdf gate 兜底」并经 captain 确认；同时把 docs §20「spec §3 清单落地」改为如实描述 |
+| **F2** | low | §3.1 #10 要求校验 `font_line/foot_x/title_max` 区间；实现只校验 font_line（0.9–1.8×font），foot_x/title_max 无检查 | 补 foot_x∈[0,1] 桶对/ title_max 合理区间检查（warn），或 spec 注明本轮只校验 font_line |
+| **F3** | low | §3.1 #11 要求 `TOC<3` → WARN；实现无该检查——ghbq `toc_samples=1` 实测无 toc 相关 warning | 补 `toc_low_sample`（warn），并在 calib 输出中体现 |
+| **F4** | low | spec §4.2 示例含 `"date_local"`，但 §4.1 要求“无时间戳”，实现按 §4.1 不输出 → 示例与实现矛盾 | 删示例字段或标 optional/注明由调用方填 |
+| **F5** | low | t179/t183/docs §20 称「gate 侧车带 calib_warnings」，实际 sidecar 顶层是 `calib` 块，`calib_warnings` 列表仅在 `report.gate`；sidecar 只通过 reasons `calib_warn:*` 体现 | 把 warnings code 列表也写入 sidecar（`calib.warnings` 已有）并统一措辞，或修正文档表述 |
+
+## 5. 结论
+
+**t181 终审 verdict：needs_revision（FAIL）**。
+
+- **通过**：schema/字段/容差（DPI 残差、coverage、font/baseline、render bp、单位）与 §2/§4 基本一致；warn 非阻断语义正确（ghbq baseline 2.073/gate PASS）；书无关；**渲染不变性**（ghbq 104/104、wz4 677/677 文本与像素一致，gate 96.8%/99.6% PASS）实测成立；35 单测通过。
+- **不通过**：F1（FAIL 退出码未落地，medium）、F2/F3（TOC 自检缺 2 条）、F4/F5（文档/字段措辞）——与「自检/容差与契约一致」的验收标准不符。
+- 修复建议：最小改动 = 补 TOC 两条 warn + 对齐 §3.2（实现退出码或修订 spec）+ 清理 date_local/calib_warnings 表述；随后以 ghbq 104 页 + wz4 677 页复跑确认渲染与门禁数字不变。
+
+## 6. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_calib.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_calib.pdf --data-dir data/wz4 --skip-ocr --force
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py output/wz4/review_wz4_calib.pdf \
+  data/wz4/wz4_spotting_coords.json data/wz4/wz4_spotting_lines.json --src-pdf source_pdf/wz4.pdf  # rc0
+/usr/bin/python3 -m pytest src/test/unit/test_horizontal_calib.py src/test/unit/test_scan2pdf.py -q  # 35 passed
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `src/utils/geometry.py` | `817c83a649a836eeec5d9b15c20590adca9970fa3e2067e54a05c04004b41204`（geometry.py） |
+| `src/tools/scan2pdf.py` | `385db39254288e215fa5e11e55a6b946761e54eba7b972141a1d7f5e908455c0` |
+| `output/ghbq_full/review_ghbq_calib.pdf.calib.json` | 1970 B；dpi139/page603×870/font16.5/baseline34.2 warn |
+| `output/wz4/review_wz4_calib.pdf.calib.json` | 1922 B；dpi144/page418×634/font10.7/warnings=[] |
+| HEAD | `abacb9c`（未 commit） |
+
+---
+
+# 附：横排标定审计 round-2 终审（t185，t184 修复 F1–F5）
+
+> 审查人：质量审查员　日期：2026-11-09 21:50–22:20
+> 对象：t184（修 t181 F1–F5）
+> 依据：`spec/governance/HORIZONTAL_CALIB.md`、`docs/scan2pdf_v1.md` §20.2、t181 终审报告
+> **结论：needs_revision（FAIL）** —— F2/F3/F4/F5 与代码侧 F1（fail→gate calib_fail/MANUAL_ONLY）实测**已修**，渲染零变化；但 **t184 报告称「spec §3.2 已按 captain 方案②修订」与实测不符**：`spec/governance/HORIZONTAL_CALIB.md` §3.2 仍写「FAIL 不静默：stdout + warnings + **退出码**」，与 §6（不阻断）及 docs §20.2 自相矛盾。按「报告说的与实测不符」标 **F1 high**（改 1 段文档即可），另 test 数字/覆盖为 low。
+
+## 0. 复跑
+
+- **ghbq 104 页**（`review_ghbq_calib2.pdf`）：exit 0、gate **PASS**（pitch **96.8%**、104=104）；calib warnings = `[baseline_font_ratio_out, toc_low_sample]`（**toc_low_sample 新增生效**，ghbq toc_samples=1）；selfcheck.verdict=warn。
+- **wz4 677 页**（`review_wz4_calib2.pdf`）：exit 0、gate **PASS**（pitch **99.6%**、677=677）；warnings=[]、selfcheck=pass（toc_samples=11）。
+- 单测：`test_horizontal_calib` **6 passed**、`test_scan2pdf` **30 passed**（合计 36）。
+- 渲染零变化（逐页文本 + 关键页像素 + 字符）：
+  - ghbq calib2 vs t181 calib vs t177 full：**104/104 页文本相同**、字符 49,262（去空白 44,739）、p1/51/104 像素相同；
+  - wz4 calib2 vs t181 calib vs t165：**677/677 页文本相同**、字符 603,844（去空白 560,324）、p1/101/677 像素相同。
+
+## 1. F1–F5 修复核对
+
+| 项 | t184 声明 | 实测 | 结论 |
+|---|---|---|---|
+| **F1** | spec §3.2 按 captain 方案②修订；FAIL→gate reasons `calib_fail:<code>`，PASS→MANUAL_ONLY | 代码 ✓（scan2pdf.py L663-676：`_cf`→reasons `calib_fail:*`、v_ok 时 ve=MANUAL_ONLY/exit=8/review_required=True）；sidecar 有 `calib_fail`；**spec §3.2 原文未改**（L228 仍「+ 退出码」），与 §6 L439「不阻断」+ docs §20.2 矛盾 | **✗ F1（high）** |
+| F2 | 补 toc_foot_x_out / toc_title_max_out | geometry.py L296-304：foot_x 桶对 0≤x0<x1≤1、title_max∈[10,80]，均 warn | ✓ |
+| F3 | 补 toc_low_sample（toc_samples<3） | geometry.py L285-288；ghbq toc_samples=1 → warnings 含 `toc_low_sample` | ✓ |
+| F4 | spec §4.2 删 date_local | `grep date_local spec/` = 0；字段与 §4.1 无时间戳一致 | ✓ |
+| F5 | sidecar calib 块含 warnings/warnings_codes + calib_warnings/calib_fail | gate.json：`calib.warnings`、`calib.warnings_codes`、`calib_warnings`、`calib_fail` 均在；reasons `calib_warn:*`；docs §20.2 措辞已对齐 | ✓ |
+
+## 2. 独立抽样（数值/语义）
+
+- ghbq：dpi139（res 0.298）、page603×870（cov 1.013/1.003）、cw25、font16.5、baseline34.2（ratio 2.073→warn）、margin95、toc_samples1（→warn）；warn 不阻断（gate PASS、exit 0、refiew_required=false）。
+- wz4：dpi144（res 0.094）、page418×634、font10.7、baseline17.8（1.664）、toc_samples11、warnings=[]、selfcheck=pass。
+- 无书专属分支（`if book==`/书表 = 0；spec §5 参考基线未入代码）。
+
+## 3. findings（must-fix）
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | **high** | **t184 报告称「spec §3.2 按 captain 方案②修订」，但 spec §3.2 原文未改**：仍为「FAIL 不静默：stdout + calib.json.warnings[] + **退出码**；不得用兜底值假装成功」，与 §6（L439「fail 项写 selfcheck.verdict=fail，不阻断」）及 docs §20.2（「spec §3.2 改为…构建不阻断（exit 0）」）自相矛盾；属「把没修的写成修了」 | 按 captain 方案②实际修订 spec §3.2：删「+ 退出码」，改为「FAIL 项 = stderr + calib.warnings + selfcheck.verdict=fail；构建不阻断（exit 0），由 scan2pdf/gate 兜底（reasons `calib_fail:*`、PASS→MANUAL_ONLY）」；并与 §6 措辞统一 |
+| **F2** | low | 新增「FAIL→gate calib_fail→PASS 转 MANUAL_ONLY」路径**无单测**（`grep calib test_scan2pdf` = 0）；当前只有代码审查+正常路径实测（ghbq/wz4 均无 fail 项，未触发） | 在 test_scan2pdf 加一例：伪造 `calib.json` warnings 含 severity=fail → 断言 reasons `calib_fail:*`、verdict_effective=MANUAL_ONLY、exit=8、review_required=true |
+| **F3** | low | t184 报告「6 passed（+scan2pdf **35** passed）」与实测不符：test_scan2pdf **30 passed**（36 = 6+30；35 是 test_ocr_book+test_scan2pdf 的旧口径） | 更正报告数字（或说明合并口径） |
+
+## 4. 结论
+
+**t185 终审 verdict：needs_revision（FAIL）**。
+
+- **通过**：F2/F3/F4/F5 全部实测修复；F1 的代码侧（calib_fail→gate/MANUAL_ONLY）实现正确；ghbq（96.8%）/wz4（99.6%）gate PASS、渲染零变化（文本/字符/像素）；warnings 非阻断语义正确；无书专属分支。
+- **不通过**：**F1（high）**——spec §3.2 未按 t184 声明修订，契约仍与实现/§6/§20.2 矛盾（报告-实测不符）；F2/F3 low。
+- 修复面：改 spec §3.2 一段 + 补 1 条 scan2pdf 单测 + 更正 t184 报告数字；随后只需复跑 ghbq/wz4（渲染与 gate 数字应不变）即可通过。
+
+## 5. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_calib2.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_calib2.pdf --data-dir data/wz4 --skip-ocr --force
+grep -n "退出码" spec/governance/HORIZONTAL_CALIB.md   # 仍命中 L228 → F1
+/usr/bin/python3 -m pytest src/test/unit/test_horizontal_calib.py src/test/unit/test_scan2pdf.py -q  # 36 passed
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `spec/governance/HORIZONTAL_CALIB.md` | 23,222 B / mtime 21:45（§3.2 未改） |
+| `src/utils/geometry.py` | `266366a4a126503e58eef080ea75c8f9050c17838c8bc8f773f3b00bd72be5ff`（calib_selfcheck TOC 三项） |
+| `src/tools/scan2pdf.py` | `38c0cef9905223ae7b6d71e2978d73cefb37d2497bf3742314fa65103cf60f63`（calib_fail → MANUAL_ONLY） |
+| `output/ghbq_full/review_ghbq_calib2.pdf.gate.json` | PASS / calib_warnings 2 / calib_fail [] |
+| `output/wz4/review_wz4_calib2.pdf.calib.json` | warnings=[] / selfcheck=pass |
+| HEAD | `abacb9c`（未 commit） |
+
+---
+
+# 附：横排标定审计 round-3 终审（t187，t186 修复 F1–F3）
+
+> 审查人：质量审查员　日期：2026-11-09 22:00–22:25
+> 对象：t186（修 t185 F1–F3）
+> 依据：`spec/governance/HORIZONTAL_CALIB.md`、`docs/scan2pdf_v1.md` §20.2/§20.3、t185 终审
+> **结论：PASS** —— t185 的 F1/F2/F3 均已真实落地：spec §3.2 已按 captain 决策改写（`grep 退出码` = 0）；新增 `test_geom_calib_fail_forces_manual` 覆盖「calib fail→gate calib_fail→PASS 降 MANUAL_ONLY/exit 8/review_required」；docs §20.3 单测口径已更正。ghbq 104 页（96.8%）/wz4 677 页（99.6%）gate PASS 且渲染零变化。无新 blocker。
+
+## 0. F1–F3 核对
+
+| 项 | 声明 | 实测 | 结论 |
+|---|---|---|---|
+| **F1** | spec §3.2 按 captain 写法替换；`grep 退出码` = 0 | `grep -c 退出码 spec/governance/HORIZONTAL_CALIB.md` = **0**；§3.2 现文：「FAIL 项 = stdout + calib.warnings[] + selfcheck.verdict=fail；**构建不阻断（exit 0）**，由 scan2pdf/gate 兜底：calib_fail:<code>、PASS→MANUAL_ONLY（review_required=true）」；与 §6「fail 项写 selfcheck.verdict=fail，不阻断」及 docs §20.2 一致 | ✓ 已修 |
+| **F2** | 新增 test_geom_calib_fail_forces_manual（test_scan2pdf.py） | 测试存在且为真实 `main()` 流程：monkeypatch build_pdf（写含 severity=fail warnings 的 calib）+ run_verify_geom（PASS）→ 断言 `rc=EXIT['manual']`、gate.reasons 含 `calib_fail:pages_mismatch`、`verdict_effective=MANUAL_ONLY`、`review_required=True`、`calib_fail=['pages_mismatch']`；**通过** | ✓ 已修 |
+| **F3** | docs §20.3 更正 test 数字 | §20.3：calib **6** / scan2pdf **30**（t185 时点）=36；t184 的「6+35」中 35=ocr_book 5+scan2pdf 30；加 F2 后 scan2pdf **31**、合计 **37**；实测 `pytest test_horizontal_calib test_scan2pdf` → **37 passed** | ✓ 已修 |
+
+## 1. 独立复跑
+
+- **ghbq 104 页**（`review_ghbq_calib3.pdf`）：exit 0、gate **PASS**（pitch **96.8%**、104=104）；calib warnings `[baseline_font_ratio_out, toc_low_sample]`、selfcheck=warn；`calib_fail=[]`、reasons 两条 `calib_warn:*`；**文本 104/104 页与 calib2 相同**。
+- **wz4 677 页**（`review_wz4_calib3.pdf`）：exit 0、gate **PASS**（pitch **99.6%**、677=677）；warnings=[]、selfcheck=pass（toc_samples=11）、`calib_fail=[]`、reasons=[]；**文本 677/677 页相同、字符 603,844 相同、p1/p101/p677 像素相同**。
+- 单测：**37 passed**（calib 6 + scan2pdf 31）。
+- spec 一致性：`date_local` 仍不存在（§4.1 无时间戳）；§4.2 无该字段；§2/§3 容差未变；无书专属分支（`if book==`/书表 = 0）。
+
+## 2. warnings 语义（最终态）
+
+- warn（baseline_font_ratio_out / toc_low_sample）：写 calib.warnings + stderr + sidecar `calib.warnings`/`calib_warnings` + reasons `calib_warn:*`，**gate PASS/exit 0 不变** ✓。
+- FAIL（如 pages_mismatch）：**不阻断 build（exit 0）**，但 scan2pdf gate 写 `calib_fail:<code>` 且 PASS→MANUAL_ONLY/exit 8/review_required=true（F2 单测 + code 双证）✓；与 captain 决策、spec §3.2、docs §20.2 一致。
+- `HORIZ_CALIB_STRICT` 仍为 spec 标注的「规划」项（未强制）——如实保留，不阻塞。
+
+## 3. 渲染不变性
+
+- ghbq：calib3 vs calib2 → 104/104 页文本相同；calib2 vs t177 full 已证像素相同（上一轮），本轮文本一致 → 渲染零变化。
+- wz4：calib3 vs calib2 → 677/677 页文本相同、字符 603,844 相同、3 页像素相同；calib2 vs t181/t165 已证一致。
+- 两书 gate 数字保持 96.8% / 99.6% PASS，与 calib 前相同 ✓。
+
+## 4. 残留（非阻断）
+
+| id | severity | problem | 建议 |
+|---|---|---|---|
+| R1 | low | `HORIZ_CALIB_STRICT` 仅记录 env，未实现（spec 标“规划”） | 保持登记；实现时按 spec §3.2 升级 WARN→FAIL 并退出 |
+| R2 | low | calib_fail 单测为 monkeypatch 流程（不跑真实 build_geom） | 已有真实 E2E（ghbq/wz4）覆盖正常路径，可接受 |
+
+## 5. 结论
+
+**t187 终审 verdict：PASS**。
+
+- **通过**：F1（spec §3.2 已真实改写、无“退出码”残留）、F2（fail→MANUAL_ONLY 单测断言四项全）、F3（test 口径 37 与实际一致）；ghbq/wz4 gate PASS 且渲染零变化；字段/自检/容差与契约一致；warn/fail 语义与 captain 决策一致；无书专属分支。
+- **结论**：横排标定审计（HORIZONTAL_CALIB v1 + calib.json + selfcheck + gate 兜底）可收口；R1/R2 为后续低风险项。
+
+## 6. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_calib3.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_calib3.pdf --data-dir data/wz4 --skip-ocr --force
+grep -c "退出码" spec/governance/HORIZONTAL_CALIB.md          # 0
+/usr/bin/python3 -m pytest src/test/unit/test_horizontal_calib.py src/test/unit/test_scan2pdf.py -q  # 37 passed
+```
+
+| 文件 | sha256 |
+|---|---|
+| `spec/governance/HORIZONTAL_CALIB.md` | `3e0c2f02d240a97b29d6632282a2bb275aa0502b3433c7460cb5c491c400609f` |
+| `src/utils/geometry.py` | `266366a4a126503e58eef080ea75c8f9050c17838c8bc8f773f3b00bd72be5ff` |
+| `src/tools/scan2pdf.py` | `38c0cef9905223ae7b6d71e2978d73cefb37d2497bf3742314fa65103cf60f63` |
+| `src/test/unit/test_scan2pdf.py` | `3c727a5f9e346d37f1407d716d70c3a136c204776a519474c579a9b4b984bb2e` |
+| `src/test/unit/test_horizontal_calib.py` | `3f2ac0e6be6218859040495511848790f7ba70a383a08eab69ccfc700ae25656` |
+| HEAD | `abacb9c`（未 commit） |
