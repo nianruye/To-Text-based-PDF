@@ -505,3 +505,52 @@ cd /opt/test
 ## CAL2.4 结论
 
 **t183 验收通过（PASS）**：t182 的 F1（render 回填）/F2（单位）/F3（文字）/F4（coverage 说明）/F5（E2E fixture）全部实测关闭；schema 完整、warnings 非阻断、report/sidecar 一致、gate 不因 calib 警告误判；ghbq 产物物理尺寸与源图仍 ≤3.7%（t180 已核）。**低风险备注**：wz4 20p 子集 render.pass=false/pitch_error 16.7% 属 TOC 页子集（t179 已登记，非 calib 缺陷）；直接 build_geom 的 `render.pass=null`（只有 scan2pdf 能填 true/false），建议后续文档注明。
+
+
+---
+
+# GMPG 泄漏修复验收（t189）
+
+> 对象：t188（fit_common pass2 移除 VERIFY_MARK，交付产物无 GMPG）
+> 日期：2026-11-09 23:34–23:55；**只写本报告、未改实现/数据、未 commit**（HEAD `00a44f7`）
+> 证据：`src/calibration/fit_common.py`（`8883395b…`）、`test_fit_common_verify_mark.py`（`85df09c5…`）、`test_fit_common_cleanup.py`（`9081d73d…`）、`output/ghbq_full/acc_ghbq_nomark.pdf*`、`output/wz4/acc_wz4_nomark.pdf*`
+
+## GMPG.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | 重建 ghbq 104 + wz4 677：`get_text()` GMPG **0**（逐页），页数不变 | **PASS** | ghbq **104=104**、GMPG total **0**（含 GMPG 页 **0**）；wz4 **677=677**、GMPG total **0**（0 页）；旧产物对照 ghbq 104 处/104 页、wz4 677 处/677 页 |
+| 2 | 与修复前产物比，除 GMPG 行外逐页文本相同（字符差可解释） | **PASS** | 逐页逐字（删除 `GMPG<k>ZZ`+空白归一）**0 diff**（ghbq 0/104、wz4 0/677）；原始字符差 ghbq **930 = 826（104 个标记 7–9 字符）+104 换行**、wz4 **6660 = 5983（677 标记）+677 换行**，完全可解释 |
+| 3 | verify_geom --src-pdf rc=0 PASS，pitch 不变；确认「按序号 1:1」回退 | **PASS** | ghbq rc=0：104=104、pitch **96.8%**；wz4 rc=0：677=677、pitch **99.6%**；stdout 均含 `对齐: 按序号 1:1 (输出未含 GMPG 标记,建议用 VERIFY_MARK=1 重渲以精确对齐)` |
+| 4 | scan2pdf gate PASS、exit 0；calib render 仍正确 | **PASS** | ghbq exit0、gate PASS 96.8%、warnings=[baseline_font_ratio_out,toc_low_sample]、calib_fail=[]；wz4 exit0、gate PASS 99.6%、warnings=[]/calib_fail=[]；render：ghbq 600.75×866.75/font16.44/pitch34.21/pass，wz4 416.44×631.63/font10.66/pitch17.67/pass（实测 34.21/17.62，均吻合） |
+| 5 | 单测：两趟 env 断言；pytest 全绿 | **PASS** | `test_fit_common_verify_mark.py` 4 passed（pass1 `[True,False]`、pass2 移除继承 shell 的 VERIFY_MARK、classic 同源、真 PDF 无标记回退「按序号 1:1」）；`test_fit_common_cleanup` 2 + `test_scan2pdf` 31 + `test_horizontal_calib` 6 = **43 passed**；全量 unit **717 passed**（184.64s） |
+| 6 | 报告追加；不改实现；不 commit | **PASS** | 本节；只改本文件；未改实现/数据；未 commit（HEAD `00a44f7`） |
+
+## GMPG.2 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/acc_ghbq_nomark.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/acc_wz4_nomark.pdf --data-dir data/wz4 --skip-ocr --force
+# 均 exit 0；ghbq 104 页 / wz4 677 页
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py output/wz4/acc_wz4_nomark.pdf \
+  data/wz4/wz4_spotting_coords.json data/wz4/wz4_spotting_lines.json --src-pdf source_pdf/wz4.pdf
+# rc=0 PASS：677=677、pitch 99.6%、按序号 1:1 回退
+/usr/bin/python3 -m pytest src/test/unit/test_fit_common_verify_mark.py -q   # 4 passed
+/usr/bin/python3 -m pytest src/test/unit -q                                # 717 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/calibration/fit_common.py` | `8883395b932f594308f9492efa95b5b23d54acf7863404578a16b68f2280ca0e` |
+| `src/test/unit/test_fit_common_verify_mark.py` | `85df09c52d7fa2a9af1e037a85288c16f3f0479f34dbdaa391c0c919bd86fe0b` |
+| `src/test/unit/test_fit_common_cleanup.py` | `9081d73dadf310a65c273d052b4cecbb21ae86a25722c57267a5e40b14f24fdf` |
+| `output/ghbq_full/acc_ghbq_nomark.pdf` | md5 `44eb50ee1780529abf23c09a3223b25e` |
+| `output/wz4/acc_wz4_nomark.pdf` | md5 `69845cc69e77ea7d0d5d25fa33aa7db1` |
+| HEAD | `00a44f7`（未 commit） |
+
+## GMPG.3 结论
+
+**t189 验收通过（PASS）**：交付产物 GMPG **0**（逐页），页数/文本（除标记行）/pitch/gate 全部不变；verify_geom 无标记按序号 1:1 回退且 PASS；calib render 与产物实测一致；两趟 env 单测与全量 unit 717 passed。无 must-fix；建议后续把 `VERIFY_MARK` 用途写入 PIPELINE_BEHAVIOR（t188 已登记待同步）。

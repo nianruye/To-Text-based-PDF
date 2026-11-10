@@ -13,9 +13,19 @@ import fitz
 SL = sys.argv[1]; CO = sys.argv[2]; OUT = sys.argv[3]
 SRC = sys.argv[4] if len(sys.argv) > 4 else ''   # 源 PDF(图页/乱码页整页贴原图)
 
-def render(out_pdf, est_log=None, ratio_table=None, fill=None, build_name='build_geom'):
+def render(out_pdf, est_log=None, ratio_table=None, fill=None, build_name='build_geom', verify_mark=True):
+    """Render one calibration pass.
+
+    verify_mark=True only for pass1: measure_heights() needs GMPG source-page marks.
+    pass2 is the delivery PDF and must not set VERIFY_MARK (delivery text layer is clean);
+    explicitly pop it so an inherited shell env cannot leak marks back in.
+    """
     env = dict(os.environ)
-    env['POSITIONAL'] = '1'; env['VERIFY_MARK'] = '1'
+    env['POSITIONAL'] = '1'
+    if verify_mark:
+        env['VERIFY_MARK'] = '1'
+    else:
+        env.pop('VERIFY_MARK', None)
     if build_name == 'build_geom':
         # geom 逐页跟随源 pitch:split_polys 后源 pitch 逐页波动(22-36pt),全局 baselineskip
         # 只能匹配中位附近的页 -> pitch 达标率掉。PER_PAGE_PITCH 让每页按源 pitch 反推 linespread。
@@ -75,7 +85,7 @@ def main(build_name):
 
     try:
         print('[pass1] 渲染 + 导出估高...')
-        render(p1, est_log=est_log, fill=99, build_name=build_name)   # FILL 极大 -> pass1 几乎不压缩,量自然高度
+        render(p1, est_log=est_log, fill=99, build_name=build_name, verify_mark=True)   # pass1 需要 GMPG 估高
         est = json.load(open(est_log))
         actual = measure_heights(p1)
 
@@ -92,7 +102,8 @@ def main(build_name):
                   f'[{min(diffs):.2f},{max(diffs):.2f}]  (实测/估高;>1=估低,<1=估高)')
 
         print('[pass2] 带 ratio 表重渲...')
-        render(OUT, ratio_table=ratio_tbl, fill=os.environ.get('POS_FILL', '0.95'), build_name=build_name)   # 0.95:估高已校准,留 5% 余量->0 溢出且空白最小
+        render(OUT, ratio_table=ratio_tbl, fill=os.environ.get('POS_FILL', '0.95'), build_name=build_name,
+               verify_mark=False)   # pass2=交付物:不带 GMPG;0.95:估高已校准,留 5% 余量
         print(f'[完成] {OUT}')
     finally:
         shutil.rmtree(tmp, ignore_errors=True)  # 清理临时目录(#7:成功/异常/SystemExit 均清理)

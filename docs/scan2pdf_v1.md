@@ -286,3 +286,16 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
 - 实测：`test_horizontal_calib.py` **6 passed**、`test_scan2pdf.py` **30 passed**（t185 时点）；两者合计 **36 passed**。
 - t184 报告写「6 passed（+scan2pdf **35** passed）」有误：35 = `test_ocr_book 5 + test_scan2pdf 30`（旧合并口径），并不含 calib 6；按本书口径应为 **6 / 30 / 36**。
 - t186 新增 F2 单测 `test_geom_calib_fail_forces_manual` 后：test_scan2pdf **31 passed**，与 calib 6 合计 **37 passed**。
+
+## 21. t188：交付产物 GMPG 清理（fit_common pass2）
+
+- **根因**：`fit_common.render()` 两趟都强制 `VERIFY_MARK=1`；pass2 是交付 PDF，于是每页 1 处 2pt `GMPG<k>ZZ` 进入文本层（可搜索/复制）。实测：ghbq 104 页 **104 处**、wz4 677 页 **677 处**、历史 `wz4_optimized.pdf` 677 处。
+- **修复**：`render(..., verify_mark=True)`；`main()` pass1 `verify_mark=True`（`measure_heights()` 需要 GMPG 归组），pass2 `verify_mark=False`（并显式 `env.pop('VERIFY_MARK')`，继承 shell env 也不会泄漏）。geom/classic 共用 `fit_common.main`，两路径同源生效。
+- **交付口径**：交付 PDF 的 `get_text()` 中 `GMPG` = **0**；pass1 仍有标记（仅临时 pass1.pdf）。两趟 ratio 表/页数/正文文本不变（见下）。
+- **verify 对齐**：`verify_geom` 在输出无 GMPG 时走「按序号 1:1」回退（源码已有路径，t188 补真 PDF 单测）；1:1 页数下正确，门禁数字不变。
+  - **边界（F3，已知不可检出）**：若出现「一源页溢出成多页」与「整页缺失」数量恰好抵消（n_out==n_src），无标记模式无法察觉；需要强保证时用 `VERIFY_MARK=1` 单独渲一份带标记副本做对齐核查（交付物仍不带标记）。
+- **E2E（本地构建）**：
+  - ghbq 104 页：`ghbq_nomark.pdf` **GMPG=0**、104=104、gate **PASS pitch 96.8%**；与旧 `ghbq_full.pdf` 去掉 GMPG 行后逐页文本 **0 diff**（字符 47,059→46,233，差 826 = 104 条 GMPG 行；含换行计数为 49,262→48,332，差 930 = 826+104 换行。两种口径均可，勿混用）。
+  - wz4 677 页：`wz4_nomark.pdf` **GMPG=0**、677=677、gate **PASS pitch 99.6%**；与旧 `review_wz4_calib3.pdf`（677 处 GMPG）去掉 GMPG 行后逐页文本 **0 diff**。
+  - 历史 `wz4_optimized.pdf` 也有 677 处，说明是旧 fit_common 的长期泄漏，不是本次新引入。
+- **单测**：`test_fit_common_cleanup.py` + `test_fit_common_verify_mark.py` **6 passed**；覆盖 pass1/pass2 env（含 shell 继承）、classic 同源、无标记真 PDF 的 `verify_geom` 1:1 回退。
