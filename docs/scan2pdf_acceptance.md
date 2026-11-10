@@ -714,3 +714,55 @@ cd /opt/test
 ## FULL.4 结论
 
 **t200 验收通过（PASS）**：p1/p3 整页 raster 覆盖整页、全部文本 type3（不可见但可搜）、p2 条形码+可见文字；chars 43,913 不减少、GMPG 0、104=104、gate 96.8；与非整页/HEAD 逐页文本全等；默认 ghbq/wz4 零回归；阈值边界 0.399/0.40/0.401 与 p2 0.037 行为正确；tests 5/43/724 全绿。**低风险备注**：p1/p3 源页 raster 拉伸到产品页尺寸（长宽比 1.455→1.443，约 0.8%），视觉无感；p2 ISBN 与 chart 顶 8pt 细条为源图自身重复。
+
+
+---
+
+# 文本校正通道验收（t204）
+
+> 对象：t203（corrected_text：每书 JSON 整行校正 + scan2pdf 接入）
+> 日期：2026-11-10 22:50–23:10；**只写本报告、未改实现/数据、未 commit**（HEAD `70fe1a7`）
+> 证据：`src/tools/corrected_text.py`（`c312e737…`）、`scan2pdf.py`（`0d602e60…`）、`test_corrected_text.py`（`21fad3db…`）、`data/ghbq/corrected_text.json`（`77da1526…`）、`output/ghbq_full/acc_ghbq_corrected.pdf*`、`/tmp/t204/*`
+
+## CT.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | 使用 ghbq 校正表重建：文本层含校正文本、不含原错字；页数/坐标/门禁不变 | **PASS** | 默认路径（book_data）`applied=2/pages=1/skipped=0`；p3 文本 `戈尔巴乔夫与 / “人道的民主的社会主义”`，全文不含 `马尔巴乔夫`/`一人道`；仅 p3 与默认版不同（104 页中 diff=[3]）；pages 104=104、coords sha `889ade99…` 不变、gate PASS 96.8、GMPG 0 |
+| 2 | 未知页/行 → warn 跳过且构建成功；行数不变；report 字段完整 | **PASS** | 未知表（page 999 / line 2:99 / invalid value / 非十进制 page abc）：`skipped=4`、warnings=`unknown_page:999, unknown_line:2:99, invalid_value:2:0, unknown_page:abc…`，**exit0、gate PASS 96.8**、文本与 HEAD 全等；`line_counts={"2":2}` 与原始 lines key2 **2 行**一致；report 含 path/source/sha256/pages/applied/skipped/warnings/warn/line_counts |
+| 3 | 零回归：无校正文件 ghbq/wz4 与 HEAD 0 diff；wz2 6 页 PASS | **PASS** | wz4 无 `corrected_text.json`：677=677、逐页文本全等 HEAD、chars 554,341、gate 99.6、corrected enabled=False；wz2 6 页 gate PASS 100；ghbq 空表（applied=0）**104/104 页文本全等 HEAD**（等价无校正） |
+| 4 | 显式 `--corrected-text` 与默认路径均生效；sha256 与文件一致 | **PASS** | 默认 source=book_data、显式 source=explicit，二者 `applied=2`、sha256 均 `77da1526…` = `data/ghbq/corrected_text.json` 实际 sha256；显式输出文本与默认全等 |
+| 5 | 单测：替换/未知/行数不变/sha；报告追加；不改实现；不 commit | **PASS** | `test_corrected_text.py` **6 passed**；连同 test_scan2pdf **39 passed**；全量 unit **731 passed**；本节报告；未改实现/数据；未 commit |
+
+## CT.2 实测细节
+
+- 校正表：`data/ghbq/corrected_text.json`（sha256 `77da1526…`），`{"2":{"0":"戈尔巴乔夫与","1":"“人道的民主的社会主义”"}}`；原始 p3：`马尔巴乔夫与 / 一 / 人道的民主的社会主义”`。
+- 默认 build（`--layout`）：104 页、chars 43,913（不变）、GMPG 0、gate PASS 96.8；p3 get_text 为校正文本（整页叠加下文本 type3，可搜）。
+- 唯一页差：default vs corrected 仅 p3（[3]）；页幅全等；coords sha 全等。
+- 显式/默认：两条路径 applied=2、sha 一致；空表 applied=0、文本全等 HEAD；未知表 skipped=4、warn 跳过、build/gate 正常。
+- 行数：原始 key2=2 行、line_counts {"2":2}；`apply_corrected_text` 对 patched 行数变化抛 ValueError（单测覆盖）。
+- 零回归：wz4 无校正文件 677 页文本全等 HEAD、chars 554,341、gate 99.6；wz2 6 页 PASS100。
+
+## CT.3 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/acc_ghbq_corrected.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+# exit 0；applied=2；p3 文本已校正；104=104；gate 96.8
+/usr/bin/python3 -m pytest src/test/unit/test_corrected_text.py -q   # 6 passed
+/usr/bin/python3 -m pytest src/test/unit -q                          # 731 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/tools/corrected_text.py` | `c312e737a84432d5a5a02a0ab5839c349ffd6d7e91021f5649a245f344ee4abb` |
+| `src/tools/scan2pdf.py` | `0d602e609e7dda7e152b92cd4d6e70b7401e7df0aba062f1efe24fe11ecb4a85` |
+| `src/test/unit/test_corrected_text.py` | `21fad3db0ebbf4d3c2b901a653a51c68e325660849b35467c3a69c2124e796a4` |
+| `data/ghbq/corrected_text.json` | `77da152677173309dae159296b1fe6e8690e0687188eba2795d073f36c067938` |
+| `output/ghbq_full/acc_ghbq_corrected.pdf` | md5 `36f1e84b22f7b97a3276635784f686a5` |
+| HEAD | `70fe1a7`（未 commit） |
+
+## CT.4 结论
+
+**t204 验收通过（PASS）**：校正表替换只影响目标页文本（p3 已修正、无原错字）、页数/坐标/门禁不变；未知页/行/非法值 warn 跳过且构建成功；行数不变；report 审计字段完整且 sha 与文件一致；默认/显式两条路径均生效；无校正/空校正零回归，wz4/wz2 正常；tests 6/39/731 全绿。无 must-fix；建议后续把 ghbq 校正表纳入 heldout 数据（避免依赖默认文件存在）。

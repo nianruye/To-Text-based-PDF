@@ -475,6 +475,7 @@ def main(argv=None):
     ap.add_argument('--data-dir', default='')
     ap.add_argument('--coords', default='')
     ap.add_argument('--fix', default='')
+    ap.add_argument('--corrected-text', default='', help='每书文本校正 JSON；缺省 data/<book>/corrected_text.json 存在则自动用')
     ap.add_argument('--lines', default='')
     ap.add_argument('--skip-ocr', action='store_true')
     ap.add_argument('--token-file', default='/tmp/paddle_token')
@@ -562,6 +563,44 @@ def main(argv=None):
                     ocr_mode=args.ocr_mode, pages_per_batch=args.ocr_pages_per_batch)
         step('data', source='ocr', ocr_mode=args.ocr_mode, batch=args.ocr_pages_per_batch)
     report['data'] = data
+    # 每书文本校正（CORRECTED_TEXT）：OCR lines 加载后、--pages 切片前应用
+    _ct_tmpdir = os.path.join(os.path.dirname(os.path.abspath(args.out)), '_scan2pdf_' + args.book)
+    os.makedirs(_ct_tmpdir, exist_ok=True)
+    _ct_arg = getattr(args, 'corrected_text', '') or ''
+    _ct_path = _ct_arg or os.path.join(ROOT, 'data', args.book, 'corrected_text.json')
+    _ct_source = 'explicit' if _ct_arg else 'book_data'
+    if _ct_arg and not os.path.exists(_ct_path):
+        log('--corrected-text 路径不存在: %s' % _ct_path); report['exit'] = EXIT['usage']
+        return EXIT['usage']
+    if not os.path.exists(_ct_path):
+        report['corrected_text'] = dict(enabled=False, path=None, source='disabled',
+                                        sha256=None, pages=[], pages_count=0,
+                                        replaced=0, applied=0, skipped=0,
+                                        warnings=[], warn=[], line_counts={})
+    else:
+        try:
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location('corrected_text', os.path.join(ROOT, 'src/tools/corrected_text.py'))
+            _ctmod = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_ctmod)
+            _lines_doc = json.load(open(lines, encoding='utf-8'))
+            _patched, _cstats = _ctmod.apply_corrected_text(_lines_doc, _ct_path, source=_ct_source)
+        except Exception as e:
+            log('corrected_text 失败: %s' % e); report['exit'] = EXIT['usage']
+            return EXIT['usage']
+        report['corrected_text'] = _cstats
+        for _w in _cstats.get('warnings') or []:
+            print('[corrected_text] WARN %s page=%s line=%s: %s' % (
+                _w.get('code'), _w.get('page'), _w.get('line'), _w.get('message')),
+                file=sys.stderr, flush=True)
+        if _cstats.get('applied'):
+            _ct_lines = os.path.join(_ct_tmpdir, 'lines_corrected.json')
+            json.dump(_patched, open(_ct_lines, 'w', encoding='utf-8'), ensure_ascii=False)
+            data['lines_sha256_original'] = data.get('lines_sha256')
+            data['lines'] = _ct_lines
+            data['lines_sha256'] = sha256(_ct_lines)
+            lines = _ct_lines
+            log('corrected_text: %d 条（%d 页，跳过 %d）' % (
+                _cstats['applied'], _cstats.get('pages_count', 0), _cstats['skipped']))
     # LAYJSON：layout mode/auto 时生成/查找；spotting 不使用
     if layout_requested(args):
         _ocr_dir = os.path.join(os.path.dirname(os.path.abspath(args.out)), '_ocr_' + args.book)
