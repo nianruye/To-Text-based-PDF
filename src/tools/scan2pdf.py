@@ -265,6 +265,43 @@ def find_fix(data_dir, book, explicit_fix=''):
     return '', 'none', ''
 
 
+def layout_requested(args):
+    """默认关：只有显式 --layout 或 LAYOUT_HEADINGS/FIGS/TOC 非 0 才读/传 LAYJSON。"""
+    if getattr(args, 'layout', False):
+        return True
+    for k in ('LAYOUT_HEADINGS', 'LAYOUT_FIGS', 'LAYOUT_TOC'):
+        if os.environ.get(k, '').lower() in ('1', 'true', 'toc'):
+            return True
+    return False
+
+
+def find_layout(data_dir, ocr_dir, book, src_pdf, jobs_path=None):
+    """找 canonical layout.json；若无但有 layout raw，则用 ocr_book.convert_layout_json 生成。"""
+    import glob
+    cands = []
+    for d in [data_dir, ocr_dir]:
+        if d and os.path.isdir(d):
+            cands += [os.path.join(d, '%s_layout.json' % book),
+                      os.path.join(d, '%s_layout.json' % book.replace('-', '_'))]
+    for p in cands:
+        if os.path.exists(p):
+            try:
+                n = len(json.load(open(p, encoding='utf-8')))
+            except Exception:
+                n = 0
+            return p, n, 'existing'
+    if not ocr_dir or not os.path.isdir(ocr_dir):
+        return None, 0, 'missing'
+    if not glob.glob(os.path.join(ocr_dir, 'raw', 'layout_*.json')):
+        return None, 0, 'missing'
+    try:
+        import ocr_book
+        p, n = ocr_book.convert_layout_json(ocr_dir, src_pdf, book)
+        return p, n, 'converted'
+    except Exception as e:
+        return None, 0, 'error:%s' % e
+
+
 def parse_pages(pages, n):
     if not pages:
         return list(range(n))
@@ -346,6 +383,15 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
     env = dict(os.environ)
     env['VERT_TMP'] = os.path.join(tempfile.gettempdir(), 'scan2pdf_%s' % args.book)
     env['VERT_MISSED_FIX'] = fix_path if fix_path else '0'
+    # LAYJSON / 图片 passthrough：只有本次 scan2pdf 显式拿到 layout 才开启；默认构建不读
+    _lay = getattr(args, 'layout_json', '') or ''
+    if _lay and pipeline == 'geom':
+        env['LAYJSON'] = _lay
+        env.setdefault('LAYOUT_HEADINGS', '0')
+        env.setdefault('LAYOUT_FIGS', '1' if getattr(args, 'layout', False) else '0')
+        env.setdefault('LAYOUT_TOC', '1' if getattr(args, 'layout', False) else '0')
+        env.setdefault('PAGE_IMAGE_FULL_RATIO', '0.40')
+        env.setdefault('PAGE_IMAGE_TEXT_MODE', 'auto')
     # 横排标定审计：build_geom 写 <out>.calib.json（fit_positional 两趟共用最终路径）
     if pipeline == 'geom':
         _o = getattr(args, 'out', None)
@@ -424,6 +470,7 @@ def main(argv=None):
     ap.add_argument('--out', required=True)
     ap.add_argument('--book', required=True)
     ap.add_argument('--ocr-mode', default='auto', choices=['auto', 'layout', 'spotting'])
+    ap.add_argument('--layout', action='store_true', help='显式启用 LAYJSON（默认关；也可用 LAYOUT_HEADINGS/FIGS/TOC=1）')
     ap.add_argument('--pipeline', default='auto', choices=['auto', 'vert', 'geom'])
     ap.add_argument('--data-dir', default='')
     ap.add_argument('--coords', default='')
@@ -436,6 +483,8 @@ def main(argv=None):
     ap.add_argument('--ocr-pages-per-batch', type=int, default=50)
     ap.add_argument('--report', default='')
     args = ap.parse_args(argv)
+    args.layout_json = ''
+    args.layout = bool(getattr(args, 'layout', False))
     report = dict(tool='scan2pdf', version='v1', book=args.book, input=args.input, out=args.out,
                   input_sha256=sha256(args.input), steps=[], exit=None,
                   book_type=None, data=None, build=None, gate=None)
@@ -474,7 +523,7 @@ def main(argv=None):
     report['mixed_axis_supported'] = False
     report['v1_limitations'] = ['mixed 书型未实现（仅 probe/前导后人工判）',
                                 '多纸型不 AUTO_PASS、review_required=true',
-                                'OCR A+B→coords/lines 转换未实现（v1 仅复用数据）']
+                                'LAYJSON 图片 passthrough v1：自动整页/正文图块、文字 invisible 待实现（开关默认关）']
     log('书型: %s, has_frame=%s, size=%s, multi_format=%s' %
         (bt['axis'], bt['has_frame'], bt['page_size'], bt['multi_format']))
     # 步骤 2：数据
@@ -513,6 +562,18 @@ def main(argv=None):
                     ocr_mode=args.ocr_mode, pages_per_batch=args.ocr_pages_per_batch)
         step('data', source='ocr', ocr_mode=args.ocr_mode, batch=args.ocr_pages_per_batch)
     report['data'] = data
+    # LAYJSON：layout mode/auto 时生成/查找；spotting 不使用
+    if layout_requested(args):
+        _ocr_dir = os.path.join(os.path.dirname(os.path.abspath(args.out)), '_ocr_' + args.book)
+        _lay, _nlay, _lsrc = find_layout(args.data_dir, _ocr_dir, args.book, args.input)
+        if _lay:
+            args.layout_json = _lay
+            report['layout'] = dict(path=_lay, pages=_nlay, source=_lsrc, sha256=sha256(_lay))
+            log('LAYJSON: %s (%s 页, %s)' % (_lay, _nlay, _lsrc))
+        else:
+            report['layout'] = dict(path=None, pages=0, source=_lsrc, requested=True)
+    else:
+        report['layout'] = dict(path=None, pages=0, source='disabled', requested=False)
     # 书型二次判定：无探针缓存时用 OCR 框长宽比（横排/竖排）修正
     if bt.get('source') == 'computed':
         ax = infer_axis_from_coords(data['coords'])

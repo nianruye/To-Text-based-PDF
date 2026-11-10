@@ -509,3 +509,21 @@ def test_geom_calib_fail_forces_manual(monkeypatch):
         assert g['verdict_effective'] == 'MANUAL_ONLY'
         assert g['review_required'] is True
         assert g.get('calib_fail') == ['pages_mismatch']
+
+
+# ---- t192: LAYJSON 查找/生成/缺失回退 ----
+def test_find_layout_missing_and_converts_raw():
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_pdf(os.path.join(tmp, 'src.pdf'), n=2)
+        assert s2p.find_layout('', tmp, 'x', src) == (None, 0, 'missing')
+        os.makedirs(os.path.join(tmp, 'raw'))
+        page = dict(prunedResult=dict(width=1000, height=1000,
+                                      parsing_res_list=[dict(block_label='image', block_content='',
+                                                             block_bbox=[0, 100, 500, 500])]))
+        with open(os.path.join(tmp, 'raw', 'layout_000.json'), 'w', encoding='utf-8') as f:
+            f.write(json.dumps(dict(result=dict(layoutParsingResults=[page, page])), ensure_ascii=False) + '\n')
+        json.dump({'layout_000': dict(state='done', pages=[0, 1])},
+                  open(os.path.join(tmp, 'jobs.json'), 'w'))
+        p, n, source = s2p.find_layout('', tmp, 'x', src)
+        assert p and n == 2 and source == 'converted'
+        assert len(json.load(open(p, encoding='utf-8'))) == 2
