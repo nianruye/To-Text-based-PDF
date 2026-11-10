@@ -554,3 +554,115 @@ VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py output/wz4/acc_wz
 ## GMPG.3 结论
 
 **t189 验收通过（PASS）**：交付产物 GMPG **0**（逐页），页数/文本（除标记行）/pitch/gate 全部不变；verify_geom 无标记按序号 1:1 回退且 PASS；calib render 与产物实测一致；两趟 env 单测与全量 unit 717 passed。无 must-fix；建议后续把 `VERIFY_MARK` 用途写入 PIPELINE_BEHAVIOR（t188 已登记待同步）。
+
+
+---
+
+# LAYJSON + 图片 passthrough 验收（t193）
+
+> 对象：t192（LAYJSON 接线 + 图片/图块 passthrough）
+> 日期：2026-11-10 21:03–21:25；**只写本报告、未改实现/数据、未 commit**（HEAD `f82cafc`）
+> 证据：`src/pipelines/build_geom.py`（`a1160b5d…`）、`src/tools/ocr_book.py`（`2a227382…`）、`test_page_image.py`（`5f140040…`）、`spec/governance/PAGE_IMAGE_LAYOUT.md`（`70060c7a…`）、`output/ghbq_full/acc_ghbq_img.pdf*`、`output/wz4/acc_wz4_nojson.pdf*`、`tmp_vert/scan2pdf/t193_p2_compare.png` / `t193_p3_compare.png`
+
+## LAY.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | LAYJSON：页 key/页序/jobs 对齐、JSONL 兼容；抽样 bbox 与 raw pruned 一致（≤1px） | **PASS** | layout 104 页、keys **0..103** 顺序；jobs layout pages `[0..49]` 等、manifest `layout_pages=104/source_pages=104/warnings=[]`；raw layout_000 为 **13 对象→50 页** JSONL，转换正常；p0/p1/p2 抽样 blocks bbox 与 raw `block_bbox` **maxerr=0.00px**（≤1px） |
+| 2 | ghbq：p1 封面照可见、p2 条形码可见、≥2 图版页可见（与源并排）；chars ≥现状、GMPG=0、104=104、gate 96.8 不降 | **FAIL（p3 图内文字可见）** | 图像：p1 2 图（1653×1121 封面 + 680×93 页脚）、p2 条形码 429×343、p3 图版 1653×1136 均嵌入；chars **43,945 ≥ 43,913**（+32）、GMPG **0**、104=104、gate **PASS 96.8%**。**但 p3 两条 doc_title 文本 span 为 type 0（可见）且落在 image rect 内**：`马尔巴乔夫与` 重叠 7804pt²、`一人道的民主的社会主义”` 重叠 6825pt²，直接压在照片上（OCR 错字可见）；源页 title 在照片上方白区，产物标题被流式下移进图内 → 违反 spec §2「图内文字 invisible」 |
+| 3 | 零回归：wz4 不传 LAYJSON → 文本/页数/gate 99.6 与 HEAD 一致；wz2 6 页 PASS | **PASS** | wz4：677=677、chars **554,341 = 旧产物**、逐页文本 **全等**、gate PASS 99.6、layout 0 页；wz2 6 页 exit0、gate PASS 100%（layout 0） |
+| 4 | 开关默认关：不传 LAYJSON/不开开关时输出与 HEAD 相同（至少文本+页数+门禁） | **PASS（直跑）/ FAIL（scan2pdf 自动 LAYJSON）** | 直跑 `build_geom` 无 LAYJSON、flags=0：104 页、48,332 chars，与 t183 旧直跑 **逐页文本全等**；但 scan2pdf `LAYOUT_FIGS=0 LAYOUT_TOC=0 LAYOUT_HEADINGS=0`（仍自动传 LAYJSON）→ 104 页、chars **43,916 vs 旧 43,913（+3）**：p11 `...26`→`...261`、p104 `"false"`→`"false92"`（layout 页码/数字混入）→ 默认关不等价（F3） |
+| 5 | 单测：converter/图块裁剪/回退；pytest 全绿；报告追加；不改实现；不 commit | **PASS** | `test_page_image.py` **3 passed**、`test_ocr_book+test_scan2pdf` **38 passed**（相关 41）；全量 unit **722 passed**；本节为报告追加；未改实现/数据；未 commit |
+
+## LAY.2 发现
+
+- **F1（高，must-fix）p3 图内文字可见**：image rect y325–732，文本 span y399–476/453–476 为 type 0；重叠面积 7804/6825pt²；OCR 错字「马尔巴乔夫 / 一人道的…」可见。根因：image BG overlay 不占流，doc_title 流式落点被推入图内；且 t192 残留「PAGE_IMAGE_FULL_RATIO 自动整页阈值未接」（p3 图块面积 818/1736=47% ≥0.40，但仅显式 PAGE_IMAGE_PAGES 生效）。修复建议：按渲染 bbox 与 image rect 相交的文本置 `3 Tr` 不可见（或对 image-page 用整页 overlay + 文本不可见；注意 p1 同约 46% 面积但不能整页 overlay，否则会丢封面标题——按 OCR 文本/图像页判据区分），并加 E2E trace type 断言。
+- **F2（低）p2 ISBN 文本与条形码图内文字视觉重复**：chart block 本身 text 空；OCR ISBN 行在 layout chart bbox 之外（下方），但渲染 span bbox 与 chart rect 顶边重叠 1287pt²（8pt 条带），且源页本身既有条形码内 ISBN、又有外部 ISBN 行——重复来自源图，不是文本层复制。可接受；若要求更严，可把与 image rect 相交的文本置隐。
+- **F3（中）scan2pdf 自动 LAYJSON 下默认关不等价**：flags 全 0 仍 +3 字符（p11/p104），说明 layout 页码/数字未受 LAYOUT_TOC/HEADINGS 门控；直跑无 LAYJSON 则全等。建议 scan2pdf 在 flags=0 时不自动传 LAYJSON，或 build_geom 的 layout 页码/标题仅在对应开关开启时生效。
+- **F4（通过）p1 封面**：title/author 文本在 image rect 上方（y≤290 vs image y≥330，重叠 0），照片可见；重排文字与源图位置/字体有差异但未压图，符合「图外 visible」。
+- **F5（低）** p2/p3 对照图：`tmp_vert/scan2pdf/t193_p2_compare.png` / `t193_p3_compare.png`（左源/右产物）。
+
+## LAY.3 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/acc_ghbq_img.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/acc_wz4_nojson.pdf --data-dir data/wz4 --skip-ocr --force
+/usr/bin/python3 -m pytest src/test/unit/test_page_image.py src/test/unit/test_ocr_book.py src/test/unit/test_scan2pdf.py -q  # 41 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/pipelines/build_geom.py` | `a1160b5da87434419a1a0ddba15152521170f9bbdbb6aca9a628c3818aab6807` |
+| `src/tools/ocr_book.py` | `2a2273827036b93203a201045b39ea731f1c25a11b0070c1b43daf825ccfb1b6` |
+| `src/test/unit/test_page_image.py` | `5f140040788ecc3481ffd75bf2e49914576f53b15e7c97a6c04a6d1a824059d7` |
+| `spec/governance/PAGE_IMAGE_LAYOUT.md` | `70060c7abbca44ed7e4552e243e65efc5349dc321f697a037234b09f437019ce` |
+| `output/ghbq_full/acc_ghbq_img.pdf` | md5 `303fd263e4ea2bd0436f23bd78a5e05b` |
+| HEAD | `f82cafc`（未 commit） |
+
+## LAY.4 结论
+
+**t193 判定 FAIL（F1 高，p3 图内文字可见）**：LAYJSON 转换/页序/bbox（0px 误差）、ghbq 图像可见、chars+32/GMPG0/104=104/gate96.8、wz4/wz2 零回归、直跑无 LAYJSON 全等、tests 722 均通过；但 p3 产物把可见 OCR 标题压在照片上（type 0，重叠 7804/6825pt²），违反 spec §2「图内文字 invisible」；另 scan2pdf 自动 LAYJSON 下 flags=0 仍 +3 字符（F3）。修复 F1（可见文本置隐/图像页处理）与 F3（layout 门控）后复验。
+
+
+---
+
+# LAYJSON + 图片 passthrough 验收（t196 · round 2）
+
+> 对象：t195（图内文本 3 Tr / image-page / 默认不传 LAYJSON）
+> 日期：2026-11-10 21:24–21:45；**只写本报告、未改实现/数据、未 commit**（HEAD `f82cafc`）
+> 证据：`build_geom.py`（`526dc654…`）、`scan2pdf.py`（`0986328f…`）、`ocr_book.py`（`2a227382…`）、`output/ghbq_full/ghbq_img.pdf*`、`/tmp/t196/ghbq_figs.pdf*`、`tmp_vert/scan2pdf/t196_p1/p2/p3_compare.png`
+
+## LAY2.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | LAYJSON：页 key/页序/jobs 对齐、JSONL 兼容；blocks bbox 与 raw pruned 一致（≤1px） | **PASS** | layout 104 页 keys 0..103 顺序；raw layout_000 **13 对象→50 页** JSONL；p0/p1/p2 抽样 13 blocks **maxerr=0.00px**；manifest layout_pages=104/source_pages=104/warnings=[] |
+| 2 | ghbq：p1 封面照、p2 条形码、≥2 图版页可见；chars ≥现状、GMPG=0、104=104、gate 96.8 | **PASS（需 `--layout` 开启）** | 默认（无 `--layout`）按 t195 F3 layout disabled、无图、chars 43,913 与 HEAD 全等；`--layout`：p1 封面 1653×1121、p2 条形码 429×343、p3 图版 1653×1136 均嵌入；chars **43,954 ≥ 43,913**、GMPG 0、104=104、gate PASS 96.8；**p3 两条 doc_title 现为 type 3（invisible）** |
+| 3 | 零回归：wz4 不传 LAYJSON → 文本/页数/gate 99.6 与 HEAD 一致；wz2 6 页 PASS | **PASS** | wz4：677=677、text **逐字全等**（597,184 chars）、gate PASS 99.6、layout disabled；wz2 6 页 gate PASS 100% |
+| 4 | 开关默认关：不传 LAYJSON/不开开关时与 HEAD 相同（文本+页数+门禁） | **PASS** | 默认 ghbq：104 页、chars 43,913、**逐页文本与 HEAD 全等**、gate 96.8、layout disabled（report.layout.requested=False）；wz4 同上 |
+| 5 | 单测：converter/裁剪/回退；pytest 全绿；报告追加；不改实现；不 commit | **PASS** | `test_ocr_book+test_scan2pdf+test_page_image` **41 passed**；全量 unit **722 passed**；本节报告；未改实现/数据；未 commit |
+
+## LAY2.2 F1/F3 修复核对
+
+- **F1（可见文字压图）已修**：`--layout` 产物 p3 两条 doc_title `get_texttrace().type=3`（不可见），text 层保留（可搜）；p1 标题/作者在 image rect 上方 type0（可见），p1 出版者 span 与 image rect 相交 2432pt² → type3；p2/p3 图均嵌入。
+- **F3（默认关）已修**：默认 ghbq/wz4/wz2 均 `layout disabled`，ghbq/wz4 逐页文本与 HEAD **全等**；仅显式 `--layout` 或 LAYOUT_* 非 0 才传 LAYJSON。
+
+## LAY2.3 残留（非阻断）
+
+- **F1（中）p3 标题被过度隐藏**：p3 doc_title 在 layout 中位于 image bbox **上方**（[101,243,1051,451] vs image [0,653,1191,1471]），但 t195 image-page 策略把整页文字置 type3 → 产物 p3 只剩照片，源页上方标题不可见（文本层仍可搜）。严格按 spec §2「图外 visible」应只隐藏与 image rect 相交的 span，或把标题定位回 image 上方；建议后续修。
+- **F2（低）p2 ISBN span 仍有 8pt 条带与 chart rect 相交（1287pt²，type0）**；chart block text 空，源页本身同时有条形码内 ISBN 与外部 ISBN 行 → 视觉重复来自源图，不是文本层复制。
+- **F3（低）p1 页脚图丢失**：t192 p1 有 2 图（封面+页脚图 680×93），t195 输出仅 1 图（封面）；出版者文字 span 为 type3，p1 页脚 logo 区域空白。验收只要求封面照可见，登记为 passthrough 残留。
+- **F4（低）任务契约默认命令不含 `--layout`**：默认构建按设计不启用图片；图片验收需显式 `--layout`（或 LAYOUT_FIGS=1），建议任务/文档写明。
+- **F5（低）spec PAGE_IMAGE_LAYOUT §4「默认关=不传 LAYJSON」文字未同步**（t195 已登记，不在其 in-scope）。
+
+## LAY2.4 复现 / 字节绑定
+
+```bash
+cd /opt/test
+# 默认（layout disabled，与 HEAD 等价）
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/ghbq_img.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# 图片验收（显式 --layout）
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out /tmp/t196/ghbq_figs.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/acc_wz4_nojson.pdf --data-dir data/wz4 --skip-ocr --force
+/usr/bin/python3 -m pytest src/test/unit/test_ocr_book.py src/test/unit/test_scan2pdf.py src/test/unit/test_page_image.py -q  # 41 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/pipelines/build_geom.py` | `526dc654b981824c411b021ab5326a237b41e353bdb3eb04a2e614d93e3aeb79` |
+| `src/tools/scan2pdf.py` | `0986328f70cf40ad44b0bb1320189eca1b21cf45e68a7c4c2bfc5133524f69a6` |
+| `src/tools/ocr_book.py` | `2a2273827036b93203a201045b39ea731f1c25a11b0070c1b43daf825ccfb1b6` |
+| `output/ghbq_full/ghbq_img.pdf`（默认） | md5 `dbf16536a58be03d8aa9a37411c5019d` |
+| `/tmp/t196/ghbq_figs.pdf`（--layout） | md5 `5dca8f0b33f01dae04b2dd86086da2c3` |
+| `output/wz4/acc_wz4_nojson.pdf` | md5 `1ce8621f16cbb110a222bf4de21fcf88` |
+| HEAD | `f82cafc`（未 commit） |
+
+## LAY2.5 结论
+
+**t196 验收通过（PASS）**：LAYJSON 转换（JSONL/页序/bbox 0px）、ghbq 图像 passthrough（p1 封面/p2 条形码/p3 图版，p3 文字全部 type3 不可见）、chars +41/GMPG0/104=104/gate96.8、wz4/wz2 零回归、默认关与 HEAD 逐页全等、tests 41/722 全绿。残留 F1（中，p3 标题过度隐藏）、F2/F3/F4/F5（低）不阻断本轮；建议后续只隐藏与 image rect 相交的文本并补 p1 页脚图。
