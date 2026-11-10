@@ -299,3 +299,18 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
   - wz4 677 页：`wz4_nomark.pdf` **GMPG=0**、677=677、gate **PASS pitch 99.6%**；与旧 `review_wz4_calib3.pdf`（677 处 GMPG）去掉 GMPG 行后逐页文本 **0 diff**。
   - 历史 `wz4_optimized.pdf` 也有 677 处，说明是旧 fit_common 的长期泄漏，不是本次新引入。
 - **单测**：`test_fit_common_cleanup.py` + `test_fit_common_verify_mark.py` **6 passed**；覆盖 pass1/pass2 env（含 shell 继承）、classic 同源、无标记真 PDF 的 `verify_geom` 1:1 回退。
+
+## 22. t192：LAYJSON 接线 + 图片/图块 passthrough
+
+- **LAYJSON**：`ocr_book.convert_layout_json()` 将 layout raw（JSON/JSONL）转 `<out>/<book>_layout.json`：页 key 由 jobs.pages，块含 category/bbox/text；`layout_manifest.json` 记页数/sha。`scan2pdf.find_layout()` 优先已存在文件，否则从 raw 自动生成；`--ocr-mode auto/layout` 接线，report 记录 `layout` path/pages/source/sha。
+- **build_geom**：`LAYOUT_FIGS=1` 加载 `image/figure/chart/footer_image/header_image`；`_lay_bbox_142()` 逐页按 src/layout 尺度换算；图块用 `\AddToShipoutPictureBG`（不占流、不翻页）；`LAYOUT_HEADINGS` 默认 **0**（本 E2E 不开，保 pitch 96.8）；`LAYOUT_TOC` 对 p11 aside 接线，p10 作者列待 S8。
+- **E2E ghbq（104 页，`--skip-ocr --data-dir output/ghbq_full/_ocr_ghbq --force`；**图片验收需显式 `--layout`（或 LAYOUT_FIGS=1），默认命令不传 LAYJSON/不出图**）**：
+  - LAYJSON **104 页**；p1 图块 2（封面照片 1653×1121 + 页脚图 680×93）、p2 条形码 `chart` 429×343、p3 图版 1653×1136 均进入 PDF 图像对象；
+  - 文本非空白字符 **43,913** vs 无图版 **43,913（0，不减）**；`GMPG=0`；页数 **104=104**；p11/p12/p104 逐字等于默认（TOC aside 已跳过、layout 页码只用直接 number）；
+  - gate **PASS**，pitch **96.8%**（LAYOUT_HEADINGS 默认 0；标题能力可显式开，本 E2E 不改变正文分页）。
+- **零回归**：
+  - wz4 不传 LAYJSON：677=677、字符 **554,341** 与 t188 无图版完全相同、gate PASS **99.6%**；
+  - wz2 6 页：6=6、gate PASS **100%**；
+  - 无 LAYJSON 时不出现图块加载日志。
+- **单测**：`test_ocr_book` converter（JSONL/页序/blocks/legacy）+ `test_scan2pdf` find_layout missing/converted + `test_page_image` category/crop/fallback；**41 passed**（test_ocr_book+test_scan2pdf+test_page_image）。
+- **残留**：p1 用 image block BG（非整页叠整页图）；p10 作者列仍待 S8；`PAGE_IMAGE_FULL_RATIO` 不再用于整页隐藏（F2 改为 span/image 相交阈值），显式 `PAGE_IMAGE_PAGES` 才整页；p2 ISBN span 与 chart 顶 8pt 条带（1287pt²，<5% span 面积）保持可见，重复来自源图本身（F5 登记）。

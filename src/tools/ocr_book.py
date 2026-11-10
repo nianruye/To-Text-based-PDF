@@ -74,6 +74,81 @@ def _load_json_objects(path):
         return objs
 
 
+LAYOUT_CATEGORY = {
+    'doc_title': 'doc_title', 'paragraph_title': 'paragraph_title', 'title': 'title',
+    'text': 'text', 'content': 'content', 'header': 'header', 'footer': 'footer',
+    'number': 'number', 'aside_text': 'aside_text', 'image': 'image', 'figure': 'figure',
+    'chart': 'chart', 'footer_image': 'footer_image', 'header_image': 'header_image',
+    'figure_title': 'figure_title', 'table': 'table', 'algorithm': 'algorithm',
+    'seal': 'seal',
+}
+
+
+def convert_layout_json(out_dir, src_pdf, book, jobs=None):
+    """layout raw（JSON/JSONL）→ legacy 可读 + canonical blocks 的 layout.json。
+
+    返回 (layout_path, page_count)；无 layout raw 返回 (None, 0)。
+    页 key 来自 jobs[key].pages（0-based）；result 页序按 raw 文件/对象顺序拼接。
+    canonical 每页同时保留 prunedResult.parsing_res_list，兼容 build_geom/页码现有读取。
+    """
+    import glob, fitz
+    jobs = jobs if jobs is not None else (
+        json.load(open(os.path.join(out_dir, 'jobs.json'), encoding='utf-8'))
+        if os.path.exists(os.path.join(out_dir, 'jobs.json')) else {})
+    raw_paths = sorted(glob.glob(os.path.join(out_dir, 'raw', 'layout_*.json')))
+    if not raw_paths:
+        return None, 0
+    src = fitz.open(src_pdf) if src_pdf and os.path.exists(src_pdf) else None
+    records = {}
+    seq = 0
+    warned = []
+    for rp in raw_paths:
+        key = os.path.splitext(os.path.basename(rp))[0]
+        pages = list((jobs.get(key) or {}).get('pages') or [])
+        objs = _load_json_objects(rp)
+        results = []
+        for d in objs:
+            results += ((d.get('result') or {}).get('layoutParsingResults') or [])
+        if not pages:
+            warned.append('%s: no jobs.pages; sequential' % key)
+            pages = list(range(seq, seq + len(results)))
+        if len(results) != len(pages):
+            warned.append('%s: results=%d pages=%d' % (key, len(results), len(pages)))
+        for i, pg in enumerate(results):
+            if i >= len(pages):
+                break
+            gpage = int(pages[i])
+            pr = pg.get('prunedResult') or {}
+            pw = float(pr.get('width') or 0); ph = float(pr.get('height') or 0)
+            pdf_w = pdf_h = None
+            if src is not None and 0 <= gpage < len(src):
+                pdf_w, pdf_h = src[gpage].rect.width, src[gpage].rect.height
+            # canonical bbox 保留 layout px；同时给 build 的兼容 prunedResult 原样
+            blocks = []
+            for b in pr.get('parsing_res_list') or []:
+                lab = b.get('block_label') or 'other'
+                blocks.append(dict(category=LAYOUT_CATEGORY.get(lab, 'other'), label=lab,
+                                   bbox=b.get('block_bbox'), text=b.get('block_content') or '',
+                                   order=b.get('block_order'), group=b.get('group_id'),
+                                   score=b.get('score')))
+            records[gpage] = dict(page_key=str(gpage), page=gpage + 1,
+                                  width=pw, height=ph, page_width_pt=pdf_w, page_height_pt=pdf_h,
+                                  bbox_space='layout_px_top_left', blocks=blocks,
+                                  prunedResult=dict(width=pw, height=ph,
+                                                    parsing_res_list=pr.get('parsing_res_list') or []))
+            seq = max(seq, gpage + 1)
+    out = os.path.join(out_dir, '%s_layout.json' % book)
+    pages = [records[k] for k in sorted(records)]
+    json.dump(pages, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    man = dict(source_pages=len(src) if src else None, layout_pages=len(pages),
+               page_keys=[p['page_key'] for p in pages], warnings=warned,
+               sha256=__import__('hashlib').sha256(open(out, 'rb').read()).hexdigest())
+    json.dump(man, open(os.path.join(out_dir, 'layout_manifest.json'), 'w', encoding='utf-8'),
+              ensure_ascii=False, indent=1)
+    if src: src.close()
+    return out, len(pages)
+
+
 def convert_raw_dir(out_dir, src_pdf, book, jobs=None):
     """raw JSON（spotting）→ legacy 2×pt coords/lines（0-based 全局页 key）。
 
@@ -225,10 +300,13 @@ def run(args):
                 jobs[key] = dict(state='timeout', jobId=jid); failed += 1
             json.dump(jobs, open(jobs_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     write_manifest(args.out_dir, jobs, batches, n)
-    cp = lp = None
+    cp = lp = lay = None
     if args.mode in ('spotting', 'both'):
         cp, lp = convert_raw_dir(args.out_dir, args.input, args.book, jobs)
         print('[ocr_book] coords=%s lines=%s' % (cp, lp))
+    if args.mode in ('layout', 'both'):
+        lay, nlay = convert_layout_json(args.out_dir, args.input, args.book, jobs)
+        print('[ocr_book] layout=%s pages=%s' % (lay, nlay))
     print('[ocr_book] batches=%d modes=%d failed=%d raw=%s' %
           (len(batches), len(modes), failed, os.path.join(args.out_dir, 'raw')))
     return 0 if failed == 0 else 5

@@ -117,3 +117,33 @@ def test_single_json_and_jsonl_equivalent():
         c2, l2 = ob.convert_raw_dir(t2, src2, 'x', jobs)
         assert json.load(open(c1)) == json.load(open(c2))
         assert json.load(open(l1)) == json.load(open(l2))
+
+
+# ---- t192: layout raw -> layout.json（JSONL/页序/blocks/bbox 元数据） ----
+def _layout_page(pw, ph, blocks):
+    return dict(prunedResult=dict(width=pw, height=ph, parsing_res_list=blocks))
+
+
+def test_convert_layout_json_jsonl_order_blocks():
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), [(595, 868), (595, 868)])
+        os.makedirs(os.path.join(tmp, 'raw'))
+        b1 = [dict(block_label='text', block_content='甲', block_bbox=[10, 20, 100, 40], block_order=1)]
+        b2 = [dict(block_label='image', block_content='', block_bbox=[0, 100, 500, 400], block_order=None),
+              dict(block_label='doc_title', block_content='乙', block_bbox=[10, 10, 300, 80], block_order=2)]
+        # JSONL 两对象；jobs 页序 [1,0] -> page_key 0 对应第二个 result
+        with open(os.path.join(tmp, 'raw', 'layout_000.json'), 'w', encoding='utf-8') as f:
+            f.write(json.dumps(dict(result=dict(layoutParsingResults=[_layout_page(1191, 1736, b1)])), ensure_ascii=False) + '\n')
+            f.write(json.dumps(dict(result=dict(layoutParsingResults=[_layout_page(1191, 1736, b2)])), ensure_ascii=False) + '\n')
+        jobs = {'layout_000': dict(state='done', pages=[1, 0])}
+        p, n = ob.convert_layout_json(tmp, src, 'x', jobs)
+        assert n == 2
+        pages = json.load(open(p, encoding='utf-8'))
+        assert [x['page_key'] for x in pages] == ['0', '1']
+        assert pages[0]['page'] == 1 and pages[1]['page'] == 2
+        assert pages[0]['width'] == 1191 and pages[0]['page_width_pt'] == 595
+        cats = [b['category'] for b in pages[0]['blocks']]
+        assert cats == ['image', 'doc_title'] and pages[0]['blocks'][0]['bbox'] == [0, 100, 500, 400]
+        # legacy 兼容字段仍在
+        assert len(pages[0]['prunedResult']['parsing_res_list']) == 2
+        assert json.load(open(os.path.join(tmp, 'layout_manifest.json')))['layout_pages'] == 2
