@@ -317,3 +317,202 @@ PY
 | `tmp_vert/scan2pdf/review_wz4_r1.pdf` | 2,597,500 B / 677 页（本终审产物） |
 | `tmp_vert/scan2pdf/review_wz4_r1.pdf.gate.json` | 1,349 B / PASS / review_required=false |
 | HEAD | `56bcaeb`（未 commit） |
+
+---
+
+# 附：OCR E2E 终审（t174，raw→coords/lines + ghbq 真 OCR）
+
+> 审查人：质量审查员　日期：2026-11-09 18:25–18:45
+> 对象：t172（OCR raw 转换 + ghbq E2E）+ t173 验收
+> 依据：`docs/scan2pdf_v1.md` §18、`docs/scan2pdf_acceptance.md`（t173）
+> **结论：PASS（有条件）** —— 转换 scale/页 key/jobs.pages 追溯/两模式 manifest 均实测正确；scan2pdf 接线优先级正确；token 只读不落盘；坐标单位与 verify_geom 口径一致；ghbq 4 页产物 2 页与源图对照文本/行位大致对位；raw 文本命中 79/80=98.75%；repetitionPenalty=1 与 §18.5 记录一致。残留均 low。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/test_ghbq/review_ghbq4.pdf --pages 20-23 --token-file /tmp/paddle_token --force
+# [scan2pdf] 书型修正（OCR 框长宽比）: horizontal
+# [scan2pdf] 构建: fit_positional.py (pipeline=geom, VERT_MISSED_FIX=0)
+# [scan2pdf] ghbq: pipeline=geom gate=PASS exit=0
+```
+
+- exit 0；pages 4=4；gate **PASS**（pitch 100%、split 0、blank 0、overflow 0、review_required=false）。
+- 独立 `verify_geom --src-pdf`（不进 scan2pdf）→ **rc=0 PASS**（4=4、pitch 100%，DPI 自适应）。
+- **独立真 OCR**：另跑 `--out output/test_ghbq/t174fresh/...`（新目录）→ 新 layout/spotting **jobId `113222871381495808` / `113222941396234240`**（与 t172/t173 均不同）、4 页、exit 0、gate PASS pitch 100%——证明非缓存 resmue 也能跑通。
+
+## 1. 转换正确性（t172 实现）
+
+| 检查 | 结果 |
+|---|---|
+| scale 公式 | 代码 `sx=2*pdf_page_w/pruned_w`（逐页取 `src[gpage].rect` 与 `prunedResult.width/height`）→ ghbq p19：`2*595.28/1191≈0.9996`；**多纸型/逐页尺寸安全**（非全局 scale） |
+| poly 值换算 | 抽 p19 前 5 条 poly：`exp=poly*sx/sy` 与 `coords['19']` **逐值差 ≤0.05**（5/5） |
+| 文本顺序 | `lines['19'] == raw rec_texts`（20/20，顺序一致） |
+| 页 key | jobs pages `[19,20,21,22]`（0-based）→ coords/lines keys **19–22**；`manifest.source_pages=104` 与源 PDF 一致 |
+| jobs 追溯 | `jobs.json` layout/spotting 均含 `pages`（resume 也补写）；manifest batches 同步 jobId/pages |
+| 缺 jobs 回退 | 无 jobs 时按 `range(len(results))` 推断 0-based 页序（**仅作 fallback**）→ 若外部 raw 是页子集（如 20-23）会误标 0-3（见 F1） |
+
+## 2. scan2pdf 接线 / 单位 / 安全
+
+- **数据源优先级**：OCR 后先找 `--data-dir`，再回退 `<out>/_ocr_<book>/`；ghbq 无 --data-dir 时 report `data.source=ocr, data_dir=.../_ocr_ghbq`，`mode=spotting`，不再报缺 coords/lines ✓；layout raw 不参与构建 ✓。
+- **单位一致**：legacy coords=2×pt（与 build_geom/fit_positional、verify_geom 的 coords 口径一致）；verify_geom `--src-pdf` 自适应 DPI（本页 595.28 宽/1191 pruned → 144dpi 量级）→ rc 0、pitch 100%。
+- **token 安全**：`ocr_book` 只读 token（check_token 仅返回路径/错误），不写文件、不打印；`grep 4ec51fe5... output/test_ghbq tmp_vert/scan2pdf` → **0 命中**。
+- **无书专属分支**：`grep -c ghbq src/tools/ocr_book.py src/tools/scan2pdf.py` = 0/0。
+
+## 3. 独立抽样
+
+### 3.1 ghbq 产物 2 页 vs 源图
+`tmp_vert/scan2pdf/t174_ghbq_compare.png`（源 p20/p23 × 产物页）：
+- p20：段落/行数与源图基本一致（首行「好，那么这个国家的共产党还有威信吗？」…），行位大致对位；**产物页未见页码「8」**（源图有）——OCR raw 未把页码作为行给出，属内容层小差异（F3 low）。
+- p23：首行「就陷入了历史唯心主义的泥坑…」与源一致；行文/换行接近；页码「11」在产物可见。
+- 无跨页/出界，无空白页。
+
+### 3.2 raw 文本命中率
+- 4 页 raw `rec_texts` 共 **80** 条；在产物完整文本（去空白归一）中 **exact 命中 79/80 = 98.75%**。
+- 唯一未命中为一条长引号行（`主化”“公开性”“多元论”和“人道主义”，特别强调了“民`）——疑似产物在行内断行/引号形态差异导致整串不是连续子串；按「归一化片段」检查可视为命中（F2 low）。
+
+### 3.3 repetitionPenalty 热修
+- `ocr_book.payload()` 现为 `"repetitionPenalty": 1`；`docs/scan2pdf_v1.md §18.5` 记录「曾写 0 → 改 1」及现象/影响，代码与文档一致 ✓。
+
+## 4. 残留 findings（均 low）
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | low | 缺 jobs.json 时 `convert_raw_dir` 回退 `range(len(results))` 推断 0-based 页序；外部 raw 若来自页子集（如 20-23）会误标 0-3 → 坐标/文本错页 | 回退时打印 WARN 并在 manifest 标 `inferred_pages=true`；或要求 jobs 缺失时显式 `--pages` 指定 |
+| **F2** | low | raw 文本命中 98.75%（79/80）；唯一 miss 为长引号行（行内断行/引号形态），按整串 exact 判定偏严 | 命中率改「去空白+按行片段」归一化统计，报告注明口径 |
+| **F3** | low | 产物 p20 未见页码「8」（源图有）；OCR raw 未把它作为行，属内容层小差异 | 可在 OCR 前导/后处理补页码行，或在 E2E 报告登记「页码不保证」 |
+| **F4** | low | `used_pages` 仅记录未断言；多批 raw 若页重叠会静默覆盖同 key | 转换时检测重复 gpage 并 WARN/失败 |
+
+## 5. 结论
+
+**t174 终审 verdict：PASS（有条件）**。
+
+- **通过**：raw→coords/lines 转换（逐页 scale、polys 值、文本顺序）、jobs.pages 0-based 追溯、manifest（batches+source_pages）、resume 补写；scan2pdf 数据源优先级（--data-dir → `_ocr_<book>`）；token 只读不落盘；坐标单位与 verify_geom 一致（rc=0、pitch 100%）；ghbq 4 页 E2E（含**新 jobId 的独立真 OCR**）exit 0/gate PASS；2 页目视文本/行位大致对位；raw 命中 79/80；repetitionPenalty 文档一致；33 单测通过。
+- **条件**：F1–F4 为低风险健壮性/口径注释项；建议 F1 在外部 raw 场景补 WARN，F2 明确统计口径。
+- 建议：把「页子集 + 无 jobs 的外部 raw」加入单测；后续多纸型横排 E2E（t171 R1）与本 OCR E2E 合并为 heldout 清单。
+
+## 6. 复现
+
+```bash
+cd /opt/test
+# 任务给定
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/test_ghbq/review_ghbq4.pdf --pages 20-23 --token-file /tmp/paddle_token --force  # exit 0
+# 独立真 OCR（新目录/新 jobId）
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/test_ghbq/t174fresh/review_ghbq4.pdf --pages 20-23 --token-file /tmp/paddle_token --force
+# 独立 verify
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py output/test_ghbq/review_ghbq4.pdf \
+  output/test_ghbq/_ocr_ghbq/ghbq_spotting_coords.json output/test_ghbq/_ocr_ghbq/ghbq_spotting_lines.json \
+  --src-pdf source_pdf/ghbq.pdf                                                     # rc 0 PASS
+# 单测
+/usr/bin/python3 -m pytest src/test/unit/test_ocr_book.py src/test/unit/test_scan2pdf.py -q  # 33 passed
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `src/tools/ocr_book.py` | `ae9848a01262bb079cd345fab63340d28dad074d8335d235c642c1ee7b76e216` |
+| `src/tools/scan2pdf.py` | `d47c4971b8c24034a4ced336417884eb5233cecf77ba8e0ea30c37634947ba5a` |
+| `src/test/unit/test_ocr_book.py` | `0010a1f3c2f368edd60f59a0a552f1585cd11e99d32d45d3bbf43a30ca77917c` |
+| `src/test/unit/test_scan2pdf.py` | `b611cc5051bd9d3e13fc68fb4e6b0ae87f0d7bfd132020a507433e3e65c7cf01` |
+| `output/test_ghbq/review_ghbq4.pdf` | 4 页（本终审产物，gate PASS） |
+| `output/test_ghbq/t174fresh/review_ghbq4.pdf` | 4 页（独立真 OCR，新 jobId） |
+| HEAD | `516871f`（未 commit） |
+
+---
+
+# 附：OCR JSONL 解析修复终审（t177，#40 / ghbq 104 页）
+
+> 审查人：质量审查员　日期：2026-11-09 18:47–19:05
+> 对象：t175（JSONL 修复正式化）+ t176 验收
+> 依据：`AGENTS.md` #40、`docs/scan2pdf_v1.md` §19、`docs/scan2pdf_acceptance.md`（t176）
+> **结论：PASS（有条件）** —— JSONL 逐行解析/页序/单 JSON 兼容实测正确；ghbq 104 页全书重转换 coords/lines 各 104、gate PASS（104=104、pitch 96.8%）；无书专属分支；35 单测通过。残留：**docs §19 的「13/13/2 行」与实测「13/13/1 行」不符**（low，须改一处文档）+ 25 页 overflow 占位诊断建议抽检 + 图片不保留属已知限制。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_full.pdf \
+  --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# [scan2pdf] 书型修正（OCR 框长宽比）: horizontal
+# [scan2pdf] 构建: fit_positional.py (pipeline=geom, VERT_MISSED_FIX=0)
+# [scan2pdf] ghbq: pipeline=geom gate=PASS exit=0
+```
+
+- exit 0；**104=104**；gate **PASS**（pitch **96.8%**、split 0、missing 0、blank 2、overflow 25、review_required=false）。
+- 独立 `verify_geom --src-pdf`（不进 scan2pdf）→ **rc=0 PASS**（104=104、pitch 96.8%）。
+- 单测：`pytest test_ocr_book test_scan2pdf -q` → **35 passed**。
+
+## 1. JSONL 解析（#40）
+
+| 检查 | 结果 |
+|---|---|
+| 实际 raw 结构 | `spotting_000.json` **13 行/13 对象/50 页**；`spotting_001` 同为 13/50；`spotting_002` **1 行/1 对象/4 页**（文件 21,993 字符、`json.loads` 可整读）；layout 同构 |
+| 解析实现 | `_load_json_objects`：先 `json.load`（单 JSON/数组兼容），`JSONDecodeError` 时逐行 `json.loads`；`convert_raw_dir` 按对象出现顺序拼接 `layoutParsingResults` |
+| 合成等价（独立复验） | JSONL（2 对象 3 页）+ jobs.pages=[5,6,7] 与同内容单 JSON → coords/lines keys **5/6/7**、**逐值相等**、文本顺序正确 |
+| 页序 | `lines['0']` == raw 第 1 对象第 1 页 `rec_texts`（7/7 行）；keys 0..103 连续、与 jobs.pages 0..103 对齐 |
+| jobs/manifest | jobs 3 批（layout/spotting 各 000/001/002，pages 0–49/50–99/100–103）；manifest 6 batch + `source_pages=104` |
+| 单 JSON 兼容 | 旧 4 页 E2E raw（单 JSON）路径未被破坏；`json.load` 分支直接返回 |
+
+## 2. 全书回归
+
+- 重转换：`ghbq_spotting_coords.json` / `_lines.json` **各 104 页**（keys 0..103），lines 共 **1,986** 行。
+- scan2pdf 全量：exit 0、geom 104 页、gate PASS（104=104、pitch 96.8%、split 0、missing 0）、`review_required=false`；`<out>.gate.json/.md` 可读。
+- 无书专属分支：`grep -c ghbq src/tools/ocr_book.py src/tools/scan2pdf.py` = **0/0**。
+
+## 3. 独立抽样（源图对照）
+
+- `tmp_vert/scan2pdf/t177_ghbq_full_compare.png`（p1/p104 × 源/产物）：
+  - p1：标题/副标题/作者/出版社文本对位；**封面照片未保留**（OCR 文本重建不嵌图，已知限制，同 wz4 p1）。
+  - p104：源为 DuXiu 元数据页，产物文本内容一致（行宽/换行不同）；非书正文页，属源文件自带页。
+- 诊断页复看 `t177_ghbq_overflow.png`（p2/p13/p59 × 源/产物）：
+  - p2 为短页（摘要+ISBN/定价），verify_geom 归「空白」是底部占位口径，非内容缺失；**条形码图片未保留**（同图片限制）；
+  - p13/p59 正文与源一致、无可见出页/截断；25 页「溢出（占位）」样本未见真实越界，但建议按 t176 提示抽检全部 25 页。
+
+## 4. 文档一致性
+
+- `AGENTS.md` #40：50 页批 13 行×4 页、逐行解析、单 JSON 兼容、104 页回归数字——与实现/实测一致。
+- `docs/scan2pdf_v1.md` §19：解析/单测/104 页回归描述一致；**唯一不符**：§19 写「spotting_000/001/002，JSONL **13/13/2 行**」，实测第三批为 **1 行**（13/13/1）→ 见 F1。
+
+## 5. 残留 findings
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | **low**（建议立即改） | docs §19 的「JSONL 13/13/2 行」与实测不符（spotting_002 = **1 行/1 对象/4 页**；50 页批才是 13 行=12×4+2 页） | 改 §19 为「13/13/1 行」（或写每批行数=ceil(页数/4)）；AGENTS #40 无需改 |
+| **F2** | low | gate PASS 但 **overflow 25 页**（占位口径）+ 页高误差 <5% 仅 27.7%；抽样 p13/p59 未见真实越界，但未逐页核 | 抽检 25 页（可批量渲染缩略图）；若占位偏差属 DPI/边距口径，登记说明 |
+| **F3** | low | 图片不保留（ghbq p1 封面照片、p2 条形码）；OCR 文本重建的已知限制，文档未在 ghbq 验收段明示 | 在 docs/scan2pdf_v1 限制段补「图片/条形码不嵌入」；或列入后续 issue |
+| **F4** | low | `_load_json_objects` 以 `JSONDecodeError` 区分单 JSON/JSONL；畸形单 JSON 会落入逐行解析并抛行级错误（诊断信息偏弱） | 可在异常信息中带文件名/行号；非阻断 |
+| **F5** | low | verify_geom「空白 2 页」实为短页（p2/p5 底部占位 0），非内容丢失 | 登记口径说明即可 |
+
+## 6. 结论
+
+**t177 终审 verdict：PASS（有条件）**。
+
+- **通过**：JSONL 逐行解析与拼接、jobs.pages 页序、单 JSON 兼容（合成等价 + 实际 raw 13/13/1 对象）；ghbq 全书 104 页重转换 coords/lines 各 104（keys 0..103）；scan2pdf 全量 exit 0、gate PASS（104=104、pitch 96.8%、split 0）；独立 verify_geom rc=0；无书专属分支；35 单测通过；AGENTS #40 与实现一致。
+- **条件**：F1（docs §19 行数笔误）应改；F2（25 页 overflow 抽检）/F3（图片限制登记）为低风险跟进。
+- 建议：heldout 清单补「大 batch（>4 页/对象）JSONL」+「50 页批末行 2 页」的回归样例；ghbq 全量产物可作为 OCR E2E 基线登记（md5 `b52c1481…`）。
+
+## 7. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_full.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py output/ghbq_full/review_ghbq_full.pdf \
+  output/ghbq_full/_ocr_ghbq/ghbq_spotting_coords.json output/ghbq_full/_ocr_ghbq/ghbq_spotting_lines.json \
+  --src-pdf source_pdf/ghbq.pdf                                   # rc 0 PASS
+python - <<'PY'  # JSONL/单 JSON 等价 + raw 对象/页
+import sys; sys.path.insert(0,'src/tools'); import ocr_book as ob
+print(len(ob._load_json_objects('output/ghbq_full/_ocr_ghbq/raw/spotting_000.json')))  # 13
+print(len(ob._load_json_objects('output/ghbq_full/_ocr_ghbq/raw/spotting_002.json')))  # 1
+PY
+/usr/bin/python3 -m pytest src/test/unit/test_ocr_book.py src/test/unit/test_scan2pdf.py -q   # 35 passed
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `src/tools/ocr_book.py` | `0e04904366c35c37070b79c77dff654abebd03243a6d8ba5f8afb02b19ae8055` |
+| `src/tools/scan2pdf.py` | `d47c4971b8c24034a4ced336417884eb5233cecf77ba8e0ea30c37634947ba5a` |
+| `src/test/unit/test_ocr_book.py` | `d5e94c40ec4e8901ab5adeb3daae972d905c7c4a5d9bb1465941b8ad7a326d7f` |
+| `output/ghbq_full/review_ghbq_full.pdf` | 104 页（本终审产物；md5 `b52c14815bf57478218783bbd53af9e6`） |
+| HEAD | `516871f`（未 commit） |

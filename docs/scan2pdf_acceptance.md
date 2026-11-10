@@ -264,3 +264,107 @@ cd /opt/test
 **t170 验收通过（PASS）**：geom 多纸型语义与竖排一致（PASS→MANUAL_ONLY、REJECT 保持、review_required/auto_pass_forbidden/note 含分布）；wz4 单纸型 sidecar review_required=false、gate PASS、pitch 99.6% 不变；wz2 6 页 PASS；sidecar/md 字段齐全、无书专属分支；R2 措辞已改「核心字段对齐（非全 schema）」并列差异；pytest 30。
 
 **限制（低）**：多纸型横排路径以「合成 book_type + 函数级/单测」验证（repo 无真实多纸型横排书），未做端到端多纸型 PDF 构建；建议后续用 heldout 多纸型横排书补 E2E。
+
+
+---
+
+# OCR E2E 验收：ghbq 20-23（t173）
+
+> 对象：t172（OCR raw→coords/lines 转换 + scan2pdf 接线）
+> 日期：2026-11-09 18:21–18:40；**只写本报告、未改实现/数据、未 commit**（HEAD `516871f`）
+> 证据：`src/tools/ocr_book.py`（`ae9848a0…`）、`scan2pdf.py`（`d47c4971…`）、`test_ocr_book.py`（`0010a1f3…`）、`output/test_ghbq/*`、`/tmp/t173/*`
+
+## OCR.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | ghbq 20-23 真 OCR（新 data-dir）：双模式成功；书型→horizontal；geom exit 0；gate PASS（4=4、pitch ≥99%） | **PASS** | 独立新目录 `/tmp/t173/_ocr_ghbq`：layout/spotting job **id 均与 t172 不同**（1132217563… / 1132218261…）；4 页；book_type 修正 **horizontal**；pipeline=geom、exit 0；gate **PASS pitch 100%、4=4、review_required=false** |
+| 2 | 转换核对：≥5 行 raw rec_text 与产物逐字一致；2 条 poly 坐标换算 | **PASS** | page20 抽 5 行 raw rec_text 全部 **exact in product text**（5/5）；poly0/1：`scale=2*src_page/pruned`（595.28/1191、867.73/1736）→ 换算结果与 coords **逐值相等**（144.111→144.06 等） |
+| 3 | 页号追溯：jobs.json pages 与 manifest 一致；key 0-based（20-23→19-22） | **PASS** | jobs：layout/spotting pages 均 `[19,20,21,22]`；manifest batches 两批同值、source_pages=104；coords/lines keys **19–22** |
+| 4 | verify_geom 独立（--src-pdf）rc=0；resume 也能生成 coords/lines | **PASS** | `verify_geom --src-pdf` rc=0：4=4、pitch 100%（样本 4）；删除 coords/lines 后同命令 resume（无 --force）→ 两文件**重新生成**（18:24）、gate PASS、exit 0 |
+| 5 | 报告追加；不改实现；不 commit | **PASS** | 本节；只改本文件；未改实现/数据；未 commit（HEAD `516871f`） |
+
+## OCR.2 实测数据
+
+- 书型：source page 595.28×867.73；OCR pruned 1191×1736；初判 vertical → **coords_boxes 修正 horizontal**。
+- 构建：geom→fit_positional 两趟；4 页；exit 0；gate sidecar：verdict PASS、pitch 100%、pages 4=4、split 0、overflow 0、review_required=false。
+- 转换：`scale_x=2*595.28/1191≈0.9996`、`scale_y=2*867.73/1736≈0.9997`；poly0 raw `[144.111,267.344]`→conv `[144.06,267.26]`（=2×pt）；poly1 同。
+- 文本：page20 抽取 5 行 raw rec_text 全部逐字出现在产物文本层（未做归一化，5/5 exact）。
+- 页号：jobs/manifest `[19,20,21,22]`、coords/lines keys 19–22（0-based 对齐）。
+- resume：删除转换文件 → 重跑（无 --force）→ coords/lines 重新生成、gate PASS。
+
+## OCR.3 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/test_ghbq/acc_ghbq4.pdf --pages 20-23 --token-file /tmp/paddle_token --force
+# exit 0；4 页；horizontal；gate PASS（pitch 100%、4=4）
+VERIFY_PITCH_FLOOR=85 /usr/bin/python3 src/test/verify_geom.py \
+  output/test_ghbq/acc_ghbq4.pdf output/test_ghbq/_ocr_ghbq/ghbq_spotting_coords.json \
+  output/test_ghbq/_ocr_ghbq/ghbq_spotting_lines.json --src-pdf source_pdf/ghbq.pdf
+# rc=0 PASS（4=4、pitch 100%）
+/usr/bin/python3 -m pytest src/test/unit/test_ocr_book.py src/test/unit/test_scan2pdf.py -q  # 33 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/tools/ocr_book.py` | `ae9848a01262bb079cd345fab63340d28dad074d8335d235c642c1ee7b76e216` |
+| `src/tools/scan2pdf.py` | `d47c4971b8c24034a4ced336417884eb5233cecf77ba8e0ea30c37634947ba5a` |
+| `src/test/unit/test_ocr_book.py` | `0010a1f3c2f368edd60f59a0a552f1585cd11e99d32d45d3bbf43a30ca77917c` |
+| `src/test/unit/test_scan2pdf.py` | `b611cc5051bd9d3e13fc68fb4e6b0ae87f0d7bfd132020a507433e3e65c7cf01` |
+| HEAD | `516871f`（未 commit） |
+
+## OCR.4 结论
+
+**t173 验收通过（PASS）**：新目录独立真 OCR（job id 与 t172 不同）双模式成功，书型 horizontal、geom exit 0、gate PASS（4=4、pitch 100%）；转换坐标（2×pt 比例）与 raw 逐值一致、5/5 文本逐字入产物、页号 0-based 追溯一致；verify_geom --src-pdf rc=0；resume 能重新生成 coords/lines；pytest 33。
+
+
+---
+
+# JSONL 解析修复验收：ghbq 104 页（t176）
+
+> 对象：t175（OCR raw JSONL 解析 + ghbq 104 页全书回归）
+> 日期：2026-11-09 18:45–19:05；**只写本报告、未改实现/数据、未 commit**（HEAD `516871f`）
+> 证据：`src/tools/ocr_book.py`（`0e049043…`）、`test_ocr_book.py`（`d5e94c40…`）、`output/ghbq_full/*`、`/tmp/t176/`
+
+## JSONL.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | 独立验证 JSONL 解析：合成 JSONL（2 对象 3 页）与等价单 JSON，转换结果 keys/文本/坐标一致 | **PASS** | 合成 jobs.pages=[5,6,7]：JSONL（2 对象：2 页+1 页）与单 JSON 均得 keys **5/6/7**、lines `{5:甲,6:乙,7:丙}`；coords **逐值相等**（scale=2.0） |
+| 2 | 全书回归：ghbq 104 页转换 coords/lines 各 104（keys 0..103）；scan2pdf --skip-ocr 构建 104 页、gate PASS（pitch ≥95%、split 0） | **PASS** | coords/lines **104/104**、keys **0..103**；scan2pdf `--skip-ocr --force` exit 0、pipeline geom、**104=104**、gate **PASS pitch 96.8%**、split 0、missing 0、review_required=false |
+| 3 | JSONL 行数与页数关系；页序与全局 key 对齐 | **PASS** | spotting_000/001：**13 行 = 13 对象 = 50 页**（12×4+2）；spotting_002：1 行/4 页；layout 同构；jobs pages 0–49 / 50–99 / 100–103；manifest source_pages=104；coords keys 0..103 顺序对齐 |
+| 4 | 报告追加；不改实现；不 commit | **PASS** | 本节；只改本文件；未改实现/数据；未 commit（HEAD `516871f`） |
+
+## JSONL.2 实测数据
+
+- JSONL 结构：50 页批返回 13 行 JSON，前 12 对象各 4 页、末对象 2 页（12×4+2=50）；4 页批为单行单对象。
+- 转换：`_load_json_objects` 逐行解析并拼接 layoutParsingResults；单 JSON 兼容；coords/lines 104 页。
+- 构建/门禁：`scan2pdf --skip-ocr --data-dir output/ghbq_full/_ocr_ghbq --force` → exit 0、104 页；gate `pitch 96.8%`（样本 94）、pages 104=104、split 0、missing 0、blank 2、overflow 25（均 ≤ 阈值，PASS）。
+- 独立 `verify_geom --src-pdf`：rc=0 PASS（104=104、pitch 96.8%、split 0）。
+- 单测：`test_ocr_book.py` **5 passed**；`test_ocr_book + test_scan2pdf` **35 passed**。
+
+## JSONL.3 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/acc_ghbq_full.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# exit 0；104 页；gate PASS（pitch 96.8%、104=104、split 0）
+/usr/bin/python3 -m pytest src/test/unit/test_ocr_book.py -q   # 5 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/tools/ocr_book.py` | `0e04904366c35c37070b79c77dff654abebd03243a6d8ba5f8afb02b19ae8055` |
+| `src/tools/scan2pdf.py` | `d47c4971b8c24034a4ced336417884eb5233cecf77ba8e0ea30c37634947ba5a` |
+| `src/test/unit/test_ocr_book.py` | `d5e94c40ec4e8901ab5adeb3daae972d905c7c4a5d9bb1465941b8ad7a326d7f` |
+| `output/ghbq_full/acc_ghbq_full.pdf` | md5 `084033d84493449f2bd3c9e0dd3ada3c` |
+| HEAD | `516871f`（未 commit） |
+
+## JSONL.4 结论
+
+**t176 验收通过（PASS）**：JSONL（2 对象 3 页）与单 JSON 转换逐值一致；ghbq 104 页全书转换 coords/lines 各 104（keys 0..103），scan2pdf --skip-ocr 104=104、gate PASS（pitch 96.8%、split 0）；JSONL 行/页关系与页序对齐正确；pytest 5/35 passed。
+
+**低风险备注**：全书 gate 的 blank 2 / overflow 25 仍在 PASS 阈值内（pitch 96.8% ≥95%），建议后续目视抽检这 25 页占位。

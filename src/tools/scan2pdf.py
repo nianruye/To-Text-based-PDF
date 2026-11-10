@@ -493,9 +493,12 @@ def main(argv=None):
             log('OCR 失败（exit %d）' % p.returncode); report['exit'] = EXIT['ocr']
             report['ocr'] = dict(returncode=p.returncode, tail=(p.stdout + p.stderr)[-800:])
             return EXIT['ocr']
-        coords, lines, dmeta = find_data(args.data_dir or ocr_out, args.coords or None, args.lines or None)
+        dpath = args.data_dir or ocr_out
+        coords, lines, dmeta = find_data(dpath, args.coords or None, args.lines or None)
+        if (not coords or not lines) and dpath != ocr_out:
+            coords, lines, dmeta = find_data(ocr_out, args.coords or None, args.lines or None)
         if not coords or not lines:
-            log('OCR 完成但缺 coords/lines（需转换，v1 未实现）'); report['exit'] = EXIT['data_missing']
+            log('OCR 完成但缺 coords/lines（检查 ocr_book 转换）'); report['exit'] = EXIT['data_missing']
             return EXIT['data_missing']
         data = dict(source='ocr', data_dir=args.data_dir or ocr_out, coords=coords, lines=lines,
                     mode=dmeta.get('mode'), reason=dmeta.get('reason'),
