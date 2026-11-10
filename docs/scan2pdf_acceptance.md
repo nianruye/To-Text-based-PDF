@@ -666,3 +666,51 @@ cd /opt/test
 ## LAY2.5 结论
 
 **t196 验收通过（PASS）**：LAYJSON 转换（JSONL/页序/bbox 0px）、ghbq 图像 passthrough（p1 封面/p2 条形码/p3 图版，p3 文字全部 type3 不可见）、chars +41/GMPG0/104=104/gate96.8、wz4/wz2 零回归、默认关与 HEAD 逐页全等、tests 41/722 全绿。残留 F1（中，p3 标题过度隐藏）、F2/F3/F4/F5（低）不阻断本轮；建议后续只隐藏与 image rect 相交的文本并补 p1 页脚图。
+
+
+---
+
+# 整页叠加验收（t200）
+
+> 对象：t199（PAGE_IMAGE_FULL_RATIO 接线：p1/p3 整页 raster + 全文字 3 Tr）
+> 日期：2026-11-10 22:12–22:30；**只写本报告/证据图、未改实现/数据、未 commit**（HEAD `70a5987`）
+> 证据：`build_geom.py`（`f882c60d…`）、`test_page_image.py`（`a7160408…`）、`output/ghbq_full/acc_ghbq_fullpage.pdf*`、`/tmp/t200/ghbq_nonfull.pdf*`、`tmp_vert/scan2pdf/t200_p1/p3_compare.png`
+
+## FULL.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | `--layout`：p1/p3 整页 raster（覆盖整页、无可见重排文字、texttrace 全 type3）；p2 仍条形码图块+可见文字 | **PASS** | p1 image **1654×2407** rect **(0,0,600.8,866.8)=整页**、6 spans 全 **type3**；p3 image **1654×2415** rect 整页、2 spans 全 **type3**；p2 image 429×343 chart、6 spans 全 **type0**（条形码可见） |
+| 2 | 文本层：字符不减少、可搜、GMPG=0；104=104、gate PASS 96.8 不降；与非整页版逐页文本一致 | **PASS** | fullpage 104 页、nospace chars **43,913**（=默认，不减少）、GMPG **0**、gate **PASS 96.8%**；与非整页版（`PAGE_IMAGE_FULL_RATIO=0.99`）**104/104 页逐字全等**；与 HEAD `ghbq_head` 也逐字全等；type3 文本仍可由 get_text 搜索 |
+| 3 | 默认零回归：ghbq/wz4 与 HEAD 0 diff；阈值边界页（<40%）行为不变 | **PASS** | 默认 ghbq 104 页、chars 43,913、**逐页文本全等 HEAD**、layout disabled、gate 96.8；wz4 677=677、chars **554,341**、逐页文本全等 HEAD、gate 99.6；p2 覆盖率 **0.037<0.40** 仍走图块（1 图 + type0 文字）；单测 0.399/0.40/0.401 边界 5 passed |
+| 4 | 单测覆盖面积判定/文本全隐；pytest 全绿；报告追加；不改实现；不 commit | **PASS** | `test_page_image.py` **5 passed**（含 0.399/0.40/0.401、TOC helper、crop/fallback）；`test_ocr_book+test_scan2pdf+test_page_image` **43 passed**；全量 unit **724 passed**；本节报告；未改实现/数据；未 commit |
+
+## FULL.2 实测细节
+
+- fullpage：p1 图 1654×2407、p3 1654×2415，均 page-sized（600.8×866.8）；p1/p3 全部 texttrace type3（不可见但可搜）；p2 chart 429×343、texttrace type0 可见；p2/p4 图块行为与 t197 一致。
+- 文本：fullpage == nonfull（阈值 0.99）== HEAD，均为 104/104 页逐字相同；nospace 43,913（与默认相同，不减少）；GMPG 0。
+- 门禁：gate PASS 96.8%、pages 104=104、layout 104 页。
+- 零回归：默认 ghbq/wz4 均 layout disabled、逐页文本 0 diff、gate 96.8/99.6；wz2 未重跑（t199 已报 6 页 PASS100；本任务不在 commands）。
+- 阈值：p2 image/chart 覆盖率 0.037 < 0.40 不触发；p1 0.466/p3 0.470 触发；单测覆盖 0.399（不触发）/0.40（触发）/0.401（触发）。
+
+## FULL.3 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/acc_ghbq_fullpage.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+# exit 0；104=104；p1/p3 整页 raster 全 type3；p2 条形码；chars 43,913；GMPG0；gate 96.8
+/usr/bin/python3 -m pytest src/test/unit/test_page_image.py -q   # 5 passed
+/usr/bin/python3 -m pytest src/test/unit -q                       # 724 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/pipelines/build_geom.py` | `f882c60d14c080b8ff25741dbb0ab99794efe0751fba47c5b385da65cf2b8a6d` |
+| `src/test/unit/test_page_image.py` | `a716040827b431e0f7b8f397637d61119626bbce55a799016d39dce555033214` |
+| `output/ghbq_full/acc_ghbq_fullpage.pdf` | md5 `e2747d0aa966be01e5742963fa8bf928` |
+| HEAD | `70a5987`（未 commit） |
+
+## FULL.4 结论
+
+**t200 验收通过（PASS）**：p1/p3 整页 raster 覆盖整页、全部文本 type3（不可见但可搜）、p2 条形码+可见文字；chars 43,913 不减少、GMPG 0、104=104、gate 96.8；与非整页/HEAD 逐页文本全等；默认 ghbq/wz4 零回归；阈值边界 0.399/0.40/0.401 与 p2 0.037 行为正确；tests 5/43/724 全绿。**低风险备注**：p1/p3 源页 raster 拉伸到产品页尺寸（长宽比 1.455→1.443，约 0.8%），视觉无感；p2 ISBN 与 chart 顶 8pt 细条为源图自身重复。
