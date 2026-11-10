@@ -527,3 +527,46 @@ def test_find_layout_missing_and_converts_raw():
         p, n, source = s2p.find_layout('', tmp, 'x', src)
         assert p and n == 2 and source == 'converted'
         assert len(json.load(open(p, encoding='utf-8'))) == 2
+
+
+def test_corrected_text_applied_before_build(monkeypatch):
+    """t203：--corrected-text 生效后 patched lines 进入 build，report 可审计。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=2)
+        ddir = os.path.join(tmp, 'data'); os.makedirs(ddir)
+        cp = os.path.join(ddir, 'x_spotting_coords.json')
+        lp = os.path.join(ddir, 'x_spotting_lines_patched.json')
+        json.dump({str(i): [[[10, 10], [10, 400], [30, 400], [30, 10]]] for i in range(2)},
+                  open(cp, 'w'))
+        json.dump({'0': ['旧甲', '旧乙'], '1': ['旧丙']}, open(lp, 'w'), ensure_ascii=False)
+        ctp = os.path.join(tmp, 'corrected_text.json')
+        json.dump({'0': {'0': '新甲'}}, open(ctp, 'w'), ensure_ascii=False)
+        out = os.path.join(tmp, 'o.pdf')
+        seen = {}
+
+        def fake_build(args, coords, lines, src, out_tmp, fix):
+            seen['lines'] = json.load(open(lines, encoding='utf-8'))
+            d = fitz.open()
+            for _ in range(2):
+                d.new_page(width=100, height=100)
+            d.save(out_tmp); d.close()
+            return True, dict(pipeline='geom', returncode=0)
+
+        def fake_vg(pdf, coords, lines, floor=None, src_pdf=None):
+            return dict(pass_=True, verdict='PASS', exit=0, floor=85, pages=2, pages_src=2,
+                        pitch_ok_pct=99.0, height_ok_pct=99.0, blank_pages=0,
+                        overflow_pages=0, stdout_tail='')
+        bt = dict(axis='horizontal', has_frame=False, multi_format=False,
+                  page_size=[300, 500], source='probe_cache', confidence=0.6, sizes=[])
+        monkeypatch.setattr(s2p, 'detect_book_type', lambda *a, **k: bt)
+        monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+        monkeypatch.setattr(s2p, 'run_verify_geom', fake_vg)
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'x', '--data-dir', ddir,
+                       '--skip-ocr', '--pipeline', 'geom', '--corrected-text', ctp])
+        assert rc == s2p.EXIT['ok']
+        assert seen['lines']['0'] == ['新甲', '旧乙']
+        rep = json.load(open(out + '.report.json'))
+        ct = rep['corrected_text']
+        assert ct['enabled'] is True and ct['applied'] == 1 and ct['replaced'] == 1
+        assert ct['pages'] == ['0'] and ct['line_counts'] == {'0': {'before': 2, 'after': 2}}
+        assert len(ct['sha256']) == 64 and ct['source'] == 'explicit'

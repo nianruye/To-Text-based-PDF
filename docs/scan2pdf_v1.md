@@ -324,3 +324,21 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
 - **实测 ghbq（104 页，`--layout`）**：p1 覆盖率 **0.466**、p3 **0.470** → 整页叠加；p2 chart 覆盖率 **0.037** 不触发、条形码仍可见、文字 type0；p1 源图含正确标题「戈尔巴乔夫」，p3 源图复制封面。p1/p3 texttrace 全 **type3**；p2 type0；文本 **43,913** = 默认（不减少）；GMPG **0**；104=104；gate **PASS 96.8%**。
 - **默认零回归**：不传 LAYJSON 时 `_page_img_full` 不启用；ghbq 104/104 与 HEAD 逐页文本 0 diff，wz4 677/chars554341/gate99.6，wz2 6/gate100。
 - **单测**：`test_image_page_full_ratio_boundary` 覆盖 0.399/0.40/0.401 与 ratio 覆盖边界；`test_page_image` 5 passed。
+
+## 24. t203：每书文本校正 corrected_text
+
+- **数据**：`data/<book>/corrected_text.json`（0-based page key + 0-based line index → 整行文本；`_comment` 忽略）。
+- **应用**：lines 加载后、`--pages` 切片前替换；patched lines 写入 `_scan2pdf_<book>/lines_corrected.json` 后交给 build/verify；coords/页数/页码不变。
+- **入口**：`--corrected-text PATH`；缺省 `data/<book>/corrected_text.json` 存在则自动启用。
+- **审计（spec §3.3 口径）**：report `corrected_text{enabled,path,source,sha256,pages,pages_count,replaced,skipped,warnings,line_counts}`；`replaced` 为主字段、`applied` 为兼容别名；`pages` 为页 key 数组、`pages_count` 为计数；`line_counts {"2":{"before":2,"after":2}}`；`warnings` 为 `{code,page,line,message}` 对象数组；resume 键用 patched lines sha（保留 `lines_sha256_original`）。
+- **warning/校验**：未知页/行/非法 value/含换行 → warn skip 并逐条写 stderr（含 code/page/line）；坏 JSON/根非 object/行数变化 → exit 2（行数变化不写 warning 码）。
+- **默认启用**：若 `data/<book>/corrected_text.json` 存在，scan2pdf **默认自动启用**（source=book_data）；不需要时必须显式移走文件（当前无 `--no-corrected-text` 开关）。
+- **宽度 sanity（未强制）**：校正值长度/宽度未做 MEASURE 校验；非整页页若显著变长可能溢出/换行，需人工控制；整页 raster 页无视觉影响。
+- **校验**：显式缺失/坏 JSON/根非 object/行数变化 → exit 2；未知 page/line/非法 value → warn 跳过；无文件零回归。
+- **E2E ghbq**（`data/ghbq/corrected_text.json`，p3 key2 两条）：
+  - `--layout` 重建：104=104、gate **PASS 96.8%**、chars 43,913 不变；
+  - 产物文本层含「戈尔巴乔夫与」「“人道的民主的社会主义”」，**不含**「马尔巴乔夫」；p3 文本 `戈尔巴乔夫与 / “人道的民主的社会主义”`；
+  - 校正 2 条、跳过 0、source=book_data；整页图上仍显示原图（文本层可搜）。
+- **默认零回归**：创建校正文件前 `t203_default` vs `t199_default`：104=104、chars 43,913=43,913、逐页文本 **0 diff**、gate 96.8、`corrected_text.enabled=false`。
+- **wz4 零回归**（无 corrected_text 文件）：677=677、chars 554,341=554,341、逐页文本 **0 diff**、gate **PASS 99.6%**、`enabled=false`。
+- **单测**：`test_corrected_text.py` 6 passed（替换/未知页行/非法值/缺失零回归/坏 JSON/根非 object）；`test_scan2pdf.py` 新增 corrected 进 build + report 审计 1 例（33 passed）。
