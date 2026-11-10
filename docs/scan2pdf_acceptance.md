@@ -368,3 +368,140 @@ cd /opt/test
 **t176 验收通过（PASS）**：JSONL（2 对象 3 页）与单 JSON 转换逐值一致；ghbq 104 页全书转换 coords/lines 各 104（keys 0..103），scan2pdf --skip-ocr 104=104、gate PASS（pitch 96.8%、split 0）；JSONL 行/页关系与页序对齐正确；pytest 5/35 passed。
 
 **低风险备注**：全书 gate 的 blank 2 / overflow 25 仍在 PASS 阈值内（pitch 96.8% ≥95%），建议后续目视抽检这 25 页占位。
+
+
+---
+
+# 横排标定审计验收（t180）
+
+> 对象：t179（HORIZONTAL_CALIB 实现：`<out>.calib.json` + 自检 warnings + scan2pdf 接入）
+> 日期：2026-11-09 21:19–21:55；**只写本报告、未改实现/数据、未 commit**（HEAD `abacb9c`）
+> 证据：`src/utils/geometry.py`（`8fc9c4d7…`）、`build_geom.py`（`9a92b541…`）、`scan2pdf.py`（`3f2beb95…`）、`test_horizontal_calib.py`（`af7318ab…`）、`spec/governance/HORIZONTAL_CALIB.md`（`1df6161c…`）、`tmp/t180/*`
+
+## CAL.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | 复跑 ghbq 4 页 + wz4 20 页，`<out>.calib.json` 存在且 schema 完整 | **PASS** | ghbq full (104p)、ghbq 4p、wz4 20p、wz4 full 四份 calib：22 个顶层必填字段 + 8 个嵌套对象必填子字段**零缺失**；schema=`horizontal-calib-v1`、status=measured |
+| 2 | 数值：wz4 dpi≈138、page_size 来自 src（覆盖率<95% 降级）、font≈10.7；ghbq 同口径；对照 spec §5 | **FAIL（任务前提数值写反）** | 实际：**wz4 full = 144 / coords / font 10.7 / baseline 17.8 / coverage 0.9991**（与 spec §5 一致，非 138/src）；**wz4 20p 子集 = 143 / coords / 11.3 / coverage 1.006**；**ghbq full = 139 / coords / 16.5 / 34.2 / coverage 1.013**（与 spec §5 一致）；**ghbq 4p = 138 / src_pdf / 16.6 / coverage 0.9239 degraded**——验收文字里的「138 + src 降级」是 **ghbq 4p** 而非 wz4（F3） |
+| 3 | 自检 warn 分支（DPI 偏差/FONT 越界/BASELINE/FONT 越界/coverage 降级）出现且不阻断；正常书 warnings=[] | **PASS** | 单测 `test_selfcheck_warn_branches` 造出 `dpi_residual_large`/`font_out_of_range`/`baseline_font_ratio_out`/`page_size_overcoverage`/`page_size_coverage_low`/measure/margin/cw/pitch/full 全部分支且 verdict=warn；真实 `PAGE_COVERAGE_THRESHOLD=1.02` 构建 → warnings `[baseline_font_ratio_out,page_size_coverage_low]`、**build rc=0、104 页、gate PASS**；ghbq 自然 baseline warn 不阻断；wz4 full warnings=[]、selfcheck pass |
+| 4 | scan2pdf report calib 块与 sidecar 一致；gate 不因 calib 警告误判 REJECT | **PASS** | `acc_ghbq_calib.pdf.report.json.calib` 与 `.calib.json` 字段逐项一致（font 16.5 / baseline 34.2 等）；report/gate sidecar verdict **PASS**、`reasons=['calib_warn:baseline_font_ratio_out']`、`calib_warnings=['baseline_font_ratio_out']`、exit 0 |
+| 5 | 报告追加；不改实现；不 commit | **PASS** | 本节；只改本文件；未改实现/数据；未 commit |
+
+## CAL.2 captain 追加：ghbq 绝对字号/行距 vs 源图墨迹
+
+**结论：产物物理尺寸与源图一致（≤3.7%），convert_raw_dir 的 2×pt scale 公式没有错；calib.json 与最终 fit_positional 产物自洽。17.8pt 是 wz4 的基线，不是 ghbq。**
+
+| 项 | 源图实测 | 产物实测 | 误差 |
+|---|---|---|---|
+| ghbq p20 行距（行中心投影） | **33.0pt**（300dpi 渲染 2481×3616 / 19 bands；native 1442×2102 同 33.02） | **34.21pt** | **+3.7%** |
+| ghbq p20 墨带高（≈字高） | **16.08pt**（native 15.69） | span 字号 **16.44pt** | **+2.2%** |
+| ghbq p101 行距 / 墨带高 | **33.0 / 16.32pt** | **34.21 / 16.44pt** | +3.7% / +0.7% |
+| ghbq 页幅 | 源 595.28×867.73pt | 600.75×866.75pt | 宽 +0.9% / 高 −0.1% |
+| wz4 full 行距 / 字号 | （源同量级） | **17.98 / 10.66pt** | 与 calib 17.8/10.7 匹配 |
+
+- **源图尺度确认**：ghbq 嵌入图 1442×2102（595×868pt → 2.42px/pt≈174dpi，不是 300dpi 原图；300dpi 渲染是 2481×3616）。按 300dpi 渲染并用 4.17px/pt 换算，行距 33.0pt、墨带高 16.1pt——与产物 34.2/16.44 同量级；captain 的 16.8pt/10–11pt 很可能是**把墨带高当行距**（16.8≈墨带高）或用了 150dpi 渲染却按 300dpi 换算（正好减半），不是源书真实字号。
+- **2×pt 换算验证**：pruned 1191×1736 vs 原图 1442×2102（0.826×）；raw poly × `2*pdf_w/pruned_w` 得 legacy 2×pt。把 pruned 页渲染到 1191px 宽后叠 raw poly，**poly 与首行墨迹逐像素对齐**；行宽 887.3 units → 443.5pt（24 字≈18.5pt/字含标点），与源墨迹一致。→ scale 公式正确。
+- **DPI 139 的含义**：legacy coords 名义 2 units/pt（≈144dpi），139 是 calibrate 由行 y 范围（非整页）反推的值，导致 FONT 16.5 略高于源墨带 16.1（+2.5%）；不是 174dpi 源图尺度错误。
+- **17.8pt 归属**：wz4 calib BASELINE=17.8、wz4 产物行距 17.98；ghbq calib BASELINE=34.2、产物 34.21。captain 的「37px@150dpi=17.76pt」精确等于 **wz4** 行距，不是 ghbq。
+
+## CAL.3 发现（must-fix / 低风险）
+
+- **F1（中，must-fix）单趟 `build_geom.py` 的 `<out>.calib.json` 不描述该 out 的真实渲染**：直接跑 build_geom ghbq → calib `139/16.5/34.2`，但该 PDF 实测行距 **20.65pt**（单趟压缩进版心）；只有 fit_positional 两趟最终产物才是 34.21。当前 build_geom 默认写 `<out>.calib.json`，用户会误读。建议：calib 增加 `render{page_pt,font_pt,pitch_pt,pass}`（由产物 PDF 回填）或只在 fit_positional pass2 写/覆盖；`selfcheck.pitch_error_pct` 同样应由 verify_geom 回填（当前用 calibrate 中位，ghbq 0.114 vs verify 0.7%）。
+- **F2（低）`page_size.*_pt` 单位是 TeX bp，不是 PDF pt**：ghbq 603×870（calib）→ PDF 600.75×866.75（×0.996264）；wz4 418×634→416.44×631.63。字段名 `_pt` 易误解，建议加 `unit=bp` 或同时给 `render_page_pt`。
+- **F3（低）任务验收数值前提写反**：wz4 实为 144/coords/10.7；138/src/16.6 是 ghbq 4p；已在上表按实际值核对（spec §5 与 full 版本一致）。
+- **F4（低）coverage>1 语义**：ghbq 1.013 表示 coords 页 603bp 比源 595pt 宽 1.3%，在 `[0.5,1.5]` sanity 内、且低于 >1.02 的 overcoverage warn 阈值，不告警合理；降级分支 ghbq 4p（0.9239<0.95）正确切到 src_pdf 并写 `page_size_coverage_low`。
+- **F5（低）warn 样本覆盖**：单测覆盖全部分支；真实构建仅验证了 coverage 降级与自然 baseline warn；DPI/FONT 越界建议补一条端到端 fixture（当前函数级足够）。
+
+## CAL.4 复现 / 字节绑定
+
+```bash
+cd /opt/test
+# 契约
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/acc_ghbq_calib.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# exit 0；gate PASS（calib_warn:baseline_font_ratio_out 不阻断）
+# 4 页 / 20 页
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq --out /tmp/t180/ghbq_4.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --pages 20-23 --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 --out /tmp/t180/wz4_20.pdf --data-dir data/wz4 --skip-ocr --pages 1-20 --force
+/usr/bin/python3 -m pytest src/test/unit/test_horizontal_calib.py -q   # 4 passed（+scan2pdf 34 passed）
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/utils/geometry.py` | `8fc9c4d7d3d4e298ff464a3595421b965f7c62873543b805a80ed4e9a2090bb3` |
+| `src/pipelines/build_geom.py` | `9a92b5411b94161f733b805d187a1a7243cbc76d875bb9bd1a8e38ebe0f783ba` |
+| `src/tools/scan2pdf.py` | `3f2beb95cc4a5da9961e04f02ea6e50f5937e97faacfffd68f4643b4ef0c9fd2` |
+| `src/test/unit/test_horizontal_calib.py` | `af7318ab9a8ef49a17f4814bd953926dbc9fc12f7972c9ffeb77454605a56719` |
+| `spec/governance/HORIZONTAL_CALIB.md` | `1df6161c14ad9602e10d89d2e973840d5d02ed32e12e6ebbb2fd461a5bdb1a4a` |
+| HEAD | `abacb9c`（未 commit） |
+
+## CAL.5 结论
+
+**t180 任务判定 FAIL（F1 must-fix；任务数值前提 F3）**：calib schema/自检 warning/scan2pdf 接入与 gate 非误判均通过；ghbq 物理尺寸与源图一致（行距 +3.7%、字高 +2.2%，≤5%），2×pt scale 公式与 DPI 反推无根因错误，17.8pt 属 wz4。但单趟 build_geom 的 `<out>.calib.json` 与真实渲染不符（34.2 vs 20.65）——按 captain 口径属「calib 输出字段没反映真实渲染参数」的 must-fix；另 page_size 单位 bp 需标注。修复后（render 段或仅 fit_positional 写 calib + 单位标注）再交 t181 终审。
+
+---
+
+## 横排标定验收文字更正（t182）
+
+> 依据 t180 CAL.3 F3 / t182 修复；不改实现结论，只更正数值归属。
+
+- **wz4 全书**：dpi **144** / `source_of_page_size=coords` / font **10.7** / baseline 17.8（与 spec §5 一致；**不是** 138/src）。
+- **ghbq 4 页**：dpi **138** / `source_of_page_size=src_pdf`（coverage 0.9239 降级）/ font 16.6。
+- **ghbq 全书**：dpi **139** / `coords` / font 16.5（与 spec §5 一致）。
+- 原验收文字「wz4 dpi≈138、page_size 来自 src」系把 **ghbq 4p** 的数值写到 wz4 名下；两书 full 版本均与 spec §5 对齐。
+
+
+---
+
+# 横排标定审计验收（t183 · round 2）
+
+> 对象：t182（calib render 回填 + 单位/文字更正 + FONT_SCALE 越界 fixture）
+> 日期：2026-11-09 21:32–21:50；**只写本报告、未改实现/数据、未 commit**（HEAD `abacb9c`）
+> 证据：`src/utils/geometry.py`、`build_geom.py`、`scan2pdf.py`、`test_horizontal_calib.py`、`output/ghbq_full/ghbq_calib.pdf*`、`/tmp/t183/*`
+
+## CAL2.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | 复跑 ghbq 4 页 + wz4 20 页；`<out>.calib.json` 存在且 schema 完整 | **PASS** | ghbq full (104p)、ghbq 4p、wz4 20p、direct build 四份 calib：22 顶层 + `render`（page_pt/font_pt/pitch_pt/pass/unit）全在；`page_size.unit='bp'`；schema=`horizontal-calib-v1` |
+| 2 | 数值核对 + spec §5 对照 | **PASS（任务文字已由 t182 更正）** | **wz4 full = 144 / coords / font 10.7 / baseline 17.8 / coverage 0.9991**（spec §5 一致；t182 已更正「wz4≈138/src」）；**ghbq full = 139 / coords / 16.5 / 34.2 / 1.013**（spec §5 一致）；**ghbq 4p = 138 / src_pdf / 16.6 / coverage 0.9239 degraded**；**wz4 20p = 143 / coords / 11.3 / 1.006**；数值与 spec/产物三方向对齐 |
+| 3 | 自检 warn 分支出现且不阻断；正常书 warnings=[] | **PASS** | `test_horizontal_calib.py` **5 passed**（含 `test_build_geom_font_scale_out_of_range_not_blocked`：FONT_SCALE=3 真实构建 rc=0、calib `font_out_of_range`、render 段存在）；ghbq 4p 自然 3 warnings（src_pages_diff / baseline_font_ratio_out / page_size_coverage_low）但 **exit 0、gate PASS**；wz4 full warnings=[]、selfcheck pass |
+| 4 | report calib 块与 sidecar 一致；gate 不因 calib 警告误判 REJECT | **PASS** | ghbq full/4p：report.calib.render == sidecar.render（pp 600.75×866.75、font16.44、pitch34.21）；ghbq full gate **PASS**（reasons 含 `calib_warn:baseline_font_ratio_out` 但不 reject）；ghbq 4p gate PASS；wz4 20p gate REJECT 的 reasons 是 `verify_geom_fail/pitch_below_floor`（pitch 83.3% TOC 子集），**非 calib 警告** |
+| 5 | 报告追加；不改实现；不 commit | **PASS** | 本节；只改本文件；未改实现/数据；未 commit |
+
+## CAL2.2 F1/F2/F3/F4/F5 修复核对
+
+- **F1（must-fix）已修 —— render 回填**：
+  - 单趟 `build_geom` ghbq：calib `font=16.5/baseline=34.2`，`render={page 600.75×866.75, font 16.44, pitch **20.65**, pass=null, unit=bp}` → 与直跑 PDF 实测 20.65 一致（不再把 34.2 冒充渲染）。
+  - fit_positional/scan2pdf ghbq full：`render={page 600.75×866.75, font 16.44, pitch **34.21**, pass=true}`、`selfcheck.pitch_error_pct=3.2`、`pitch_error_source=verify_geom` → 与产物实测 34.21/16.44 一致。
+  - wz4 20p：render pitch 18.52 = 产物 18.54，pass=false（pitch 83.3% 子集如实反映）。
+- **F2（单位）已修**：`page_size.unit='bp'`、`render.unit='bp'`；spec §4 示例同步（603bp→600.75pt 不再被误读）。
+- **F3（文字）已修**：docs 增 t182 更正节（wz4 full 144/coords；ghbq 4p 138/src；ghbq full 139/coords）。
+- **F4（coverage>1）已补**：spec §2.2 明确「coverage>1 允许至 1.02，属 DPI 估计/坐标边界误差」；ghbq 1.013 不告警合理。
+- **F5（E2E fixture）已补**：`test_build_geom_font_scale_out_of_range_not_blocked` 真实构建 FONT_SCALE=3 → rc0 + calib warning + render 段。
+
+## CAL2.3 复现 / 字节绑定
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/ghbq_calib.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force
+# exit 0；104 页；gate PASS（pitch 96.8%）；calib render pitch 34.21/font 16.44/pass true
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 --out /tmp/t183/wz4_20.pdf --data-dir data/wz4 --skip-ocr --pages 1-20 --force
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq --out /tmp/t183/ghbq_4.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --pages 20-23 --force
+/usr/bin/python3 -m pytest src/test/unit/test_horizontal_calib.py -q   # 5 passed（+scan2pdf 35 passed）
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/utils/geometry.py` | `8fc9c4d7…` 系（t182 后另有改动，以本轮报告复算为准） |
+| `src/pipelines/build_geom.py` | 同上（render 回填） |
+| `src/tools/scan2pdf.py` | 同上（render.pass/pitch_error_source） |
+| `src/test/unit/test_horizontal_calib.py` | 5 passed（含 FONT_SCALE fixture） |
+| `output/ghbq_full/ghbq_calib.pdf` | render pitch 34.21 / font 16.44 / page 600.75×866.75 |
+| HEAD | `abacb9c`（未 commit） |
+
+## CAL2.4 结论
+
+**t183 验收通过（PASS）**：t182 的 F1（render 回填）/F2（单位）/F3（文字）/F4（coverage 说明）/F5（E2E fixture）全部实测关闭；schema 完整、warnings 非阻断、report/sidecar 一致、gate 不因 calib 警告误判；ghbq 产物物理尺寸与源图仍 ≤3.7%（t180 已核）。**低风险备注**：wz4 20p 子集 render.pass=false/pitch_error 16.7% 属 TOC 页子集（t179 已登记，非 calib 缺陷）；直接 build_geom 的 `render.pass=null`（只有 scan2pdf 能填 true/false），建议后续文档注明。
