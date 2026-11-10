@@ -313,4 +313,14 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
   - wz2 6 页：6=6、gate PASS **100%**；
   - 无 LAYJSON 时不出现图块加载日志。
 - **单测**：`test_ocr_book` converter（JSONL/页序/blocks/legacy）+ `test_scan2pdf` find_layout missing/converted + `test_page_image` category/crop/fallback；**41 passed**（test_ocr_book+test_scan2pdf+test_page_image）。
-- **残留**：p1 用 image block BG（非整页叠整页图）；p10 作者列仍待 S8；`PAGE_IMAGE_FULL_RATIO` 不再用于整页隐藏（F2 改为 span/image 相交阈值），显式 `PAGE_IMAGE_PAGES` 才整页；p2 ISBN span 与 chart 顶 8pt 条带（1287pt²，<5% span 面积）保持可见，重复来自源图本身（F5 登记）。
+- **残留**：p10 作者列仍待 S8；`LAYOUT_TOC` 仅 p11 aside；p2 ISBN span 与 chart 顶 8pt 条带（1287pt²，<5% span 面积）保持可见，重复来自源图本身（F5 登记）。
+
+## 23. t199：整页叠加 PAGE_IMAGE_FULL_RATIO（p1/p3）
+
+- **实现**：`LAYOUT_FIGS=1` 时按 `_lay_img_cov`（image/figure/chart/header_image/footer_image 并集面积 / layout 页面积）判定；`>= PAGE_IMAGE_FULL_RATIO`（默认 0.40）触发 `_page_img_full`：
+  - `render_src_page(key)` 生成源页整页 raster，`\AddToShipoutPictureBG` 按 `PAGE_W×PAGE_H` 铺满（图像 1654×2407 / 页 600.8×866.8）；
+  - 本页文本 span 全 `3 Tr`（不可见、可搜、字符不减少）；
+  - 未达阈值页保持原图块裁贴 + 图外文字可见。
+- **实测 ghbq（104 页，`--layout`）**：p1 覆盖率 **0.466**、p3 **0.470** → 整页叠加；p2 chart 覆盖率 **0.037** 不触发、条形码仍可见、文字 type0；p1 源图含正确标题「戈尔巴乔夫」，p3 源图复制封面。p1/p3 texttrace 全 **type3**；p2 type0；文本 **43,913** = 默认（不减少）；GMPG **0**；104=104；gate **PASS 96.8%**。
+- **默认零回归**：不传 LAYJSON 时 `_page_img_full` 不启用；ghbq 104/104 与 HEAD 逐页文本 0 diff，wz4 677/chars554341/gate99.6，wz2 6/gate100。
+- **单测**：`test_image_page_full_ratio_boundary` 覆盖 0.399/0.40/0.401 与 ratio 覆盖边界；`test_page_image` 5 passed。

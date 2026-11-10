@@ -979,3 +979,80 @@ cd /opt/test
 | `output/ghbq_full/review_ghbq_img2_figs.pdf`（--layout） | md5 `5c239d78cbcd7e12fa0d811469175f54` / 104 页 / 9 页含图 |
 | `output/wz4/review_wz4_layoutoff2.pdf`（默认） | md5 `de6f4bdc627ad134688cad6157ef211d` / 677 页 |
 | HEAD | `f82cafc`（未 commit） |
+
+---
+
+# 附：整页叠加终审（t201，t199/t200）
+
+> 审查人：质量审查员　日期：2026-11-10 22:22–22:50
+> 对象：t199（PAGE_IMAGE_FULL_RATIO 整页叠加）+ t200 验收
+> 依据：`spec/governance/PAGE_IMAGE_LAYOUT.md` §2/§4、`docs/scan2pdf_v1.md` §23、`AGENTS.md` #45
+> **结论：PASS（有条件）** —— 面积比阈值/整页 raster/全文字 3 Tr/未达阈值页不变均实测成立；p1/p3 与源页并排基本一致；默认零回归（ghbq/wz4 0 diff）；43 单测通过。残留：raster 纵横比拉伸 ~0.8%（低）、p3 文本层仍含 OCR 错字（可见由源图覆盖，A4 处理）、全隐文本的可选中/无障碍语义（低）。
+
+## 0. 复跑（任务给定命令）
+
+```bash
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_fullpage.pdf \
+  --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+# [scan2pdf] ghbq: pipeline=geom gate=PASS exit=0
+```
+
+- ghbq：104 页、GMPG **0**、layout 104、gate **PASS pitch 96.8%**、104=104；非空白字符 **43,913**（=默认，不减少）。
+- **p1**：源页 raster 1654×2407，rect **(0,0,600.8,866.8)** 覆盖整页；文本 38 字符全 **type3**（get_text 保留，可搜）。
+- **p3**：raster 1654×2415，rect (0,0,600.8,866.8)；文本 18 字符全 **type3**。
+- **p2**：chart 429×343（rect 394.9,657.0–548.7,780.0）不触发；文本全 **type0**；与 `PAGE_IMAGE_FULL_RATIO=0.99` 版一致。
+- 未达阈值版（`PAGE_IMAGE_FULL_RATIO=0.99`）：p1 2 图/1400+ 文本可见、p3 标题可见；与 fullpage 版 **104/104 页文本全等（0 diff）**。
+- wz4 默认（无 LAYJSON）：677 页、GMPG 0、layout disabled、gate PASS 99.6、677=677；与 t190 nomark **文本 0 diff**、字符 554,341 相同。
+- 单测：`test_page_image` 5 + `test_scan2pdf` + `test_ocr_book` → **43 passed**。
+- 目视对照（`tmp_vert/scan2pdf/t201_fullpage_compare.png`）：p1/p3 与源页**基本逐像素一致**；p2 与 ratio0.99 版一致（条形码可见、正文重排）。
+
+## 1. 契约/代码核对
+
+| 契约（spec §2/§4） | 实测 |
+|---|---|
+| 面积比 = image/figure/chart/header_image/footer_image 并集 / 页面积 | `_lay_img_cov` 并集；p1 cov 0.466、p3 0.470、p2 0.037（数据决定，非书/页白名单） ✓ |
+| 阈值 `PAGE_IMAGE_FULL_RATIO` 默认 0.40，env 可覆盖 | L298 默认 0.40；`_image_page_full()` ≥ 比较；0.99 版行为正确 ✓ |
+| 整页 raster 尺寸/位置 | p1/p3 rect = 页幅 600.8×866.8，`\AddToShipoutPictureBG` 铺满 ✓ |
+| 本页文本全隐 + 可搜 + 字符不减少 | p1/p3 texttrace 全 type3；`get_text` 保留；非空白字符 43,913 = 默认 ✓ |
+| 未达阈值页不变 | p2 与 ratio0.99 版图像/文本一致；全页文本 104/104 相同 ✓ |
+| 默认关零回归 | 未传 LAYJSON 时 ghbq/wz4 与旧版 0 diff、gate 96.8%/99.6% ✓ |
+| 无书专属分支 | `_image_page_full` 只看 cov；grep 书名为注释 ✓ |
+
+## 2. 残留（非阻断）
+
+| id | severity | problem | 处理 |
+|---|---|---|---|
+| R1 | low | p1/p3 raster 纵横比与页幅差 ~0.8–0.9%（1654×2407 vs 600.8×866.8），轻微拉伸 | t200 已登记「视觉无感」；如需精确可按页幅 crop/scale |
+| R2 | low | p3 文本层仍是 OCR 错字「马尔巴乔夫」（可见由源图覆盖，但搜索/复制得到错字） | 随 A4 per-book 校正表处理 |
+| R3 | low | 全页文本 type3：文本可搜但不可选中/可见（无障碍/选取语义退化） | 设计取舍，文档已注明「invisible overlay」；可接受 |
+| R4 | low | 整页叠加后该页不再有文本重排/字号校准（纯源图） | 设计目的（还原度优先），已登记 |
+
+## 3. 结论
+
+**t201 终审 verdict：PASS（有条件）**。
+
+- **通过**：面积比规则/阈值/整页 raster 尺寸位置/文本全隐可搜/未达阈值页不变全部实测成立；p1/p3 与源页并排基本一致；p2 不变；默认零回归（ghbq/wz4 0 diff、gate 96.8%/99.6%）；43 单测通过；spec §2/§4、docs §23、AGENTS #45 一致；无书专属分支。
+- **条件**：R1–R4 为低风险登记项（拉伸/文本层 OCR 错字/不可选中语义/无重排），不阻断收口。
+
+## 4. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_fullpage.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+PAGE_IMAGE_FULL_RATIO=0.99 /usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_nofull.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_layoutoff3.pdf --data-dir data/wz4 --skip-ocr --force
+/usr/bin/python3 -m pytest src/test/unit/test_page_image.py src/test/unit/test_scan2pdf.py src/test/unit/test_ocr_book.py -q  # 43 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/pipelines/build_geom.py` | `f882c60d14c080b8ff25741dbb0ab99794efe0751fba47c5b385da65cf2b8a6d` |
+| `src/test/unit/test_page_image.py` | `a716040827b431e0f7b8f397637d61119626bbce55a799016d39dce555033214` |
+| `output/ghbq_full/review_ghbq_fullpage.pdf` | md5 `43e3eca06ba10542f9c966f9510b773f` / 104 页 |
+| `output/ghbq_full/review_ghbq_nofull.pdf`（0.99） | md5 `1d8150b8aac43e01dff0ace4cd27f897` / 104 页 |
+| `output/wz4/review_wz4_layoutoff3.pdf` | md5 `71de4550b0aab9d7b4f7c0e942f7737d` / 677 页 |
+| HEAD | `70a5987`（未 commit） |

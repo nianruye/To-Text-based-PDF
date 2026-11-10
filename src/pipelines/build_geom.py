@@ -297,6 +297,9 @@ LDPI = 142.0   # layout 渲染 DPI 兼容基准; canonical 按每页 src/layout 
 USE_LAY_FIGS = os.environ.get('LAYOUT_FIGS', '') in ('1', 'true', 'True')
 PAGE_IMAGE_FULL_RATIO = float(os.environ.get('PAGE_IMAGE_FULL_RATIO', '0.40'))
 PAGE_IMAGE_TEXT_MODE = os.environ.get('PAGE_IMAGE_TEXT_MODE', 'auto')
+def _image_page_full(cov, ratio=None):
+    """image-like 块并集覆盖率是否达到整页叠加阈值（>=，含边界）。"""
+    return float(cov) >= float(PAGE_IMAGE_FULL_RATIO if ratio is None else ratio)
 _figs = {}
 _lay_img_cov = {}   # page_key -> image-like 面积/页面积（LAYOUT_FIGS 开关时算）
 _fig_titles = {}   # figure_title block(图说明)bbox,用于图下方说明行居中
@@ -893,6 +896,7 @@ for key in sorted(sl.keys(), key=int):
     # 该页的图块(提取贴原图,不整页贴;OCR 文字落在图块内的跳过=图非文字)
     _page_figs = extract_figs(key)
     _page_figs_bg = bool(_page_figs and USE_LAY_FIGS)   # LAYOUT_FIGS: BG overlay, 不占流/不翻页
+    _page_img_full = bool(_page_figs_bg and SRC and _image_page_full(_lay_img_cov.get(key, 0.0)))
     gk = str(int(key) + pn_off); pn_ext = pntab.get(gk, ''); pn_ocr = ''
     rows = []
     for i in range(len(sl[key])):
@@ -1000,13 +1004,21 @@ for key in sorted(sl.keys(), key=int):
     elif pn_ocr and not _pn_ocr_use:
         _prev_pn = None   # 突变弃用(目录页误识):重置 prev,允许下页重新起步(序列断裂后恢复连续,否则 prev 卡住致后续全弃用)
     body = [f'\\setcounter{{page}}{{{pn}}}' if pn else '\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']   # 清上页旁注叠加+图页背景
-    if _page_figs_bg:
+    if _page_img_full:
+        # t199: image-like 页整体覆盖率 >= PAGE_IMAGE_FULL_RATIO -> 源页整页 raster 背景；
+        # 本页全部文本由下面的 page-level 3 Tr 隐藏（仍可搜），不再重排压图。
+        _src_full = render_src_page(key)
+        body.append('\\AddToShipoutPictureBG{\\includegraphics[width=%.1fpt,height=%.1fpt]{%s}}' % (PAGE_W, PAGE_H, _src_full))
+        print(f"  p{int(key)+1} image-page cov={_lay_img_cov.get(key,0):.3f}≥{PAGE_IMAGE_FULL_RATIO:.2f} → 整页源图+全文字3Tr")
+    elif _page_figs_bg:
         for _fp, _bb in _page_figs:
             _bx0 = _bb[0]*72.0/LDPI; _bx1 = _bb[2]*72.0/LDPI
             _by0 = _bb[1]*72.0/LDPI; _by1 = _bb[3]*72.0/LDPI
             _bw = max(1.0, _bx1-_bx0); _bh = max(1.0, _by1-_by0)
             # PDF 原点左下; layout bbox 左上 -> y = PAGE_H - y1
             body.append('\\AddToShipoutPictureBG{\\put(%.2fpt,%.2fpt){\\includegraphics[width=%.2fpt,height=%.2fpt]{%s}}}' % (_bx0, PAGE_H-_by1, _bw, _bh, _fp))
+    if _page_img_full:
+        body.append('\\special{pdf:literal direct q 3 Tr}')
     if os.environ.get('VERIFY_MARK', '') in ('1', 'true', 'True'):
         # 验证专用源页标记:零流式footprint 的 shipout 叠加,盖在本源页的每张物理页(含溢出续页)左下角。
         # verify_geom.py 按 GMPG<key> 把输出页归组到源页 → 一源页对多输出页 = 溢出。不影响正式输出(默认关)。
@@ -1435,7 +1447,7 @@ for key in sorted(sl.keys(), key=int):
             else:
                 body.append(inner + '\\par')
         body.append('}')   # 关闭脚注组,恢复正文 \\linespread
-    if _all_text_invis:
+    if _page_img_full or _all_text_invis:
         body.append('\\special{pdf:literal direct Q}')
     body.append('\\par\\newpage')
     page_tex = '\n'.join(body)
