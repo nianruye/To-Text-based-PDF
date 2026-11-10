@@ -1056,3 +1056,129 @@ PAGE_IMAGE_FULL_RATIO=0.99 /usr/bin/python3 src/tools/scan2pdf.py --input source
 | `output/ghbq_full/review_ghbq_nofull.pdf`（0.99） | md5 `1d8150b8aac43e01dff0ace4cd27f897` / 104 页 |
 | `output/wz4/review_wz4_layoutoff3.pdf` | md5 `71de4550b0aab9d7b4f7c0e942f7737d` / 677 页 |
 | HEAD | `70a5987`（未 commit） |
+
+---
+
+# 附：corrected_text 每书文本校正终审（t205，t203/t204）
+
+> 审查人：质量审查员　日期：2026-11-10 22:58–23:25
+> 对象：t203（corrected_text 通道 + scan2pdf 接入）+ t204 验收
+> 依据：`spec/governance/CORRECTED_TEXT.md`（t202 契约）、`docs/scan2pdf_v1.md` §24、`AGENTS.md` #46
+> **结论：needs_revision（FAIL）** —— 功能与零回归实测通过（p3 校正、空表/未知项、wz4 无文件 0 diff、39 单测），但 **report 审计字段与 t202 契约 §3.3 不一致**（`pages` 类型、`replaced/applied` 命名、`line_counts` 结构、`warnings` 元素结构、`source` 取值），属「审计字段」验收项不通过；另有 warnings 未写 stderr、换行未校验等 low。
+
+## 0. 复跑
+
+- **默认（任务命令）** `review_ghbq_corrected.pdf`：104 页、GMPG 0、gate **PASS 96.8%**、104=104、nospace **43,913**；p3 文本层 = `戈尔巴乔夫与 / “人道的民主的社会主义”`，全文**无**「马尔巴乔夫」；coords sha `889ade99…` 与报告一致（未变）。
+- **空表**（`--corrected-text /tmp/empty_ct.json`）：exit 0、gate 96.8、applied 0；与默认校正版文本 diff **仅 p3**（[3]）→ 校正作用域正确。
+- **未知表**（page999 / line2:99 / line2:abc / page:"bad"）：exit 0、gate 96.8、applied 0、**skipped 4**、warnings 4 条；文本与空表版 **104/104 0 diff**。
+- **wz4 无校正文件**：677 页、gate **PASS 99.6%**、corrected `enabled=false`、文本与 t190 nomark **0 diff**、nospace 554,341 相同。
+- 单测：`test_corrected_text` 6 + `test_scan2pdf` → **39 passed**。
+- 代码：应用时机 = lines 加载后、`--pages` 切片前（L569-597 / L666）✓；优先级 explicit > book_data ✓；显式缺失 exit2、默认缺失 disabled ✓；coords/页数/行数不变 ✓；无书专属分支（仅路径按 book 拼接）✓。
+
+## 1. findings（must-fix）
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | **medium** | **report `corrected_text` 审计字段与 spec §3.3 不一致**：① `pages`：spec 为页 key 数组 `["2"]`，实现为计数 `1`；② `replaced`：spec 字段名，实现只给 `applied`（无 `replaced`）；③ `line_counts`：spec 为 `{"2":{"before":2,"after":2}}`，实现为 `{"2":2}`；④ `warnings`：spec 为对象数组 `{code,page,line,message}`，实现为字符串数组（`unknown_page:999` 等）；⑤ 无文件时 `source`：spec 为 `disabled`，实现为 `none`。docs §24 也照实现写成 `applied`，与 spec 冲突 | 二选一并同步 docs：①实现按 spec 输出（`replaced`、`pages` 数组、`line_counts.before/after`、warnings 对象、`source=disabled`）；②修订 spec §3.3 并注明兼容字段（同时更新 docs §24）。审计 schema 是交付契约，不能两套 |
+| **F2** | low | spec §3.3 要求「同一 warnings 同步写 stderr（用户可见）」；实测未知表构建日志无任何 corrected_text 警告行（仅汇总一行「跳过 4」） | 应用后把每条 warning 打到 stderr（或至少 warn 列表摘要） |
+| **F3** | low | spec §2.3「不新增/删除换行；一行仍是一行」；实现未校验 value 内 `\n`（含换行会改变行语义/渲染） | 校验 `'\n' in val` → warn skip（或 exit2 明确禁止） |
+| **F4** | low | spec §3.3 warnings 列出 `line_count_changed` 码，但 §2.4 又要求行数变化 exit2；实现直接 `ValueError`（exit2），不产生该 warning——契约内部不一致 | 统一：exit2 即可（删该 warning 码）或先写 warning 再 exit2 |
+| **F5** | low | 校正文本长度/宽度未校验：如 p3 line1 增加一个引号字符；当前 p3 为整页 raster 无视觉影响，但非整页页可能因变长而溢出/换行 | 可选：对非 image-page 的校正行做宽度 sanity（>MEASURE 时 warn）；至少文档注明 |
+| **F6** | note | ghbq 默认自动启用 `data/ghbq/corrected_text.json`（默认构建与 HEAD 仅 p3 不同）——符合设计（per-book data），但需在交付说明中标注默认已启用 | 文档注明 |
+
+## 2. 结论
+
+**t205 终审 verdict：needs_revision（FAIL）**。
+
+- **通过**：替换时机/优先级/未知项 warn-skip/显式缺失 exit2/默认无文件 disabled；coords 不变、行数不变、104=104、GMPG 0、gate 96.8；p3 文本层校正且唯一差异页；空表/未知表等价；wz4 无校正 0 diff/gate 99.6；39 单测；功能上正确。
+- **不通过**：F1（审计字段与 spec 不一致，medium）——`pages`/`replaced`/`line_counts`/`warnings`/`source` 五处不符；F2–F5 low。
+- 修复建议：F1 优先（实现或 spec 二选一，并同步 docs §24）；F2 补 stderr；F3 加换行校验；F4 统一契约；F5 文档注明。
+
+## 3. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_corrected.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+echo '{}' > /tmp/empty_ct.json
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_ctempty.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout --corrected-text /tmp/empty_ct.json
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_ct.pdf --data-dir data/wz4 --skip-ocr --force
+/usr/bin/python3 -m pytest src/test/unit/test_corrected_text.py src/test/unit/test_scan2pdf.py -q  # 39 passed
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `src/tools/corrected_text.py` | `c312e737a84432d5a5a02a0ab5839c349ffd6d7e91021f5649a245f344ee4abb` |
+| `src/tools/scan2pdf.py` | `0d602e609e7dda7e152b92cd4d6e70b7401e7df0aba062f1efe24fe11ecb4a85` |
+| `data/ghbq/corrected_text.json` | sha `77da1526…`（p3 两条） |
+| `output/ghbq_full/review_ghbq_corrected.pdf` | 104 页 / gate 96.8 / p3 已校正 |
+| `output/wz4/review_wz4_ct.pdf` | 677 页 / gate 99.6 / corrected disabled |
+| HEAD | `70fe1a7`（未 commit） |
+
+---
+
+# 附：corrected_text round-2 终审（t207，t206 修复 F1–F6）
+
+> 审查人：质量审查员　日期：2026-11-10 23:12–23:40
+> 对象：t206（修 t205 F1–F6）
+> 依据：`spec/governance/CORRECTED_TEXT.md` §3.3/§4.1、`docs/scan2pdf_v1.md` §24、`AGENTS.md` #46
+> **结论：PASS（有条件）** —— F1 审计字段已对齐 spec（replaced/pages 数组/line_counts before-after/warnings 对象/source=disabled）；F2 stderr 逐条、F3 换行校验、F4 契约统一、F5/F6 文档均实测；ghbq p3 校正、wz4 零回归、40 单测通过。残留仅「spec 最小示例 vs 实现超集字段」等 low。
+
+## 0. F1–F6 核对
+
+| 项 | 声明 | 实测 | 结论 |
+|---|---|---|---|
+| **F1** 审计字段 | replaced 主字段（applied 别名）、pages 页 key 数组 + pages_count、line_counts before/after、warnings 对象、无文件 source=disabled | ghbq report：`pages ["2"]`、`replaced 2`、`line_counts {"2":{"before":2,"after":2}}`、`warnings []`、source=book_data；wz4 无文件 `source=disabled`、pages [] | ✓ |
+| **F2** stderr | 每条 warning 逐条打印 | 未知表：stderr **4 行** `[corrected_text] WARN unknown_page/unknown_line/invalid_line/invalid_page …`；newline 表 1 行 | ✓ |
+| **F3** 换行 | `\n`/`\r` → newline_in_value warn skip | newline 表 skipped=1、warning `{code:newline_in_value,page:"2",line:0,message:"校正值不得含换行"}` | ✓ |
+| **F4** 契约统一 | 行数变化 ValueError→exit2；spec 删除 line_count_changed | `grep line_count_changed spec` = 0；spec §4.1 注明；代码 ValueError | ✓ |
+| **F5/F6** 文档 | 宽度 sanity 未强制、默认自动启用 | docs §24 已注明「宽度 sanity（未强制）」与「默认启用（无 --no-corrected-text）」 | ✓ |
+
+## 1. 独立复跑
+
+- **ghbq 默认校正**（任务命令）：104 页、GMPG 0、gate **PASS 96.8%**、nospace **43,913**；p3 文本层 = `戈尔巴乔夫与 / “人道的民主的社会主义”`，全文无「马尔巴乔夫」；coords sha 不变（`889ade99…`）。
+- **未知表**（page999/line2:99/line2:abc/page:bad）：exit 0、skipped **4**、warnings **4 对象**（code/page/line/message 齐全）、stderr 4 行；文本与默认 0 diff。
+- **换行表**（line0 含 `\n`）：exit 0、skipped 1、`newline_in_value`、stderr 1 行。
+- **wz4 无校正**：677 页、gate **PASS 99.6%**、`source=disabled`、与 t190 nomark **文本 0 diff**、nospace 554,341。
+- **单测**：`test_corrected_text` + `test_scan2pdf` → **40 passed**。
+- 代码：应用时机（lines 加载后、--pages 前）/优先级（explicit>book_data）/行数不变/coords 不变/无书专属分支（仅 data/<book> 路径拼接）保持 ✓。
+
+## 2. 残留（非阻塞）
+
+| id | severity | problem | 处理 |
+|---|---|---|---|
+| R1 | low | spec 无文件示例为最小集（enabled/path/source/replaced/skipped），实现输出超集（pages/pages_count/applied/warn/line_counts/sha256）；`applied` 为 replaced 兼容别名 | 超集无害；文档已注明别名；如需严格可在 spec 标注「实现可含兼容别名」 |
+| R2 | low | 校正文本长度/宽度未强制 sanity（非整页页显著变长可能溢出） | docs §24 已注明「需人工控制」；可选后续加 warn |
+| R3 | low | 默认自动启用 `data/<book>/corrected_text.json`，无 `--no-corrected-text` 开关；移走文件才能关闭 | docs 已注明；建议后续加显式关闭开关 |
+| R4 | note | p3 可见标题由整页源图 raster 提供，文本层为校正文本；两者已一致（视觉=源图，搜索=校正） | 设计预期 |
+
+## 3. 结论
+
+**t207 终审 verdict：PASS（有条件）**。
+
+- **通过**：F1–F6 全部实测修复；审计字段与 spec §3.3 对齐（replaced/pages 数组/line_counts before-after/warnings 对象/source=disabled）；未知项/换行 warn-skip + stderr；行数变化 exit2 契约统一；ghbq p3 文本层校正、coords/行数不变、104=104、GMPG 0、gate 96.8；wz4 无校正 0 diff/gate 99.6；40 单测；文档/AGENTS #46 一致；无书专属分支。
+- **条件**：R1–R3 为 low（超集字段/宽度 sanity/无显式关闭开关），文档已注明，不阻断收口。
+
+## 4. 复现
+
+```bash
+cd /opt/test
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_corrected2.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout
+printf '{"2": {"0": "戈尔巴\\n乔夫"}}' > /tmp/newline_ct.json
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.pdf --book ghbq \
+  --out output/ghbq_full/review_ghbq_ctnl.pdf --data-dir output/ghbq_full/_ocr_ghbq --skip-ocr --force --layout --corrected-text /tmp/newline_ct.json
+/usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/wz4.pdf --book wz4 \
+  --out output/wz4/review_wz4_ct2.pdf --data-dir data/wz4 --skip-ocr --force
+/usr/bin/python3 -m pytest src/test/unit/test_corrected_text.py src/test/unit/test_scan2pdf.py -q  # 40 passed
+```
+
+| 文件 | sha256 / md5 |
+|---|---|
+| `src/tools/corrected_text.py` | `fcd674382b22a48fc29cbe7fd48b8cb267b88e6253deabbe36565898abe2a402` |
+| `src/tools/scan2pdf.py` | `a8e09154376d949f802952d03d54e493bff15f2de4d00786078802bf0538f14f` |
+| `output/ghbq_full/review_ghbq_corrected2.pdf` | md5 `f2c2ba5e0b4249159f6c026e593d9d10` / 104 页 |
+| `output/wz4/review_wz4_ct2.pdf` | md5 `0998ecfe360f83a35c856861c4d5e68f` / 677 页 |
+| HEAD | `70fe1a7`（未 commit） |
