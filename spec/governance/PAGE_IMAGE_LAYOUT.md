@@ -153,6 +153,7 @@ bbox_pt = [x0*sx, y0*sy, x1*sx, y1*sy]
 | **正文图块** | `LAYOUT_FIGS=1`，`category ∈ {image,figure,chart,footer_image,header_image}` 且非整页 | 按 bbox 裁源页 → 流内 `figrow`/`\includegraphics` 贴回；图块内 OCR 文字 invisible；图外文字正常 |
 
 - **full-page 阈值**：`PAGE_IMAGE_FULL_RATIO` 是页幅比例，不是书目；封面/图版用块面积和（可多个 image 块并集近似）判定。
+- **实现锚点（t199）**：`build_geom` 的 `_image_page_full()` + `_page_img_full`；源页 raster 由 `render_src_page(key)` 生成，`\AddToShipoutPictureBG` 整页铺满；本页 `body` 前后 `\special{pdf:literal direct q 3 Tr}`/`Q`，文本层保留。
 - `PAGE_IMAGE_PAGES` 是**显式数据覆盖**（0-based key，逗号分隔），不是判据；默认空，不得在代码里写页号。
 - `PAGE_IMAGE_PREFIX` 保留现有手工整页图（`p<key>.png`）路径；新自动路径不依赖手工 PNG。
 - **图块类别**：`image`/`figure`/`chart`/`footer_image`/`header_image`；`figure_title` 不是图块（文字，保留可见）；`table`/`algorithm`/`seal` 不默认 passthrough。
@@ -366,6 +367,7 @@ PAGE_IMAGE_FULL_RATIO=0.40 PAGE_IMAGE_TEXT_MODE=auto \
 - `ocr_book.convert_layout_json()`：layout raw（JSON/JSONL）→ `<out>/<book>_layout.json`；页 key 由 `jobs.pages`；每页 `page_key/page/width/height/page_width_pt/page_height_pt/blocks`；`prunedResult` legacy 兼容；`layout_manifest.json` 记录页数与 sha。
 - `scan2pdf.find_layout()`：优先 existing `layout.json`，否则从 `raw/layout_*.json` 生成；`--ocr-mode auto/layout` 时启用；`build_pdf` 设 `LAYJSON/LAYOUT_HEADINGS/LAYOUT_FIGS/LAYOUT_TOC/PAGE_IMAGE_*`。
 - `build_geom`：`LAYOUT_FIGS=1` 加载 image/figure/chart/footer_image/header_image；`_lay_bbox_142()` 按每页 src/layout 尺度换算；图块用 BG overlay（不占流、不翻页）；文本保留（图块内 OCR 行仍按现有 `in_figure` 跳过的情况只限无字符图块）。
-- 实现验收（ghbq）：104 页；p1 2 图（封面照片 1653×1121 + 页脚图）、p2 条形码 429×343、p3 图版；文本 **43,945** vs 无图 **43,913（+32）**；GMPG 0；gate **PASS pitch 96.8%**（LAYOUT_HEADINGS 默认 0；标题能力可显式开启；见 docs §22）。
+- 实现验收（ghbq）：104 页；p1/p3 覆盖率 0.466/0.470 ≥ PAGE_IMAGE_FULL_RATIO=0.40 → 整页源图 + 全文字 3 Tr（p1 源图标题正确、p3 复制封面）；p2 chart 0.037 走正文图块、文字可见；文本 **43,913** = 默认（不减少）；GMPG 0；gate **PASS pitch 96.8%**（见 docs §22/§23）。
 - wz4：677=677、字符 554,341 与无 LAYJSON 完全相同、gate PASS 99.6%；wz2 6 页 PASS 100%；无 LAYJSON 不启用 layout/图块。
-- 残留：p1 采用 image block BG（未整页叠整页图）；`LAYOUT_TOC` 仅 p11 aside 块接线，p10 作者列仍待 S8；`PAGE_IMAGE_FULL_RATIO` 自动整页阈值保留为规划（当前显式 `PAGE_IMAGE_PAGES` 才整页）。
+- **t199 整页叠加**：LAYOUT_FIGS=1 时 image-like 并集覆盖率 ≥ PAGE_IMAGE_FULL_RATIO（默认0.40）→ `render_src_page()` 源页 raster 整页 BG（width=PAGE_W,height=PAGE_H）+ 本页文本 span 全 `3 Tr`（可搜）；未达阈值保持图块裁贴/图外文字可见。p1/p3 触发，p2 不触发。
+- 残留：`LAYOUT_TOC` 仅 p11 aside 块接线，p10 作者列仍待 S8；显式 `PAGE_IMAGE_PAGES` 仍可强制整页（手工数据）。

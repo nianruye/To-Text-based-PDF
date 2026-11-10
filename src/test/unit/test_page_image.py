@@ -63,3 +63,14 @@ def test_layout_toc_page_detection():
     assert f([{'block_label': 'aside_text', 'block_content': '2\n3\n11'}])
     assert not f([{'block_label': 'text', 'block_content': '正文'}])
     assert not f([{'block_label': 'aside_text', 'block_content': '书名'}])
+
+
+def test_image_page_full_ratio_boundary():
+    ns = load('build_geom.py', {'_image_page_full'},
+              mocks={'PAGE_IMAGE_FULL_RATIO': 0.40})
+    f = ns['_image_page_full']
+    assert not f(0.399)
+    assert f(0.40)       # >= 边界
+    assert f(0.401)
+    assert not f(0.5, 0.55)
+    assert f(0.55, 0.55)
