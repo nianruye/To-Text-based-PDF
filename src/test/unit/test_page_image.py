@@ -74,3 +74,15 @@ def test_image_page_full_ratio_boundary():
     assert f(0.401)
     assert not f(0.5, 0.55)
     assert f(0.55, 0.55)
+
+
+def test_page_image_pages_branch_keeps_text_layer():
+    """t273 回归：显式 PAGE_IMAGE_PAGES 不能提前 continue（只贴图），
+    必须保留正常文本流并由 3Tr + giant 1pt 路径输出可搜文本。"""
+    src = (ROOT / 'src' / 'pipelines' / 'build_geom.py').read_text(encoding='utf-8')
+    start = src.index('if int(key) in _PAGE_IMG_PAGES')
+    end = src.index('if not rows:', start)
+    branch = src[start:end]
+    assert '_page_img_forced = True' in branch
+    assert '3 Tr' in branch
+    assert '\n        continue' not in branch

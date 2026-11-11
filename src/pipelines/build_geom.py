@@ -10,13 +10,14 @@ build_geom.py — seg2 原型:PaddleOCR spotting 行级 → 逐行还原(书风�
 """
 import json, sys, statistics, subprocess, os, shutil, re, opencc
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from utils.tex_escape import escape_latex
+from utils.tex_escape import escape_latex, normalize_cjk_punct
 from utils.geometry import calibrate, build_calib_doc, calib_selfcheck, write_calib, update_calib_render
 from utils.page_numbers import load_pntab, infer_lay_numbers, PN_RE
 from utils import image_blocks as _img
 from utils import missing_chars as _mc
 from _latex_preamble import build_latex
 
+_NORM_CHANGES = []   # t275: CJK 上下文 ASCII 标点归一化审计
 SL = sys.argv[1] if len(sys.argv) > 1 else '/opt/test/wz1p108_spotting_lines.json'
 CO = sys.argv[2] if len(sys.argv) > 2 else '/opt/test/wz1p108_spotting_coords.json'
 OUT = sys.argv[3] if len(sys.argv) > 3 else '/tmp/seg2_line.pdf'
@@ -384,6 +385,7 @@ def _hf(f):
     '按标题档选字体: part/title=章字体, section=节字体'
     return _SUBTITLE_CJK if f.get('tier') == 'section' else _TITLE_CJK
 _PAGE_IMG_PAGES = set(int(x) for x in os.environ.get('PAGE_IMAGE_PAGES', '').split(',') if x.strip())   # 贴图页(封面/扉页/版权页): 直接渲染原扫描图
+_page_img_forced = False   # 显式贴图页：仍走正常文本层（1pt/3Tr），只额外铺源图
 _TOC_LEVELS = []
 _toc_rules_f = os.environ.get('TOC_RULES', '')
 if _toc_rules_f and os.path.exists(_toc_rules_f):
@@ -1015,6 +1017,15 @@ for key in sorted(sl.keys(), key=int):
     for i in range(len(sl[key])):
         t = sl[key][i].strip()
         if not t: continue
+        _lc = next((sl[key][j].strip()[-1] for j in range(i - 1, -1, -1) if sl[key][j].strip()), '')
+        _rc = next((sl[key][j].strip()[0] for j in range(i + 1, len(sl[key])) if sl[key][j].strip()), '')
+        _t_norm, _nchg = normalize_cjk_punct(t, left_context=_lc, right_context=_rc)
+        if _nchg:
+            for _c in _nchg:
+                _NORM_CHANGES.append(dict(page=int(key) + 1, line=i, pos=_c['pos'],
+                                          old=_c['old'], new=_c['new'],
+                                          before=t, after=_t_norm))
+            t = _t_norm
         poly = co.get(key, [None]*len(sl[key]))[i] if i < len(co.get(key, [])) else None
         if poly:
             xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
@@ -1164,10 +1175,16 @@ for key in sorted(sl.keys(), key=int):
         _vstack = '\\shortstack{' + '\\\\\\\\'.join(_chars) + '}'
         _y_bot = PAGE_H - _cy2   # \put 原点在页左下,旁注 bbox 底
         body.append('\\AddToShipoutPictureFG{\\put(%.1f,%.1f){\\fontsize{%spt}{%spt}\\selectfont %s}}' % (_cx1, _y_bot, FONT_SM, round(FONT_SM*1.6,1), _vstack))   # baselineskip×1.6:竖排字间留空(源 aside 字间有空,默认×1.05 太紧)
-    if int(key) in _PAGE_IMG_PAGES:   # 贴图页: 原扫描图 shipout 背景整页铺满(含边距, 不占流不溢出), 估高=页高
+    if int(key) in _PAGE_IMG_PAGES:   # 贴图页: 源图铺满 + 保留正常文本流（1pt/3Tr，见下）
         _pos_est[str(int(key))] = PAGE_H
+        _page_img_forced = True
+        _giant_page = True   # 复用巨行页的 1pt 文本/脚注/页眉路径；但本页文本来自正常 OCR 行
+        body.append('\\thispagestyle{empty}')
         body.append('\\AddToShipoutPictureBG{\\includegraphics[width=%.1fpt,height=%.1fpt]{%s%d.png}}' % (PAGE_W, PAGE_H, _PAGE_IMG_PREFIX, int(key)))
-        body.append('\\thispagestyle{empty}\\par\\null\\newpage'); pages_tex.append('\n'.join(body)); continue
+        body.append('\\special{pdf:literal direct q 3 Tr}')
+        if pn and str(pn).isdigit():   # 源图页码可能已被页图覆盖；文本层仍保留可搜页码
+            body.append('\\null\\vspace*{\\fill}{\\fontsize{1pt}{1.2pt}\\selectfont %s}' % str(pn))
+        # 不 continue：让 rows 走正常分类/渲染，所有文本在 3Tr + giant 1pt 下保留
     if not rows:
         body.append('\\null'); body.append('\\par\\newpage'); pages_tex.append('\n'.join(body)); continue
     h_body = H_BODY   # 用全局正文行高(单页全标题时 per-page 中位会失真)
@@ -1327,7 +1344,7 @@ for key in sorted(sl.keys(), key=int):
     _has_body_block = any((_b.get('block_label') in ('text','content')) for _b in (_ld[int(key)].get('prunedResult',{}).get('parsing_res_list',[]) if LAYJSON and os.path.exists(LAYJSON) and int(key) < len(_ld) and USE_LAY_FIGS else []))
     if _page_figs_bg:
         is_divider = False   # 图像页不做垂直居中（p3 doc_title 源 bbox 在 image 上方）
-    _all_text_invis = False
+    _all_text_invis = bool(_page_img_forced)
     if key in _TOC_PAGE:   # F14b 目录页缩进基准=全部非数字片段最左 x0(作者粘连行/回填行 frags 常缺, 逐片段取不到则退回行 x0)
         _rc14 = [_fr14[1] for _f14 in flow for _fr14 in (_f14.get('frags') or []) if not _fr14[0].strip().isdigit() and _fr14[1] > 0]
         _rc14 += [_f14['x0'] for _f14 in flow if not _f14.get('frags') and _f14.get('x0', 0) > 0 and not _f14['t'].strip().isdigit() and _norm_core(_f14['t']) not in ('目录', '') and not _f14['t'].strip().startswith('政治的逻辑') and re.search(r'[\u4e00-\u9fff]', _f14['t']) and not _f14['t'].strip().endswith(('。', '，', '、', '！', '？'))]
@@ -1642,7 +1659,8 @@ for key in sorted(sl.keys(), key=int):
     # （源 OCR `1987年版第18~19页。` → 产物 `1987 年 版 第 18~19 页。`），已撤销。
     # 仅保留 p97 所需的「巨行页整页文本 1pt 不可见」。
     if footnotes:
-        body.append('\\vspace{6pt}\\hrule width 0.3\\textwidth\\vspace{3pt}')
+        if not _page_img_forced:   # 贴图页的脚注线由源图提供；文本层只保留1pt可搜内容，避免多画一条线
+            body.append('\\vspace{6pt}\\hrule width 0.3\\textwidth\\vspace{3pt}')
         _fsm = 1.0 if _giant_page else FONT_SM
         fbl = round(_fsm*1.2, 1)
         body.append('{\\linespread{1}\\fontsize{' + str(_fsm) + 'pt}{' + str(fbl) + 'pt}\\selectfont')   # 脚注区整体 \linespread{1},防全局行距倍数撑大脚注 pitch
@@ -1703,6 +1721,15 @@ if os.path.exists(_src):
             update_calib_render(_cp, OUT)
     except Exception as _re:
         print('[calib] render 回填失败（不阻断）: %s' % _re, file=sys.stderr, flush=True)
+    _norm_path = OUT + '.normalize.json'
+    try:
+        json.dump(dict(schema='punct-normalize-v1', total=len(_NORM_CHANGES),
+                       pages=sorted(set(c['page'] for c in _NORM_CHANGES)),
+                       changes=_NORM_CHANGES), open(_norm_path, 'w', encoding='utf-8'),
+                  ensure_ascii=False, indent=1)
+    except Exception as _e:
+        print('[normalize] 审计写入失败: %s' % _e)
+    print(f"[normalize] punct_fullwidth changes={len(_NORM_CHANGES)} audit={_norm_path}")
     print(f"[完成] {OUT}")
 else:
     print("[失败] xelatex 未生成 PDF,查 /tmp/seg2_line.log")

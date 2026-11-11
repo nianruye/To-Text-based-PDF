@@ -35,3 +35,63 @@ def escape_latex(text, mode='classic'):
     for c, d in _CIRC.items():
         text = text.replace(c, d)
     return text
+
+# ── 横排标点形态归一化（t275）────────────────────────────────────────────
+# 只处理 CJK 上下文中的 ASCII 标点；数字/拉丁相邻、行首尾、已全角不动。
+# 归一化在 build_geom 文本装配阶段调用；本函数幂等，返回 (out, changes)。
+_ASCII_TO_FULL = {',': '，', ';': '；', ':': '：', '?': '？', '!': '！', '.': '。'}
+_SPACE_CHARS = set(' \t\u3000')
+
+
+def _cjk_context_char(ch):
+    """CJK 字符或全角标点；用于归一化左右邻判断。"""
+    if not ch:
+        return False
+    o = ord(ch)
+    if 0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF:
+        return True
+    # 全角标点只接受句读/括号类；引号/破折号/省略号作为左邻会把拉丁短语后的
+    # 英文逗号误判为中文逗号（wz1 p123/p127/p185），因此不作上下文。
+    if ch in '，。；：、！？（）【】〔〕':
+        return True
+    return False
+
+
+def _nonzero_neighbor(s, i, step):
+    # 严格相邻：空格也视为非 CJK，避免把 CIP/版权页的 ASCII 字段冒号/逗号误转
+    j = i + step
+    return s[j] if 0 <= j < len(s) else ''
+
+
+def normalize_cjk_punct(text, left_context='', right_context=''):
+    """CJK 上下文 ASCII `, ; : ? ! .` -> 全角；幂等。
+
+    `左右两侧都是 CJK（允许空格；行首/行尾可传上一/下一行邻字）` 才替换；返回
+    `(out, changes)`，changes 为逐字 `{pos, old, new}`，供审计写入 report。
+    """
+    if not text:
+        return text, []
+    out = list(text)
+    changes = []
+    for i, ch in enumerate(text):
+        full = _ASCII_TO_FULL.get(ch)
+        if not full:
+            continue
+        left = _nonzero_neighbor(text, i, -1) if i > 0 else (left_context or '')
+        right = _nonzero_neighbor(text, i, 1) if i < len(text) - 1 else (right_context or '')
+        def _ctx_ok(ch, j, step):
+            if _cjk_context_char(ch):
+                return True
+            # 引号本身不是 CJK，但引号内侧是 CJK 时允许（p31 “开始,“在”）；
+            # 拉丁短语后的 ” 后逗号（p123/wz1）仍拒绝。
+            if ch in '“”‘’':
+                k = j + step
+                if 0 <= k < len(text):
+                    return _cjk_context_char(text[k])
+            return False
+        left_ok = _ctx_ok(left, i - 1, -1) if i > 0 else _cjk_context_char(left)
+        right_ok = _ctx_ok(right, i + 1, 1) if i < len(text) - 1 else _cjk_context_char(right)
+        if left_ok and right_ok:
+            out[i] = full
+            changes.append(dict(pos=i, old=ch, new=full))
+    return ''.join(out), changes
