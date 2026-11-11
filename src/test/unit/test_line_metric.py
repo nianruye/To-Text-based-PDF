@@ -58,17 +58,14 @@ def test_s4_p2_rewrap_does_not_add_body_line():
 
 
 
-def test_s4_p2_p5_output_fixture_if_built():
-    # 集成 fixture：有 ghbq S4 产物时锁定 p2/p5 行粒度（无产物时跳过，保持 CI 可移植）
-    import os
-    import pytest
-    import fitz
-    pdf = 'output/ghbq_full/ghbq_s4final.pdf'
-    if not os.path.exists(pdf):
-        pytest.skip('ghbq S4 fixture not built')
-    d = fitz.open(pdf)
-    try:
-        assert len(d[1].get_text().splitlines()) == 18   # p2 引号 rewrap 不再增加逻辑正文行
-        assert len(d[4].get_text().splitlines()) == 34   # p5 CIP 34 条字段保粒度
-    finally:
-        d.close()
+def test_s4_p2_p5_rewrap_merge_pure_function():
+    # 纯函数口径（不依赖外部产物，CI 可移植）：p2 引号处同 y 两 span 合一行、p5 CIP 短字段不误并
+    # p2：源 12 行，输出在引号处把第 5 行拆成同 y 两 span，逻辑行应仍为 12
+    src = [_ln(100 + i * 34) for i in range(12)]
+    out = [_ln(100 + i * 34) for i in range(12)]
+    out[4] = _ln(236, x0=10, x1=120)
+    out.insert(5, _ln(236, x0=100, x1=220))
+    assert len(vg._logical_lines(out, 10.0)) == 12
+    # p5：CIP 短字段（责任/电子/项目）相距较近但属不同逻辑行，容差 10 不误并
+    cip = [_ln(100), _ln(116), _ln(132), _ln(148)]
+    assert len(vg._logical_lines(cip, 10.0)) == 4
