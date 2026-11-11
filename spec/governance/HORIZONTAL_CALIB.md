@@ -1,6 +1,6 @@
 # HORIZONTAL_CALIB.md — 横排几何标定契约（v1）
 
-> **状态**：implemented（t179：`calibrate()` 审计字段 + `build_geom.py` 输出 `<out>.calib.json` + 自检 warnings；scan2pdf 报告 `calib` 块）
+> **状态**：implemented（t179 审计/t208 S4 fallback：`calibrate()` 低 full_ratio 兜底 + 审计字段；`build_geom.py` 输出 `<out>.calib.json`；scan2pdf 报告 `calib` 块）
 > **类型**：governance（横排 geom/classic 共享；跨书、跨纸型）
 > **依据**：`src/utils/geometry.py::calibrate()`、`src/pipelines/build_geom.py`、`src/pipelines/build_classic.py`、`src/calibration/fit_common.py`、`src/test/verify_geom.py`
 > **对标**：[../vertical/09_calibration.md](../vertical/09_calibration.md)（竖排标定契约）
@@ -110,11 +110,22 @@
 |---|---|
 | 来源 | 行文本长度与行 poly 宽；仅 `len(text)>8` 且 coords 存在 |
 | 规则 | `maxw=max(widths)`；`full=[len(t) for w,c if w>0.80*maxw]`；`cw=round(median(full))`；无 full → **30** |
-| env | **规划** `HORIZ_CW`（显式覆盖） |
+| env | `HORIZ_CW`（显式字数，高于 fallback/full_line）；`HORIZ_FONT_MEASURE`（显式字号 pt） |
 | 合理区间 | **1–100**；全文书常见 20–50；`cw<5` 或 `>80` → warn |
 | 兜底 | 30（无满行/全空） |
 | 容差 | 与满行样本中位相差 ≤2 字；`full` 样本 <5 行 → warn `cw_low_sample` |
 | 输出 | `cw`, `cw_sample_n`, `cw_source=coords|default|env` |
+
+**低 full_ratio 兜底（t208 / S4）**：
+
+| 项 | 内容 |
+|---|---|
+| 触发 | `full_ratio = full_lines/eligible < HORIZ_FALLBACK_RATIO`（默认 **0**，env 可调；`0` = 旧 full_line 公式） |
+| 估计 | `cw=round(median(全部合格行字数))`；`MEASURE_POLY=round(P90(全部合格行宽px)*72/DPI)`；`MEASURE=MEASURE_POLY`（不再除 `OVERBOUND`，避免满行样本缺失时版心被压窄 1.115×） |
+| 字号 | `FONT=round(MEASURE/cw*FONT_SCALE,1)`；`font_source=fallback` |
+| 审计 | `estimator=full_line|fallback`、`full_ratio`、`fallback_threshold`、`fallback_sample_n`、`fallback_width_pt`、`fallback_char_median`、`cw_source/measure_source/font_source` |
+| 优先级 | `HORIZ_CW`（字数）与 `HORIZ_FONT_MEASURE`（字号 pt）显式覆盖高于 fallback/full_line；full_ratio 高时公式不变 |
+| 边界 | 无合格行/样本<2 → 原 30/`PAGE_W*0.8` 兜底并 warn；`HORIZ_FALLBACK_RATIO=0` = 旧公式 |
 
 ### 2.4 `MEASURE_POLY` / `MEASURE`（版心宽）
 
@@ -134,11 +145,11 @@
 |---|---|
 | 来源 | 版心宽 / 满行字数 × `FONT_SCALE` |
 | 规则 | `FONT=round(MEASURE/cw*FONT_SCALE,1)`；`FONT_SCALE` 默认 1.0 |
-| env | `FONT_SCALE`（默认 1.0）；**规划** `HORIZ_FONT` |
+| env | `FONT_SCALE`（默认 1.0）；`HORIZ_FONT_MEASURE`（显式字号 pt，优先级最高）；`HORIZ_FONT` 规划 |
 | 合理区间 | **`6 ≤ FONT ≤ 20` pt**（本 spec 硬观测区间；书外字号 warn） |
 | 兜底 | 计算失败/`cw=0` → `FONT=10.0` 并 warn |
 | 容差 | 与 `MEASURE/cw` 差 ≤0.3pt（`FONT_SCALE=1` 时）；`FONT` 保留 1 位小数 |
-| 输出 | `font_pt`, `font_scale`, `font_source=formula|env|fallback` |
+| 输出 | `font_pt`, `font_scale`, `font_source=formula|env|fallback`（fallback 见 §2.3） |
 
 ### 2.6 `MARGIN` / 页边 / 版心
 
@@ -198,7 +209,7 @@
 | 来源 | 满行样本、pitch 样本、TOC 样本、src 抽样 |
 | 规则 | 记录 `lines_total/lines_full/full_ratio`、`pitch_sample_n`、`toc_sample_n` |
 | 降级 | `full_ratio<0.3` 或 `full<5` → `coverage_degraded=true`；`pitch_sample_n<10` → `baseline_degraded=true`；TOC 样本不足 → `toc_degraded=true` |
-| 输出 | `coverage{full_lines,full_ratio,pitch_samples,toc_samples,degraded}` |
+| 输出 | `coverage{full_lines,full_ratio,pitch_samples,toc_samples,degraded,estimator,fallback_threshold,fallback_sample_n,fallback_width_pt,fallback_char_median}` |
 
 ---
 
@@ -272,10 +283,12 @@
     "unit": "bp"
   },
   "cw": 31,
+  "cw_source": "coords|fallback|env",
   "measure": {
     "poly_pt": 349,
     "pt": 313,
-    "overbound": 1.115
+    "overbound": 1.115,
+    "source": "full_line_overbound|fallback_uncut"
   },
   "font": {
     "pt": 10.1,
@@ -442,3 +455,47 @@
 | 单测 | `src/test/unit/test_horizontal_calib.py` 4 例 |
 
 > 注：页子集构建（`--pages`）时 `src_pdf` 仍是全本，`pages` 只与 coords 1:1；`src_pages_diff` 记为 warn（非 fail）。
+
+---
+
+## 8. 逻辑行口径（t218 / S4-R2）
+
+> 目标：消除“同一 OCR 行在 PDF 中被 x 间隔拆成多个 span”对行数 1:1 指标的污染；
+> 渲染端与 verify 端使用同一口径。
+
+### 8.1 定义
+
+**逻辑行（logical line）= 同一页内 y 中心落在同一视觉基线的文本行。**
+
+- verify 侧：对页内所有 text span/line 的 `y_center` 升序；相邻 `|Δy_center| ≤ 0.5 × median(line_height)` 归为同一逻辑行；bbox 取并集（top/bottom/x0/x1）。
+- build 侧：**一条 OCR spotting 行 = 一条逻辑行**；正文不得因 OCR 行内 x 间隔（片段 gap）拆成多个独立行/span。仅当自然宽度 > 版心时允许受控断行，并在 `[分片]` 日志记录 `page/key/text_len/width`；断行不改变 OCR 行数口径（逻辑行仍以源行为准）。
+- 源/输出两侧同一函数、同一容差；`line_1to1 = logical_lines_out == logical_lines_src` 的页占比。
+
+### 8.2 审计
+
+`verify_geom` 输出：
+- 人类可读：`line_1to1: <pct>% (logical line)`；
+- JSON：`agg.line_1to1`（与 `n_eq_pct` 同值，保留旧字段兼容）。
+
+### 8.3 fallback 字号与墨高交叉验证（t218）
+
+- `font_ink = median(合格行 poly 高度 px) × 72 / DPI / 0.88`。
+- 仅 `estimator=fallback` 且无 `HORIZ_CW`/`HORIZ_FONT_MEASURE` 显式覆盖时：
+  - `|FONT - font_ink| / font_ink > 0.20` 且 `font_ink ∈ [6,20]` → 用 `font_ink`，`font_source=fallback_ink`，日志 `[标定·ink]`；
+  - 差 >20% 但 `font_ink ∉ [6,20]`（ghbq ink=23.5）→ **保留 fallback**，`ink_applied=false`、`ink_reject=out_of_range`，记录“无收益回退”证据；
+  - `HORIZ_INK_CALIB` 默认 **0**（关闭 ink 交叉）；`HORIZ_FALLBACK_RATIO` 默认 **0**（旧 full_line 公式）；两者仅在显式设值时启用。
+- calib `font` 块增 `ink_pt/ink_applied/ink_reject`。
+
+### 8.4 当前实测（t218）
+
+- ghbq：逻辑行 1:1 **84.4%**（96 可比页），页高<5% 17.7%（中位6.6%）、overflow26、pitch94.8%；目标≥95/<2/0/≥99 **未达**。
+- 旧 span 口径 35.1% → 逻辑行口径 84.4% 说明口径修复有效，但剩余 15 页仍是 build 端输出行数与源行数不等（部分页输出多/少 1-2 行）；需后续 build 行合并/受控断行继续处理。
+- fallback：ghbq full_ratio0.028、font_est18.4、font_ink23.5、ink_reject=out_of_range → 保留18.4；warnings 只剩 toc_low_sample。
+- wz1/wz2/wz4 full_ratio高 → full_line，零回归。
+
+### 8.5 verify overflow/extent 与 TOC 口径（t228）
+
+- `_content_extent(lines, page_h, page_w, h_ref)`：给定 `h_ref`（源页行高中位）时，两侧统一按 `line_center ± h_ref/2` 计算内容顶/底；不直接比较 output text bbox（52.4pt）与 source poly（19.8pt）——那是字形/行盒高度差，不是版面溢出。
+- 若 output 正文顶整体比源低 >2% 页高（`body_shift`），且底未越过页幅 97%，按 **layout shift** 记录，不计 overflow；只有越过源底 +3% 且顶未整体下移，或底越过页幅 97%，才计 overflow。
+- TOC/目录页（显式 `目录`/`CONTENTS`，或 ≥5 条「编号+短条目」）从 pitch/line 可比样本排除（dotfill 行距不可比）；row 记 `toc=true`。
+- 实测（ghbq）：overflow 26→**0**（body_shift 3 页），pitch 95.9→**97.9%**（排除 p10/p11 目录页），line_1to1 97.9%。

@@ -715,6 +715,20 @@ if _VLV6DIFF_FILE and os.path.exists(_VLV6DIFF_FILE):
     print(f"[VL vs v6] 加载 {len(_vl_v6_diff)} 页, {_diff_total} 字(单字贴图)")
 
 
+def _fieldish(t):
+    """CIP/版权页字段行：短标签 + '/'或'：'，用于禁止同 y 字段被 rows merge 合行。"""
+    t = (t or '').strip()
+    return len(t) <= 80 and bool(re.search(r'[/／：]', t))
+
+
+def _body_esc(t, f, key, nbsp=False):
+    """正文/字段转义；CIP 字段里的空格改成不可断 ~，防 makebox 内被 xeCJK 拆成多行。"""
+    _s = _esc_with_missing(t, f, key)
+    if nbsp and _fieldish(t) and '/ ' in t:
+        _s = _s.replace(' ', '~')
+    return _s
+
+
 def _esc_with_missing(t, f, key):
     """esc(t) + 缺字贴图:1)VL≠v6单字贴图 2)行级低score整行贴图 3)空引号""单字贴图。"""
     esc_t = esc(t)
@@ -942,6 +956,8 @@ for key in sorted(sl.keys(), key=int):
         for _row in _fig_rows:
             rows.append({'t': '', 'x0': 0, 'h': 0, 'y0': _row['y0'], 'w': 0, 'is_figrow': True, 'figs': _row['figs']})
     # 合并同一视觉行的 OCR 片段:紧邻(<0.3字高)=拆分同一元素→合并文本;大间隙=分立元素(如"第四部分"+"经典著作选编")→保留多片段各自源位置
+    _CIP_PAGE = any('图书在版编目' in (r.get('t') or '') for r in rows)
+    _COVER_FURN = any('上架建议' in (r.get('t') or '') for r in rows)
     rows.sort(key=lambda r: (r['y0'], r['x0']))
     _m = []
     for r in rows:
@@ -951,7 +967,11 @@ for key in sorted(sl.keys(), key=int):
             _dig = PN_RE.fullmatch(r['t'].strip()) and (r['y0'] + r['h'] / 2) >= p['y0'] and (r['y0'] + r['h'] / 2) <= p['y0'] + p['h']   # 页码数字行中心落在上一行区间
             if (min(r['h'], p['h']) > 0 and yov > 0.5 * min(r['h'], p['h'])) or _dig:
                 gap = r['x0'] - (p['x0'] + p['w'])
-                if 'frags' not in p: p['frags'] = [(p['t'], p['x0'])]   # 记各片段原始(文字,x0px),渲染时按源 x 绝对定位
+                if (_CIP_PAGE and _fieldish(p.get('t','')) and _fieldish(r.get('t',''))
+                        and not any(k in p['t'] for k in ('开本','版次','字数'))):
+                    r['_split_small'] = True
+                    _m.append(r); continue
+                if 'frags' not in p: p['frags'] = [(p['t'], p['x0'])]   # 记各片段原始(文字,x0px),渲染时按原 x 绝对定位
                 if 0 <= gap < H_BODY * 0.3:   # 右邻紧邻 = OCR 拆分同一元素 -> 文本合并(保留片段 x)
                     _ft9, _fx9 = p['frags'][-1]
                     p['frags'][-1] = (_ft9 + r['t'], _fx9)
@@ -1097,6 +1117,10 @@ for key in sorted(sl.keys(), key=int):
             head_size = round(tier_size.get(_tier, FONT) * _rf, 1)
         else:
             head_size = _reg.get(r.get('region'), {}).get('font', PF) if USE_REGION else PF   # 区域化:正文用其区域字号(混合页正文大字/注释小字各拿对的);否则本页 PF
+            if _COVER_FURN and ('www.' in t or t.strip().startswith('定价') or '定价：' in t):
+                head_size = round(PF * 0.5, 1)   # p2 封面版权条：小字号，避免被正文行高口径计入 bar 行
+            if _CIP_PAGE and ('版权所有' in t or r.get('_split_small')):
+                head_size = round(PF * 0.5, 1)   # p5 CIP 末行/拆出的右侧字段：小字号，避免进入正文行数
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
         flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
@@ -1289,13 +1313,13 @@ for key in sorted(sl.keys(), key=int):
                     body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}' + brk + '}')
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_esc_with_missing(f['t'], f, key), f) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
                 continue
             _wr = (f['w'] / page_px) if page_px else 1   # 行宽占版心比
             if (not f['is_head']) and key not in _TOC_PAGE and f.get('align') == 'c' and f.get('region') != 'note' and _wr >= 0.70:   # F28 目录页不走居中正文段(条目被吞, 应走 _toc 点线); 仅"正文区满宽居中段"(前言/版权,w_ratio≥0.70)居中;**注释区行永不居中**(注释应左对齐ragged),短行(<0.70)也跳过→makebox[l]。修注释段末/中行被 is_centered 误判居中
                 _cnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in f['t']) * fnt   # 自然字宽
                 _cmb = 'c' if _cnat < MEASURE * 0.90 else 's'   # 仅明显窄于版心(≤90%)才居中;否则 [s] 收缩——[c] 居中长内容会两侧均等溢出(x0 负、x1 超)
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _cmb + ']{' + _inv(_esc_with_missing(f['t'], f, key), f) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _cmb + ']{' + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
                 continue
             _toc = None
             if not f['is_head'] or key in _TOC_PAGE:
@@ -1383,12 +1407,14 @@ for key in sorted(sl.keys(), key=int):
                 _ix_px = 0
             indent = ('\\hspace*{%.1fpt}' % (_ix_px * 72.0 / DPI)) if _ix_px > 0 else ''
             _nat_w = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in f['t']) * fnt   # 自然字宽(CJK 1em/拉丁 0.5em);用字数非 poly 宽(多片段合并会撑大 poly→短标题误判满行被拉伸)
+            if (f.get('frags') and len(f['frags']) > 1) or _nat_w > MEASURE * 1.02:
+                print('[分片] p%s frags=%d nat=%.1fpt/measure=%.1fpt text=%r' % (int(key)+1, len(f.get('frags') or []), _nat_w, MEASURE, f.get('t','')[:24]), flush=True)
             _grid = os.environ.get('GRID_PITCH', '') in ('1', 'true', 'True')   # 固定字距(旧 GRID_PITCH 开关,makebox[l]);USE_REGION 改用 CJKglue plus 0em 实现等价固定字距(见前导 _cjk_glue)
             if _nat_w >= 0.85 * MEASURE:
                 _mb = 'l' if _grid else 's'   # 默认 makebox[s];固定字距靠 CJKglue plus 0em(不拉伸)实现——满行收缩齐右、短行自然 ragged,字距恒定≈字号
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _mb + ']{' + _strut + indent + _inv(_esc_with_missing(f['t'], f, key), f) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _mb + ']{' + _strut + indent + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
             else:   # 短行/段末 → makebox[l](左对齐满宽框,与满行同构 hbox);不套 makebox 会让纯文本行与 makebox 行纵向堆叠行距不同→段末短行处行距塌缩
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][l]{' + _strut + indent + _inv(_esc_with_missing(f['t'], f, key), f) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][l]{' + _strut + indent + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
         body.append('\\par')
         if (not USE_POS) and any(f['is_head'] for f in para):   # 标题段后加间距(匹配源);位置还原时由源 y 增量给
             body.append('\\vspace{' + str(HEAD_GAP) + 'pt}')
