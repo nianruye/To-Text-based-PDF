@@ -126,3 +126,107 @@ def test_toc_selfcheck_low_sample_and_range():
         assert 'toc_low_sample' in codes
         assert 'toc_foot_x_out' in codes
         assert 'toc_title_max_out' in codes
+
+
+# ---- t208: S4 fallback for low full_ratio ----
+def _low_full(n=1):
+    sl, co = {}, {}
+    # 12 行行宽差异大：仅 1 行 >0.8*maxw -> full_ratio 1/12 <0.10
+    for i in range(n):
+        lines, polys = [], []
+        for j in range(12):
+            c = 20 if j == 0 else 8 + (j % 6) * 4
+            w = 300 if j == 0 else 40 + j   # 仅 1 行 >0.8*max -> full_ratio 1/12
+            lines.append('测' * c)
+            polys.append([[10, 20 + j*145], [10+w, 20 + j*145],
+                          [10+w, 38 + j*145], [10, 38 + j*145]])
+        sl[str(i)] = lines; co[str(i)] = polys
+    return sl, co
+
+
+def test_low_full_ratio_fallback_estimator(monkeypatch):
+    monkeypatch.setenv('HORIZ_FALLBACK_RATIO', '0.10')
+    monkeypatch.delenv('HORIZ_CW', raising=False)
+    monkeypatch.delenv('HORIZ_FONT_MEASURE', raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), 1, 300, 600)
+        sl, co = _low_full(1)
+        g = geo.calibrate(sl, co, 200, src_pdf=src)
+        assert g['full_ratio'] < 0.10
+        assert g['estimator'] == 'fallback'
+        assert g['fallback_sample_n'] == 11
+        assert g['fallback_width_pt'] > 0
+        assert g['cw_source'] == 'fallback'
+        assert g['font_source'] in ('fallback', 'fallback_ink')
+        assert g['measure_source'] == 'fallback_uncut'
+        doc = geo.build_calib_doc(sl, co, g, src, 'low')
+        assert doc['coverage']['estimator'] == 'fallback'
+        assert doc['coverage']['fallback_sample_n'] == 11
+        assert doc['cw_source'] == 'fallback'
+
+
+def test_high_full_ratio_uses_full_line_formula(monkeypatch):
+    monkeypatch.delenv('HORIZ_CW', raising=False)
+    monkeypatch.delenv('HORIZ_FONT_MEASURE', raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), 2, 300, 600)
+        sl, co = _synthetic(2)
+        g = geo.calibrate(sl, co, 200, src_pdf=src)
+        assert g['full_ratio'] == 1.0
+        assert g['estimator'] == 'full_line'
+        assert g['measure_source'] == 'full_line_overbound'
+        assert g['cw_source'] == 'coords'
+
+
+def test_explicit_cw_font_overrides(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), 1, 300, 600)
+        sl, co = _low_full(1)
+        monkeypatch.setenv('HORIZ_CW', '31')
+        monkeypatch.setenv('HORIZ_FONT_MEASURE', '12.7')
+        g = geo.calibrate(sl, co, 200, src_pdf=src)
+        assert g['cw'] == 31
+        assert g['FONT'] == 12.7
+        assert g['cw_source'] == 'env'
+        assert g['font_source'] == 'env'
+
+
+def test_fallback_disabled_by_zero_threshold(monkeypatch):
+    monkeypatch.setenv('HORIZ_FALLBACK_RATIO', '0')
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), 1, 300, 600)
+        sl, co = _low_full(1)
+        g = geo.calibrate(sl, co, 200, src_pdf=src)
+        assert g['estimator'] == 'full_line'
+
+
+def test_fallback_ink_cross_validation_fields(monkeypatch):
+    monkeypatch.setenv('HORIZ_FALLBACK_RATIO', '0.10')
+    monkeypatch.delenv('HORIZ_CW', raising=False)
+    monkeypatch.delenv('HORIZ_FONT_MEASURE', raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), 1, 300, 600)
+        sl, co = _low_full(1)
+        g = geo.calibrate(sl, co, 200, src_pdf=src)
+        assert 'ink_font' in g and g['ink_font'] is not None
+        assert 'ink_applied' in g and 'ink_reject' in g
+        # 低 full_ratio 合成页的 ink 也不应越出 FONT 合理区间后静默采用
+        if g['ink_applied']:
+            assert 6.0 <= g['FONT'] <= 20.0
+        else:
+            assert g['ink_reject'] in (None, 'out_of_range')
+
+
+def test_defaults_fallback_and_ink_off(monkeypatch):
+    monkeypatch.delenv('HORIZ_FALLBACK_RATIO', raising=False)
+    monkeypatch.delenv('HORIZ_INK_CALIB', raising=False)
+    monkeypatch.delenv('HORIZ_CW', raising=False)
+    monkeypatch.delenv('HORIZ_FONT_MEASURE', raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = _mk_src(os.path.join(tmp, 'src.pdf'), 1, 300, 600)
+        sl, co = _low_full(1)
+        g = geo.calibrate(sl, co, 200, src_pdf=src)
+        assert g['estimator'] == 'full_line'
+        assert g['fallback_threshold'] == 0.0
+        assert g['ink_applied'] is False
+        assert g['font_source'] in ('formula', 'env')

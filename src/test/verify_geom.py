@@ -39,14 +39,53 @@ def _median(xs):
     return statistics.median(xs) if xs else 0.0
 
 
-def _content_extent(lines, page_h, page_w):
+def _logical_lines(lines, tol=None):
+    """y 中心聚类：同一视觉行被拆成多个 span/line 时合并。
+    tol 显式给出时两侧共用（verify 用源页 0.5×行高中位；避免输出 bbox 高度不同导致合并不对称）。
+    返回 [(top,bot,center,height,x0,x1)]，按 center 升序。"""
+    if not lines:
+        return []
+    if tol is None:
+        _h = _median([l[3] for l in lines if l[3] > 0])
+        _tol = max(0.5, 0.5 * _h)
+    else:
+        _tol = max(0.5, float(tol))
+    _rows = sorted(lines, key=lambda l: ((l[2]), l[4]))
+    out = []
+    for l in _rows:
+        if out and abs(l[2] - out[-1][2]) <= _tol:
+            p = out[-1]
+            top = min(p[0], l[0]); bot = max(p[1], l[1])
+            x0 = min(p[4], l[4]); x1 = max(p[5], l[5])
+            out[-1] = (top, bot, (top + bot) / 2.0, bot - top, x0, x1)
+        else:
+            out.append(tuple(l))
+    return out
+
+
+def _toc_like(texts):
+    """TOC/目录页判定：显式目录标题，或 ≥5 条「编号+条目」短行（pitch 用 dotfill 不可比）。"""
+    ts = [str(t).strip() for t in (texts or []) if str(t).strip()]
+    if any(t in ('目录', '目 录', 'CONTENTS') or t.startswith('目录') for t in ts):
+        return True
+    import re as _re
+    entry = sum(1 for t in ts if len(t) <= 40 and _re.match(r'^\d+[\s.、]?[^\d]', t))
+    return entry >= 5
+
+
+def _content_extent(lines, page_h, page_w, h_ref=None):
     """内容纵向占位:排除页眉带(<4%)、页码(底部窄短行)后,首个文本行顶 y 与末个文本行底 y。
-    这是「填充/空白/溢出」的直接信号——不区分正文/脚注,只看内容占了多高。"""
+
+    S4-P3：h_ref 给定时两侧统一用「行中心 ± h_ref/2」的 ink/baseline 口径；
+    不再直接用 output text bbox 高（52.4pt）vs src poly 高（19.8pt）——那种差异不是物理溢出。
+    """
     L = [l for l in lines if 0.02 * page_h < l[2] < 0.98 * page_h]
     # 排除页码:很靠底(>92%)且很窄(<15% 页宽)的短行
     L = [l for l in L if not (l[2] > 0.92 * page_h and (l[5] - l[4]) < 0.15 * page_w)]
     if not L:
         return 0.0, 0.0
+    if h_ref and h_ref > 0:
+        return min(l[2] - h_ref / 2.0 for l in L), max(l[2] + h_ref / 2.0 for l in L)
     return min(l[0] for l in L), max(l[1] for l in L)
 
 
@@ -163,6 +202,10 @@ def main():
     src = src_pages(coords, lines, a.dpi)
     out = out_pages(a.out_pdf)
 
+    for _k in src:
+        _tol = 0.5 * _median([l[3] for l in src[_k]['lines'] if l[3] > 0])
+        src[_k]['lines'] = _logical_lines(src[_k]['lines'], _tol)
+        src[_k]['line_tol'] = _tol
     src_keys = sorted(src, key=lambda k: int(k))
     n_src, n_out = len(src_keys), len(out)
     print(f"页数: 源 OCR {n_src} 页  |  输出 PDF {n_out} 页  |  {'✓ 1:1' if n_src == n_out else '✗ 不一致'}")
@@ -186,11 +229,11 @@ def main():
     keys_iter = src_keys[:a.sample] if a.sample else src_keys
     N = len(keys_iter)
 
-    def combined_body(pgs, ph, pw):
+    def combined_body(pgs, ph, pw, tol=None):
         """一源页的多张物理页:合并正文行数 + 行距(各页内相邻差汇总取中位)。"""
         n_tot, diffs = 0, []
         for op in pgs:
-            b, _, _, _, _, n = _body_lines(op["lines"], ph, pw)
+            b, _, _, _, _, n = _body_lines(_logical_lines(op["lines"], tol), ph, pw)
             n_tot += n
             b.sort(key=lambda l: l[2])
             diffs += [y - x for (x, y) in ((a2[2], b2[2]) for a2, b2 in zip(b, b[1:])) if y - x > 1.0]
@@ -211,12 +254,15 @@ def main():
             continue
         n_out_pages = len(og)
         ph, pw = og[0]["page_h"], og[0]["page_w"]
+        _tol = src[key].get('line_tol', 0.5 * _median([l[3] for l in src[key]['lines'] if l[3] > 0]))
+        _href = _median([l[3] for l in src[key]["lines"] if l[3] > 0]) or None
+        _toc = _toc_like(lines.get(key, []))
         sb, sp, sh, st, sbot, sn = _body_lines(src[key]["lines"], ph, pw)
-        s_top, s_bot = _content_extent(src[key]["lines"], ph, pw)
-        comparable = sn >= 8 and 10.0 <= sp <= 45.0
+        s_top, s_bot = _content_extent(src[key]["lines"], ph, pw, _href)
+        comparable = sn >= 8 and 10.0 <= sp <= 45.0 and not _toc
 
         if n_out_pages == 1:
-            ob, opitch, oh, ot, obot, on = _body_lines(og[0]["lines"], ph, pw)
+            ob, opitch, oh, ot, obot, on = _body_lines(_logical_lines(og[0]["lines"], _tol), ph, pw)
             # 非标准页排除（不计入 pitch 达标率）：
             # 1. 目录页 dotfill 合并: on<sn 且 opitch>sp*1.2 (2行式->1行)
             # 2. 行数过少: on<10 或 sn<10 (稀疏页 pitch 不可靠)
@@ -231,27 +277,30 @@ def main():
                     comparable = False
                 elif on > sn * 1.1 and opitch < sp * 0.85:
                     comparable = False
-            o_top, o_bot = _content_extent(og[0]["lines"], ph, pw)
+            o_top, o_bot = _content_extent(og[0]["lines"], ph, pw, _href)
             h_err = abs(oh - sh) / sh if sh > 0 else None
             bot_gap = (s_bot - o_bot) / ph if (s_bot > 0 and o_bot > 0) else None
             blank = bot_gap is not None and bot_gap > 0.08
-            overflow = (o_bot > 0 and s_bot > 0 and o_bot > s_bot + 0.03 * ph) or (o_bot > 0.97 * ph)
+            # S4-P3：正文整体下移（top 比源低 >2% 页高）是 layout shift，不是物理溢出；
+            # 只有「源底被越过且正文顶没有整体下移」或「越过页幅 97%」才算 overflow。
+            body_shift = bool(s_top > 0 and o_top > s_top + 0.02 * ph)
+            overflow = (o_bot > 0.97 * ph) or (o_bot > 0 and s_bot > 0 and o_bot > s_bot + 0.03 * ph and not body_shift)
         else:
             # 源页溢成多张物理页 = 溢出(版面还原失败:应 1 页)。行数/pitch 用合并值,页高/占位不计。
-            on, opitch = combined_body(og, ph, pw)
+            on, opitch = combined_body(og, ph, pw, _tol)
             h_err = None; bot_gap = None; blank = False; overflow = True
             oh = None; o_bot = None
         p_err = abs(opitch - sp) / sp if sp > 0 else None
         rows.append({
             "key": key, "page": ik + 1, "out_pages": n_out_pages, "missing": False,
-            "src_n": sn, "out_n": on, "n_eq": sn == on,
+            "src_n": sn, "out_n": on, "n_eq": sn == on, "toc": _toc,
             "src_h": round(sh, 1), "out_h": None if oh is None else round(oh, 1),
             "h_err": None if h_err is None else round(h_err, 3),
             "src_pitch": round(sp, 2), "out_pitch": round(opitch, 2),
             "p_err": None if p_err is None else round(p_err, 3),
             "s_bot": round(s_bot, 1), "o_bot": None if o_bot is None else round(o_bot, 1),
             "bot_gap": None if bot_gap is None else round(bot_gap, 3),
-            "blank": blank, "overflow": overflow, "comparable": comparable,
+            "blank": blank, "overflow": overflow, "body_shift": body_shift, "comparable": comparable,
         })
 
     dense = [r for r in rows if r["comparable"]]
@@ -271,7 +320,7 @@ def main():
     miss_n = sum(1 for r in rows if r.get("missing"))
 
     print(f"\n== 聚合(可比正文页 {len(dense)}/{N};排除分隔/图/标题/扉页 {N-len(dense)}) ==")
-    print(f"  行数 1:1 相等   : {n_eq_pct:.1f}%")
+    print(f"  line_1to1       : {n_eq_pct:.1f}%  (logical line)")
     print(f"  页高误差 <{a.tol_height:.0%}   : {h_ok_pct:.1f}%  (样本 {h_pool},排除溢出分页)")
     print(f"  pitch 误差 <{a.tol_pitch:.0%}  : {p_ok_pct:.1f}%  (样本 {p_pool})")
     print(f"  底部占位 <8% 偏差: {fill_ok_pct:.1f}%   空白页 {blank_n}  溢出页(占位) {over_n}")
@@ -304,7 +353,7 @@ def main():
 
     if a.json:
         json.dump({"n_src": n_src, "n_out": n_out, "rows": rows,
-                   "agg": {"n_eq_pct": n_eq_pct, "h_ok_pct": h_ok_pct, "p_ok_pct": p_ok_pct,
+                   "agg": {"n_eq_pct": n_eq_pct, "line_1to1": n_eq_pct, "h_ok_pct": h_ok_pct, "p_ok_pct": p_ok_pct,
                            "fill_ok_pct": fill_ok_pct, "blank": blank_n, "overflow": over_n,
                            "split": split_n, "missing": miss_n, "comparable": len(dense)}},
                   open(a.json, "w"), ensure_ascii=False, indent=1)

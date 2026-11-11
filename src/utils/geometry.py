@@ -88,11 +88,64 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
     page_px = PAGE_W * DPI / 72
     maxw = max(widths) if widths else 1
     full = [(w, c) for w, c in zip(widths, chars) if w > 0.80*maxw]
-    cw = int(statistics.median([c for w, c in full])) if full else 30
-    MEASURE_POLY = round(statistics.median([w for w, c in full]) * 72 / DPI) if full else round(PAGE_W*0.8)
+    _full_n = len(full)
+    _eligible = len(widths)
+    _full_ratio = round(_full_n / _eligible, 4) if _eligible else 0.0
+    _fb_thresh = float(os.environ.get('HORIZ_FALLBACK_RATIO', '0'))
     OVERBOUND = float(os.environ.get('OVERBOUND', '1.115'))
-    MEASURE = round(MEASURE_POLY / OVERBOUND)
+    # 低 full_ratio 兜底（S4/A1）：满行样本 <10% 时，maxw/中位满行估计不稳（ghbq 50/1770=2.8%）。
+    # 用全部合格行的 P90 行宽 + 行字数中位；MEASURE 取实测行宽（不再除 OVERBOUND），
+    # 避免旧公式把版心压窄 1.115 倍导致二次换行。高 full_ratio 走原公式（零变化）。
+    _estimator = 'full_line'
+    _fb = None
+    if _eligible and _full_ratio < _fb_thresh:
+        _sw = sorted(widths)
+        _w90 = _sw[min(len(_sw)-1, int(round(0.9 * (len(_sw)-1))))]   # P90 行宽(px)
+        _cmed = int(round(statistics.median(chars)))
+        cw = _cmed if _cmed > 0 else 30
+        MEASURE_POLY = round(_w90 * 72 / DPI)
+        MEASURE = MEASURE_POLY
+        _estimator = 'fallback'
+        _fb = dict(threshold=_fb_thresh, sample_n=_eligible, width_px=round(_w90,1),
+                   width_pt=MEASURE_POLY, char_median=_cmed)
+        print(f"[标定·fallback] full_ratio={_full_ratio:.3f}<{_fb_thresh:.2f} → "
+              f"cw={cw} measure={MEASURE}pt (P90行宽{_w90:.1f}px, 行数{_eligible})", flush=True)
+    else:
+        cw = int(statistics.median([c for w, c in full])) if full else 30
+        MEASURE_POLY = round(statistics.median([w for w, c in full]) * 72 / DPI) if full else round(PAGE_W*0.8)
+        MEASURE = round(MEASURE_POLY / OVERBOUND)
+    # 显式覆盖优先（HORIZ_CW 字数；HORIZ_FONT_MEASURE 字号 pt）。
+    _cw_env = os.environ.get('HORIZ_CW', '').strip()
+    if _cw_env:
+        try:
+            _cw_v = int(float(_cw_env))
+            if _cw_v > 0: cw = _cw_v
+        except ValueError:
+            pass
     FONT = round(MEASURE / cw * float(os.environ.get('FONT_SCALE', '1.0')), 1)
+    _font_env = os.environ.get('HORIZ_FONT_MEASURE', '').strip()
+    if _font_env:
+        try:
+            _fv = float(_font_env)
+            if _fv > 0: FONT = round(_fv, 1)
+        except ValueError:
+            pass
+    # S4-R2: fallback 字号与墨高交叉验证（poly 高度中位 / 0.88）。
+    _ink_font = round(statistics.median(heights) * 72.0 / DPI / 0.88, 1) if heights else None
+    _ink_applied = False
+    _ink_reject = None
+    if (_estimator == 'fallback' and _ink_font
+        and not os.environ.get('HORIZ_FONT_MEASURE') and not os.environ.get('HORIZ_CW')
+        and os.environ.get('HORIZ_INK_CALIB', '0') not in ('0', 'false', 'False')):
+        if abs(FONT - _ink_font) / max(_ink_font, 0.1) > 0.20:
+            if 6.0 <= _ink_font <= 20.0:
+                print(f"[标定·ink] fallback font={FONT} vs ink={_ink_font} (>20%) -> 用 ink", flush=True)
+                FONT = _ink_font
+                _ink_applied = True
+            else:
+                # 无收益/越界：ink 估计落在 FONT 合理区间外（ghbq ink=23.5），保留 fallback 并记录
+                print(f"[标定·ink] fallback font={FONT} vs ink={_ink_font} (>20%) 但 ink∉[6,20] -> 保留 fallback", flush=True)
+                _ink_reject = 'out_of_range'
     MARGIN = round((PAGE_W - MEASURE) / 2)
     pitches = []
     for _k in sl:
@@ -123,10 +176,16 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
                 coverage_threshold=_coverage_threshold,
                 coverage_degraded=bool(_coverage_degraded),
                 source_of_page_size=_source_page,
-                cw_sample_n=_full_n, cw_source='coords',
-                full_lines=_full_n, full_ratio=round(_full_n / _eligible, 3) if _eligible else 0.0,
+                cw_sample_n=_full_n, cw_source=('env' if os.environ.get('HORIZ_CW') else ('fallback' if _estimator == 'fallback' else 'coords')),
+                full_lines=_full_n, full_ratio=_full_ratio,
+                estimator=_estimator, fallback_threshold=_fb_thresh,
+                fallback_sample_n=(_fb or {}).get('sample_n'),
+                fallback_width_pt=(_fb or {}).get('width_pt'),
+                fallback_char_median=(_fb or {}).get('char_median'),
+                measure_source=('fallback_uncut' if _estimator == 'fallback' else 'full_line_overbound'),
                 font_scale=float(os.environ.get('FONT_SCALE', '1.0')),
-                font_source=('env' if os.environ.get('FONT_SCALE') else 'formula'),
+                font_source=('env' if (os.environ.get('HORIZ_FONT_MEASURE') or os.environ.get('FONT_SCALE')) else ('fallback_ink' if _ink_applied else ('fallback' if _estimator == 'fallback' else 'formula'))),
+                ink_font=_ink_font, ink_applied=_ink_applied, ink_reject=_ink_reject,
                 baseline_source=('coords' if pitches else 'fallback'),
                 pitch_sample_n=len(pitches), pitch_median_pt=round(_pitch_med, 3) if _pitch_med is not None else None)
 
@@ -172,8 +231,10 @@ def build_calib_doc(sl, co, g, src_pdf, book):
             'src_height_pt': g.get('src_height_pt'),
         },
         'cw': g.get('cw'),
+        'cw_source': g.get('cw_source', 'coords'),
         'measure': {
             'poly_pt': g.get('MEASURE_POLY'),
+            'source': g.get('measure_source', 'full_line_overbound'),
             'pt': g.get('MEASURE'),
             'overbound': g.get('OVERBOUND'),
         },
@@ -181,6 +242,9 @@ def build_calib_doc(sl, co, g, src_pdf, book):
             'pt': g.get('FONT'),
             'scale': g.get('font_scale', 1.0),
             'source': g.get('font_source', 'formula'),
+            'ink_pt': g.get('ink_font'),
+            'ink_applied': bool(g.get('ink_applied')),
+            'ink_reject': g.get('ink_reject'),
         },
         'baseline': {
             'pt': g.get('BASELINE'),
@@ -202,6 +266,11 @@ def build_calib_doc(sl, co, g, src_pdf, book):
             'full_ratio': g.get('full_ratio'),
             'pitch_samples': g.get('pitch_sample_n'),
             'toc_samples': 0,
+            'estimator': g.get('estimator', 'full_line'),
+            'fallback_threshold': g.get('fallback_threshold'),
+            'fallback_sample_n': g.get('fallback_sample_n'),
+            'fallback_width_pt': g.get('fallback_width_pt'),
+            'fallback_char_median': g.get('fallback_char_median'),
         },
         'source_of_page_size': g.get('source_of_page_size', 'fallback'),
         'warnings': [],
