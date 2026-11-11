@@ -21,6 +21,7 @@ def render(out_pdf, est_log=None, ratio_table=None, fill=None, build_name='build
     explicitly pop it so an inherited shell env cannot leak marks back in.
     """
     env = dict(os.environ)
+    env.setdefault('PYTHONHASHSEED', '0')   # 构建确定性：消除 set/dict 顺序差异
     env['POSITIONAL'] = '1'
     if verify_mark:
         env['VERIFY_MARK'] = '1'

@@ -570,3 +570,73 @@ def test_corrected_text_applied_before_build(monkeypatch):
         assert ct['enabled'] is True and ct['applied'] == 1 and ct['replaced'] == 1
         assert ct['pages'] == ['0'] and ct['line_counts'] == {'0': {'before': 2, 'after': 2}}
         assert len(ct['sha256']) == 64 and ct['source'] == 'explicit'
+
+
+def test_scan2pdf_passes_ocr_param_flags(monkeypatch):
+    """t219：scan2pdf OCR 调用透传参数 flags。"""
+    import types
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=2)
+        out = os.path.join(tmp, 'o.pdf')
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            return types.SimpleNamespace(returncode=3, stdout='', stderr='fake')
+        monkeypatch.setattr(s2p.subprocess, 'run', fake_run)
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'b', '--pipeline', 'geom',
+                       '--ocr-max-pixels', '4000000', '--ocr-min-pixels', '100000',
+                       '--ocr-orientation', '1', '--ocr-unwarp', '1',
+                       '--ocr-layout-shape', 'rect'])
+        assert rc == s2p.EXIT['ocr']
+        cmd = calls[0]
+        for flag, val in (('--ocr-max-pixels', '4000000'), ('--ocr-min-pixels', '100000'),
+                          ('--ocr-orientation', '1'), ('--ocr-unwarp', '1'),
+                          ('--ocr-layout-shape', 'rect')):
+            assert flag in cmd and cmd[cmd.index(flag) + 1] == val
+
+
+def test_scan2pdf_report_ocr_params_and_jobid(monkeypatch):
+    """t219：OCR 后 report 含 ocr_params/jobId；fake OCR 产物。"""
+    import types
+    with tempfile.TemporaryDirectory() as tmp:
+        inp = _mk_pdf(os.path.join(tmp, 'in.pdf'), n=1)
+        out = os.path.join(tmp, 'o.pdf')
+        ocr_dir = os.path.join(tmp, '_ocr_b')
+
+        def fake_run(cmd, **kw):
+            if 'ocr_book.py' in ' '.join(cmd):
+                od = cmd[cmd.index('--out-dir') + 1]
+                os.makedirs(os.path.join(od, 'raw'), exist_ok=True)
+                json.dump({'0': [[[10, 10], [10, 100], [30, 100], [30, 10]]]},
+                          open(os.path.join(od, 'b_spotting_coords.json'), 'w'))
+                json.dump({'0': ['x']}, open(os.path.join(od, 'b_spotting_lines.json'), 'w'))
+                json.dump({'params': {'max_pixels': 4000000, 'min_pixels': 147384,
+                                      'orientation': 1, 'unwarp': 0, 'layout_shape': 'auto'},
+                           'sources': {'max_pixels': 'cli'}, 'path': None, 'sha256': None},
+                          open(os.path.join(od, 'ocr_params_effective.json'), 'w'))
+                json.dump({'spotting_000': {'state': 'done', 'jobId': 'JOB123', 'pages': [0]}},
+                          open(os.path.join(od, 'jobs.json'), 'w'))
+                return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+            raise AssertionError(cmd)
+
+        def fake_build(args, coords, lines, src, out_tmp, fix):
+            d = fitz.open(); d.new_page(width=100, height=100); d.save(out_tmp); d.close()
+            return True, dict(pipeline='geom', returncode=0)
+
+        def fake_vg(pdf, coords, lines, floor=None, src_pdf=None):
+            return dict(pass_=True, verdict='PASS', exit=0, floor=85, pages=1, pages_src=1,
+                        pitch_ok_pct=99.0, height_ok_pct=99.0, blank_pages=0,
+                        overflow_pages=0, stdout_tail='')
+        bt = dict(axis='horizontal', has_frame=False, multi_format=False,
+                  page_size=[300, 500], source='probe_cache', confidence=0.6, sizes=[])
+        monkeypatch.setattr(s2p.subprocess, 'run', fake_run)
+        monkeypatch.setattr(s2p, 'detect_book_type', lambda *a, **k: bt)
+        monkeypatch.setattr(s2p, 'build_pdf', fake_build)
+        monkeypatch.setattr(s2p, 'run_verify_geom', fake_vg)
+        rc = s2p.main(['--input', inp, '--out', out, '--book', 'b', '--pipeline', 'geom',
+                       '--ocr-max-pixels', '4000000', '--ocr-orientation', '1'])
+        assert rc == s2p.EXIT['ok']
+        rep = json.load(open(out + '.report.json'))
+        assert rep['ocr_params']['params']['max_pixels'] == 4000000
+        assert rep['ocr_jobs']['spotting_000'] == 'JOB123'

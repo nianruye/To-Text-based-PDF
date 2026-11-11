@@ -358,6 +358,7 @@ def run_verify_geom(pdf, coords, lines, floor=None, src_pdf=None):
     import os
     floor = floor if floor is not None else float(os.environ.get('VERIFY_PITCH_FLOOR', '85'))
     env = dict(os.environ); env['VERIFY_PITCH_FLOOR'] = str(floor)
+    env.setdefault('PYTHONHASHSEED', '0')
     cmd = ['/usr/bin/python3', os.path.join(ROOT, 'src/test/verify_geom.py'), pdf, coords, lines]
     if src_pdf and os.path.exists(src_pdf):
         cmd += ['--src-pdf', src_pdf]
@@ -383,6 +384,8 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
     env = dict(os.environ)
     env['VERT_TMP'] = os.path.join(tempfile.gettempdir(), 'scan2pdf_%s' % args.book)
     env['VERT_MISSED_FIX'] = fix_path if fix_path else '0'
+    # 可复现：build 端稳定 hash（消除 set/dict 顺序导致的文本差异）
+    env.setdefault('PYTHONHASHSEED', '0')
     # LAYJSON / 图片 passthrough：只有本次 scan2pdf 显式拿到 layout 才开启；默认构建不读
     _lay = getattr(args, 'layout_json', '') or ''
     if _lay and pipeline == 'geom':
@@ -482,13 +485,19 @@ def main(argv=None):
     ap.add_argument('--pages', default='')
     ap.add_argument('--force', action='store_true')
     ap.add_argument('--ocr-pages-per-batch', type=int, default=50)
+    ap.add_argument('--ocr-max-pixels', type=int, default=None)
+    ap.add_argument('--ocr-min-pixels', type=int, default=None)
+    ap.add_argument('--ocr-orientation', type=int, default=None, choices=[0, 1])
+    ap.add_argument('--ocr-unwarp', type=int, default=None, choices=[0, 1])
+    ap.add_argument('--ocr-layout-shape', default=None)
     ap.add_argument('--report', default='')
     args = ap.parse_args(argv)
     args.layout_json = ''
     args.layout = bool(getattr(args, 'layout', False))
     report = dict(tool='scan2pdf', version='v1', book=args.book, input=args.input, out=args.out,
                   input_sha256=sha256(args.input), steps=[], exit=None,
-                  book_type=None, data=None, build=None, gate=None)
+                  book_type=None, data=None, build=None, gate=None,
+                  env=dict(PYTHONHASHSEED='0'))
     import time
     _t0 = time.time()
 
@@ -545,7 +554,15 @@ def main(argv=None):
                '--token-file', args.token_file, '--mode', args.ocr_mode if args.ocr_mode != 'auto' else 'both',
                '--pages-per-batch', str(args.ocr_pages_per_batch), '--resume']
         if args.pages: cmd += ['--pages', args.pages]
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=7200, cwd=ROOT)
+        for _flag, _val in (('--ocr-max-pixels', getattr(args, 'ocr_max_pixels', None)),
+                            ('--ocr-min-pixels', getattr(args, 'ocr_min_pixels', None)),
+                            ('--ocr-orientation', getattr(args, 'ocr_orientation', None)),
+                            ('--ocr-unwarp', getattr(args, 'ocr_unwarp', None)),
+                            ('--ocr-layout-shape', getattr(args, 'ocr_layout_shape', None))):
+            if _val is not None:
+                cmd += [_flag, str(_val)]
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=7200, cwd=ROOT,
+                           env=dict(os.environ, PYTHONHASHSEED='0'))
         if p.returncode != 0:
             log('OCR 失败（exit %d）' % p.returncode); report['exit'] = EXIT['ocr']
             report['ocr'] = dict(returncode=p.returncode, tail=(p.stdout + p.stderr)[-800:])
@@ -561,6 +578,20 @@ def main(argv=None):
                     mode=dmeta.get('mode'), reason=dmeta.get('reason'),
                     coords_sha256=sha256(coords), lines_sha256=sha256(lines),
                     ocr_mode=args.ocr_mode, pages_per_batch=args.ocr_pages_per_batch)
+        _ep = os.path.join(ocr_out, 'ocr_params_effective.json')
+        if os.path.exists(_ep):
+            try:
+                report['ocr_params'] = json.load(open(_ep, encoding='utf-8'))
+            except Exception as e:
+                report['ocr_params'] = {'error': str(e)}
+        _jp = os.path.join(ocr_out, 'jobs.json')
+        if os.path.exists(_jp):
+            try:
+                report['ocr_jobs'] = {k: v.get('jobId') for k, v in
+                                      json.load(open(_jp, encoding='utf-8')).items()
+                                      if isinstance(v, dict)}
+            except Exception:
+                pass
         step('data', source='ocr', ocr_mode=args.ocr_mode, batch=args.ocr_pages_per_batch)
     report['data'] = data
     # 每书文本校正（CORRECTED_TEXT）：OCR lines 加载后、--pages 切片前应用

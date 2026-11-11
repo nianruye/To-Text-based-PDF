@@ -53,7 +53,17 @@
           <button class="toolbar-toggle" onclick="this.parentElement.classList.toggle('expanded')" title="Export options" aria-label="Export options">⋯</button>
         </div>
       </div>
-      <p class="subtitle">扫描 PDF -> PaddleOCR spotting -> 逐行几何还原 -> XeLaTeX -> 文字型 PDF ｜ 3 渲染管线 + 2 校准驱动 + QA（基于 docs/pipeline_audit.md）</p>
+      <p class="subtitle">历史架构图（2026-10-18）：扫描 PDF -> OCR -> 渲染 -> QA；当前主线 scan2pdf 见 PROJECT_ARCHITECTURE.md</p>
+    </div>
+
+    <div style="background:rgba(251,191,36,0.10);border:1px solid #fbbf24;border-radius:0.75rem;padding:1rem 1.25rem;margin-bottom:1.25rem">
+      <div style="color:#fbbf24;font-size:0.8rem;font-weight:700;letter-spacing:0.02em">⚠ 历史图（2026-10-18）——当前主线见 <a href="PROJECT_ARCHITECTURE.md" style="color:#67e8f9">docs/PROJECT_ARCHITECTURE.md</a></div>
+      <div style="color:#cbd5e1;font-size:0.72rem;line-height:1.7;margin-top:0.45rem">
+        当前端到端：源 PDF → <b>ocr_book</b>（layout+spotting，批量/断点/JSONL）→ coords/lines + layout.json
+        → corrected_text（可选）→ <b>fit_positional</b> 两趟（横排）或 <b>build_vert</b>（竖排）
+        → <b>verify_geom/verify_vert</b> → <b>quality_gate</b> → 交付 PDF + report/calib/gate sidecar。
+        图中旧节点（run_spotting_ocr / build_pdf_v13 / Web localhost:8765）仅作历史参考；scan2pdf/ocr_book/quality_gate 的当前结构见 PROJECT_ARCHITECTURE.md。
+      </div>
     </div>
 
     <div class="diagram-container">

@@ -13,6 +13,14 @@ import time
 
 JOB = 'https://paddleocr.aistudio-app.com/api/v2/ocr/jobs'
 DEFAULT_TOKEN = '/tmp/paddle_token'
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+OCR_DEFAULTS = {'max_pixels': 2822400, 'min_pixels': 147384,
+                'orientation': 0, 'unwarp': 0, 'layout_shape': 'auto'}
+_BOOK_KEYS = {'max_pixels': ('max_pixels', 'maxPixels'),
+              'min_pixels': ('min_pixels', 'minPixels'),
+              'orientation': ('orientation', 'useDocOrientationClassify'),
+              'unwarp': ('unwarp', 'useDocUnwarping'),
+              'layout_shape': ('layout_shape', 'layoutShapeMode')}
 
 
 def check_token(path):
@@ -49,12 +57,49 @@ def split_batches(input_pdf, pages_per_batch=50, pages=None):
     return d, batches
 
 
-def payload(layout, prompt):
+def resolve_ocr_params(book, cli=None, root=ROOT):
+    """参数优先级 CLI > data/<book>/ocr_params.json > 默认。返回 (params, sources, path, sha)。"""
+    import hashlib
+    params = dict(OCR_DEFAULTS)
+    sources = {k: 'default' for k in OCR_DEFAULTS}
+    path = os.path.join(root, 'data', book, 'ocr_params.json')
+    sha = None
+    if os.path.exists(path):
+        try:
+            doc = json.load(open(path, encoding='utf-8'))
+        except Exception as e:
+            raise ValueError('ocr_params.json 解析失败: %s' % e)
+        if not isinstance(doc, dict):
+            raise ValueError('ocr_params.json 根必须是 object')
+        sha = hashlib.sha256(open(path, 'rb').read()).hexdigest()
+        for k, aliases in _BOOK_KEYS.items():
+            for a in aliases:
+                if a in doc and doc[a] is not None:
+                    params[k] = doc[a]
+                    sources[k] = 'book_data'
+                    break
+    for k, v in (cli or {}).items():
+        if v is not None:
+            params[k] = v
+            sources[k] = 'cli'
+    # normalize
+    params['max_pixels'] = int(params['max_pixels'])
+    params['min_pixels'] = int(params['min_pixels'])
+    params['orientation'] = int(params['orientation'])
+    params['unwarp'] = int(params['unwarp'])
+    params['layout_shape'] = str(params['layout_shape'])
+    return params, sources, (path if os.path.exists(path) else None), sha
+
+
+def payload(layout, prompt, params=None):
+    p = dict(OCR_DEFAULTS); p.update(params or {})
     return {"model": "PaddleOCR-VL-1.6", "optionalPayload": json.dumps({
         "useLayoutDetection": layout, "promptLabel": prompt, "temperature": 0,
-        "minPixels": 147384, "maxPixels": 2822400, "repetitionPenalty": 1,
-        "topP": 1, "layoutShapeMode": "auto", "useDocUnwarping": False,
-        "useDocOrientationClassify": False})}
+        "minPixels": int(p['min_pixels']), "maxPixels": int(p['max_pixels']),
+        "repetitionPenalty": 1, "topP": 1,
+        "layoutShapeMode": str(p['layout_shape']),
+        "useDocUnwarping": bool(int(p['unwarp'])),
+        "useDocOrientationClassify": bool(int(p['orientation']))})}
 
 
 
@@ -209,12 +254,14 @@ def convert_raw_dir(out_dir, src_pdf, book, jobs=None):
 
 
 def write_manifest(out_dir, jobs, batches, src_pages):
-    man = dict(batches=[], source_pages=src_pages)
+    man = dict(batches=[], source_pages=src_pages,
+               env=dict(PYTHONHASHSEED=(os.environ.get('PYTHONHASHSEED') or '0')))
     for mode_key, info in sorted(jobs.items()):
         if not isinstance(info, dict):
             continue
         man['batches'].append(dict(key=mode_key, state=info.get('state'),
-                                   jobId=info.get('jobId'), pages=info.get('pages')))
+                                   jobId=info.get('jobId'), pages=info.get('pages'),
+                                   params=info.get('params')))
     json.dump(man, open(os.path.join(out_dir, 'manifest.json'), 'w', encoding='utf-8'),
               ensure_ascii=False, indent=1)
     return man
@@ -242,6 +289,19 @@ def run(args):
     elif args.mode == 'spotting': modes = modes[1:]
     import requests
     H = {'Authorization': 'bearer ' + tok}
+    _cli = dict(max_pixels=getattr(args, 'ocr_max_pixels', None),
+                min_pixels=getattr(args, 'ocr_min_pixels', None),
+                orientation=getattr(args, 'ocr_orientation', None),
+                unwarp=getattr(args, 'ocr_unwarp', None),
+                layout_shape=getattr(args, 'ocr_layout_shape', None))
+    try:
+        _params, _psrc, _ppath, _psha = resolve_ocr_params(args.book, _cli)
+    except Exception as e:
+        print('[ocr_book] ' + str(e), file=sys.stderr); return 2
+    json.dump(dict(params=_params, sources=_psrc, path=_ppath, sha256=_psha),
+              open(os.path.join(args.out_dir, 'ocr_params_effective.json'), 'w', encoding='utf-8'),
+              ensure_ascii=False, indent=1)
+    print('[ocr_book] params: %s' % _params)
     failed = 0
     for mode, layout, prompt in modes:
         for bi, idxs in batches:
@@ -250,10 +310,12 @@ def run(args):
             if args.resume and os.path.exists(raw_path):
                 jobs.setdefault(key, {})
                 jobs[key]['pages'] = idxs
+                jobs[key]['params'] = _params
                 json.dump(jobs, open(jobs_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
                 continue
             if key in jobs and jobs[key].get('state') == 'done' and os.path.exists(raw_path):
                 jobs[key]['pages'] = idxs
+                jobs[key]['params'] = _params
                 json.dump(jobs, open(jobs_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
                 continue
             batch_pdf = os.path.join(args.out_dir, 'batches', key + '.pdf')
@@ -267,7 +329,7 @@ def run(args):
             for att in range(4):
                 try:
                     with open(batch_pdf, 'rb') as f:
-                        r = requests.post(JOB, headers=H, data=payload(layout, prompt),
+                        r = requests.post(JOB, headers=H, data=payload(layout, prompt, _params),
                                           files={'file': f}, timeout=1800)
                     if r.status_code != 200:
                         raise RuntimeError('HTTP %d %s' % (r.status_code, r.text[:120]))
@@ -289,7 +351,7 @@ def run(args):
                     raw = requests.get(url, timeout=600)
                     raw.raise_for_status()
                     open(raw_path, 'w', encoding='utf-8').write(raw.text)
-                    jobs[key] = dict(state='done', jobId=jid, pages=idxs)
+                    jobs[key] = dict(state='done', jobId=jid, pages=idxs, params=_params)
                     break
                 if state == 'failed':
                     jobs[key] = dict(state='failed', jobId=jid, error=str(d.get('errorMsg'))[:200])
@@ -323,6 +385,11 @@ def main(argv=None):
     ap.add_argument('--workers', type=int, default=4)
     ap.add_argument('--resume', action='store_true')
     ap.add_argument('--pages', default='')
+    ap.add_argument('--ocr-max-pixels', type=int, default=None)
+    ap.add_argument('--ocr-min-pixels', type=int, default=None)
+    ap.add_argument('--ocr-orientation', type=int, default=None, choices=[0, 1])
+    ap.add_argument('--ocr-unwarp', type=int, default=None, choices=[0, 1])
+    ap.add_argument('--ocr-layout-shape', default=None)
     args = ap.parse_args(argv)
     return run(args)
 
