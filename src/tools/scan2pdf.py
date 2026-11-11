@@ -370,6 +370,29 @@ def run_verify_geom(pdf, coords, lines, floor=None, src_pdf=None):
     return m
 
 
+
+def attach_typography(report, args, lines_path):
+    """t239：排版评测（不改变几何门禁；决策 A 语义在 verify_typography 内）。"""
+    try:
+        tool = os.path.join(ROOT, 'src/test/verify_typography.py')
+        if not os.path.exists(tool):
+            return
+        outj = args.out + '.typography.json'
+        bt = 'vertical' if (args.book_type or {}).get('axis') == 'vertical' else 'horizontal'
+        cmd = ['/usr/bin/python3', tool, args.out, '--json', outj, '--book-type', bt]
+        if args.src_pdf if hasattr(args, 'src_pdf') else False:
+            cmd += ['--src-pdf', args.src_pdf]
+        if lines_path:
+            cmd += ['--lines', lines_path]
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=300,
+                           env=dict(os.environ, PYTHONHASHSEED='0'))
+        if os.path.exists(outj):
+            report['typography'] = json.load(open(outj, encoding='utf-8'))
+        else:
+            report['typography'] = dict(tool='verify_typography', error='no report', rc=p.returncode)
+    except Exception as e:
+        report['typography'] = dict(tool='verify_typography', error=str(e))
+
 def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
     pipeline = getattr(args, 'pipeline_resolved', None) or args.pipeline
     if pipeline == 'auto':
@@ -855,6 +878,7 @@ def main(argv=None):
         report['gate']['json'] = gp
         report['gate']['reasons'] = reasons
         rp = args.report or (args.out + '.report.json')
+        attach_typography(report, args, lines)
         json.dump(report, open(rp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
         print('[scan2pdf] %s: pipeline=geom gate=%s exit=%d report=%s' %
               (args.book, report['gate']['verdict'], code, rp))
