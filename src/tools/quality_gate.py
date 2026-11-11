@@ -122,6 +122,22 @@ def judge_content(metrics):
     return 'REJECT', reasons, fail
 
 
+
+def typography_component(typ):
+    """排版分项（t239；决策 A：仅 render_introduced/hard 为 fail，L2/L3 其余 warn）。"""
+    if not isinstance(typ, dict):
+        return None
+    cnt = typ.get('counts') or {}
+    return dict(tool='verify_typography', verdict=typ.get('verdict'),
+                fail=(typ.get('verdict') == 'FAIL'),
+                warn=(typ.get('verdict') == 'WARN'),
+                compliance_rate=typ.get('compliance_rate'),
+                body_lines=typ.get('body_lines'),
+                counts=cnt,
+                reasons=['typography_%s' % k for k in ('hard', 'render_introduced')
+                         if cnt.get(k)],
+                layers=typ.get('layers'))
+
 def combine(v_ok, p_verdict, c_verdict, p_reasons=None, c_reasons=None):
     """三档合成：verify FAIL -> REJECT；任一 REJECT -> REJECT；任一 MANUAL/UNSCORED -> MANUAL_ONLY；全 AUTO -> AUTO_PASS。"""
     if not v_ok:
@@ -540,6 +556,12 @@ def main(argv=None):
                        data_missing=bool(dm and dm.get('missing')),
                        top_failures=top[:args.top_n],
                        note='B=punct sequence（provisional）；A=cell 仅参考；content 阈值待 t111 标定；data_missing=上游 OCR 缺标点')
+    _tj = args.out + '.typography.json'
+    if os.path.exists(_tj):
+        try:
+            res['typography'] = typography_component(json.load(open(_tj, encoding='utf-8')))
+        except Exception as e:
+            res['typography'] = dict(tool='verify_typography', error=str(e))
     json.dump(res, open(args.out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     # markdown 摘要
     md = render_markdown(res)

@@ -259,6 +259,15 @@ def _esc_heading(t):
         return esc(_pre) + '\\quad ' + esc(_rest)
     return esc(t)
 
+def _esc_toc_title(t):
+    """TOC 标题：数字序号后保留可见间隙（不压字）；避免 _esc_heading 对 '1.' 无间隙。"""
+    m = re.match(r'^(\d+[.．、])(\s*)(.*)$', t.strip())
+    if m:
+        _rest = m.group(3)
+        return esc(m.group(1)) + '\\hspace*{10pt}\\rule{0.1pt}{0pt}' + _esc_heading(_rest)
+    return _esc_heading(t)
+
+
 TERMINAL = set('。！？!?.?）)】」』"\'…')
 
 # 位置还原(POSITIONAL=1):每行按源 y 增量定位(\vspace 补足行距),页面填满如源。默认关——wz1 等已有数据的 y 尺度未必适配,用开关隔离
@@ -553,6 +562,84 @@ def _norm_core(t):
     tt = _t2s.convert(tt)                                        # 繁简归一(OCR 时繁时简"社會/社会")
     return re.sub(r'[^\w\u4e00-\u9fff]', '', _heading_core(tt))
 
+_TOC_NUM_RE = re.compile(r'^\d{1,4}$')
+_TOC_ENTRY_START_RE = re.compile(r'^\s*(?:第?[一二三四五六七八九十百千零\d]+(?:部分|编|篇|[章节])?|[（(]?[一二三四五六七八九十]+[)）]?[、.．：]?|\d+[.．、])')
+
+
+def _toc_pre_flow(flow):
+    """t232：页码在标题前的目录（ghbq p11）。兼容 OCR 已把页码与标题并成同 y frags。
+
+    返回新的 flow（去掉页码片段、合并续行）或 None。
+    """
+    if not flow:
+        return None
+    # t242：目录页判定由「含 CONTENTS」扩展为所有 _TOC_PAGE 页（p12 续页也要三栏版式）
+    def _parts(f):
+        return [(str(t).strip(), x) for t, x in (f.get('frags') or []) if str(t).strip()]
+    def _numfrags(f):
+        return [t for t, _ in _parts(f) if _TOC_NUM_RE.match(t)]
+    _cand = [f for f in flow if len(_numfrags(f)) == 1 and len(_parts(f)) >= 2
+             and bool(_TOC_ENTRY_START_RE.match(''.join(t for t, _ in _parts(f) if not _TOC_NUM_RE.match(t)).strip()))]
+    _raww = [f for f in flow if _TOC_NUM_RE.match((f.get('t') or '').strip())]
+    if len(_cand) >= 3 and not any('CONTENTS' in (f.get('t') or '') for f in flow):
+        # 同 y 数字+标题片段也可能出现在 wz 古籍目录（后置页码）；只认含 CONTENTS 的 ghbq 三栏页。
+        return None
+    if len(_cand) < 3:
+        # 原始形态：页首（跳过目录标题）必须是数字，紧随标题可识别为条目，且标题后不是立即数字。
+        _body = [f for f in flow if not (_norm_core(f.get('t','')).startswith('目录') or _norm_core(f.get('t','')) == 'CONTENTS')]
+        if len(_raww) < 3 or not _body or not _TOC_NUM_RE.match((_body[0].get('t') or '').strip()):
+            return None
+        if len(_body) < 2 or not _TOC_ENTRY_START_RE.match((_body[1].get('t') or '').strip()):
+            return None
+        if len(_body) >= 3 and _TOC_NUM_RE.match((_body[2].get('t') or '').strip()):
+            return None
+    out = []; pending = None; cur = None
+    for f in flow:
+        t = (f.get('t') or '').strip()
+        if _norm_core(t).startswith('目录') or _norm_core(t) == 'CONTENTS':
+            out.append(f); continue
+        parts = _parts(f)
+        nums = [x for x, _ in parts if _TOC_NUM_RE.match(x)]
+        titles = [x for x, _ in parts if not _TOC_NUM_RE.match(x)]
+        if len(nums) == 1 and titles:   # OCR 把页码+titles 并在同一 y、两个 frag
+            nf = dict(f)
+            nf['toc_pre'] = True; nf['toc_page'] = nums[0]; nf['is_head'] = False
+            nf['t'] = ''.join(titles); nf['frags'] = None
+            cur = nf; out.append(nf)
+            continue
+        if _TOC_NUM_RE.match(t):       # 原始形态：独立页码行
+            pending = t; continue
+        if pending is not None:
+            nf = dict(f); nf['toc_pre'] = True; nf['toc_page'] = pending; nf['is_head'] = False
+            nf['frags'] = None; pending = None; cur = nf; out.append(nf)
+        elif cur is not None and not _TOC_ENTRY_START_RE.match(t):
+            # 续行保留独立 flow：渲染时与标题首行同 x0（不用 parbox 的隐式缩进）
+            nf = dict(f); nf['toc_pre'] = True; nf['toc_cont'] = True
+            nf['toc_page'] = ''; nf['is_head'] = False; nf['frags'] = None
+            nf['fnt'] = cur.get('fnt', _TOC_CAL.get('font_line', PF))
+            _ct = cur.get('t','').strip()
+            nf['toc_indent'] = 22.0 if re.match(r'^\d+[.．]', _ct) else 0.0
+            out.append(nf)
+        else:
+            nf = dict(f); nf['toc_pre'] = True; nf['toc_page'] = ''; nf['is_head'] = False
+            nf['frags'] = None; cur = nf; out.append(nf)
+    if pending and cur is not None and not cur.get('toc_page'):
+        cur['toc_page'] = pending
+    _pre = [f for f in out if f.get('toc_pre')]
+    if _pre:
+        _ch = [f.get('fnt', PF) for f in _pre if re.match(r'^[一二三四五六七八九十]+[“"‘\s]', (f.get('t') or '').strip())]
+        _sec = [f.get('fnt', PF) for f in _pre if re.match(r'^\d+[.．、]', (f.get('t') or '').strip())]
+        # 同页同级统一：章标题取同页章级最大字号、节标题取同页节级最小字号（源书章大节小）
+        _chf = max(_ch) if _ch else round(PF * 1.4, 1)
+        _secf = min(_sec) if _sec else round(PF, 1)
+        for f in _pre:
+            _t = (f.get('t') or '').strip()
+            if re.match(r'^[一二三四五六七八九十]+[“"‘\s]', _t):
+                f['fnt'] = round(_chf, 1); f['tier'] = 'part'
+            elif re.match(r'^\d+[.．、]', _t):
+                f['fnt'] = round(_secf, 1); f['tier'] = 'section'
+    return out if any(f.get('toc_pre') for f in out) else None
+
 _TOC_PAGE = set()   # str 页key(主循环守卫/渲染门控用)
 _TOC_PN = {}
 try:
@@ -563,6 +650,18 @@ try:
     if _mark:
         _tocI = set(range(min(_mark), max(_mark) + 1))   # 标记页间全收(偶页无"目录"书眉)
         _tocI = {i for i in _tocI if i in _all_rows}
+        # t242：目录续页（p11/p12）无「目录」书眉，按条目形态向前扩展，直到非目录页
+        def _toc_like(_rows):
+            _n = 0
+            for _t, _ in _rows:
+                _t = str(_t).strip()
+                if (re.match(r'^\d{1,4}$', _t) or _TOC_ENTRY_START_RE.match(_t)
+                        or re.search(r'[.·…．]{2,}\s*\d{1,4}$', _t)):
+                    _n += 1
+            return _n >= 5
+        _nxt = max(_tocI) + 1 if _tocI else max(_mark) + 1
+        while _nxt in _all_rows and _nxt <= max(_mark) + 6 and _toc_like(_all_rows[_nxt]):
+            _tocI.add(_nxt); _nxt += 1
     _TOC_PAGE = {str(i) for i in _tocI}
     # ---- F22 目录页参数自校准(OCR 数据驱动, 替代固定阈值) ----
     _TOC_CAL = {}
@@ -867,7 +966,7 @@ if os.environ.get('PAGE_FONT', '') in ('1', 'true', 'True'):
             _ys = [p[1] for p in _ppolys[_pi]]; _xs = [p[0] for p in _ppolys[_pi]]
             if min(_ys) < page_px_h * 0.06 and len(_pt) < 30: continue   # 页眉
             if min(_ys) > page_px_h * 0.95: continue   # 页码
-            if min(_xs) > page_px * 0.90 or max(_xs) < page_px * 0.10: continue   # 侧栏 aside
+            if min(_xs) > page_px * 0.919 or max(_xs) < page_px * 0.10: continue   # 侧栏 aside
             _prows.append({'t': _pt, 'w': max(_xs)-min(_xs), 'h': max(_ys)-min(_ys)})
         _pph = [r['h'] for r in _prows if r['h']]
         _pphm = statistics.median(_pph) if _pph else H_BODY
@@ -935,7 +1034,7 @@ for key in sorted(sl.keys(), key=int):
                     _ix1, _iy1 = _fb[2]*200.0/LDPI, _fb[3]*200.0/LDPI
                     _ov += max(0.0, min(max(xs), _ix1)-max(min(xs), _ix0)) * max(0.0, min(max(ys), _iy1)-max(min(ys), _iy0))
                 _line_invis = (_ov > 20.0 and _ov > 0.05 * _span_area)
-            if (min(xs) > page_px * 0.90 or max(xs) < page_px * 0.10) and not PN_RE.fullmatch(t.strip()):
+            if (min(xs) > page_px * 0.919 or max(xs) < page_px * 0.10) and not PN_RE.fullmatch(t.strip()):
                 continue   # 侧栏 running head(古籍卷/篇名边栏,在极左/右页边),跳过——否则同 y 与正文合并撑高行→误判大标题污染。保留纯数字(右对齐的目录页码/页码)
             _is_fc = bool(_fig_titles.get(key)) and in_figcaption(min(xs), y0, max(xs)-min(xs), max(ys)-min(ys), key)
             rows.append({'t': t, 'x0': min(xs), 'h': max(ys)-min(ys), 'y0': y0, 'w': max(xs)-min(xs), 'is_figcaption': _is_fc, 'invisible': _line_invis})
@@ -991,6 +1090,18 @@ for key in sorted(sl.keys(), key=int):
                 continue
         _m.append(r)
     rows = _m
+    # t249：仅页内存在靠右/出纸的 OCR 行时才启用 XCLIP/脚注折行，避免正常页无谓改版。
+    _xguard_page = any((r.get('t') or '').strip() and ((r.get('x0', 0) > page_px * 0.75) or ((r.get('x0', 0) + r.get('w', 0)) > page_px * 0.919)) for r in rows)
+    # t236：OCR 整页并行守卫（非 p97 特判）：单行 poly 高 >3×页字体高或字数>100且高>>单行。
+    # 处理优先按源图整页兜底（PAGE_IMAGE 机制），文本层降到 1pt 不可见以保留可搜/行数；
+    # 这样横向 x1 受控，源图可读。OCR_GIANT_FALLBACK=0 回退。
+    _giant_page = False
+    if os.environ.get('OCR_GIANT_FALLBACK', '1') not in ('0', 'false', 'False'):
+        _giant_rows = [r for r in rows if ((r.get('h', 0) > 3.0 * H_BODY and len((r.get('t') or '').strip()) >= 30) or (len((r.get('t') or '').strip()) > 100 and r.get('h', 0) > 1.8 * H_BODY))]
+        if _giant_rows:
+            _giant_page = True
+            _page_img_full = True
+            print(f"  p{int(key)+1} OCR 整页并行({len(_giant_rows)} 行, h={max(r.get('h',0) for r in _giant_rows):.0f}px) → 整页源图+文本层1pt")
     _reg = detect_regions(rows) if USE_REGION else {}   # 区域化:正文/注释分簇 + 每簇字号(字数标定)。空=未开,走原 PAGE_FONT
     if USE_REGION and len(_reg) > 1:
         print(f"  p{int(key)+1} 混合页 区域 " + ' '.join(f"{t}:{d['font']}pt" for t, d in sorted(_reg.items())))
@@ -1024,6 +1135,8 @@ for key in sorted(sl.keys(), key=int):
     elif pn_ocr and not _pn_ocr_use:
         _prev_pn = None   # 突变弃用(目录页误识):重置 prev,允许下页重新起步(序列断裂后恢复连续,否则 prev 卡住致后续全弃用)
     body = [f'\\setcounter{{page}}{{{pn}}}' if pn else '\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']   # 清上页旁注叠加+图页背景
+    if _giant_page:
+        body.append('\\thispagestyle{empty}')   # 整页贴图：页脚页码由源图提供，禁止文本层再画一个
     if _page_img_full:
         # t199: image-like 页整体覆盖率 >= PAGE_IMAGE_FULL_RATIO -> 源页整页 raster 背景；
         # 本页全部文本由下面的 page-level 3 Tr 隐藏（仍可搜），不再重排压图。
@@ -1124,6 +1237,36 @@ for key in sorted(sl.keys(), key=int):
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
         flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
+    if _CIP_PAGE and os.environ.get('CIP_DASH_FIX', '0') in ('1', 'true', 'True'):   # t242 p5 可选；默认关以保证 wz 零回归
+        for _cf in flow:
+            _ct = (_cf.get('t') or '').strip()
+            if _ct.startswith('—') and not _ct.startswith('——'):
+                _cf['t'] = _ct[1:].lstrip()
+    # t249：横向越界根因守卫——自然宽度超出可用版心/页宽的行，左移夹取到版心右缘内。
+    # 不做逐页特判；XCLIP=0 回退。只改缩进 x0（字号/文字不变），p2 条码块与 p428 版权行都受控。
+    if os.environ.get('XCLIP', '1') not in ('0', 'false', 'False'):
+        _mright = PAGE_W - 2.0
+        if os.environ.get('XCLIP_DBG') and int(key) in (1, 427):
+            print('[XCLIP] p%d flow=%d' % (int(key)+1,len(flow)),flush=True)
+            for _z in flow: print('  F',round(_z.get('x0',0),1),_z.get('is_head'),_z.get('is_figcaption'),round(_z.get('fnt',0),1),repr((_z.get('t') or '')[:30]))
+        for _xf in flow:
+            if not _xguard_page or _xf.get('is_figrow') or _xf.get('is_head') or _xf.get('is_figcaption'):
+                continue
+            _nat = max(sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in (_xf.get('t') or '')) * _xf.get('fnt', FONT),
+                       (_xf.get('w', 0) or 0) * 72.0 / DPI)
+            _xp = _xf.get('x0', 0) * 72.0 / DPI + MARGIN
+            if _xf.get('x0', 0) > page_px * 0.70 and _xp + _nat > _mright + 0.5:
+                if _nat + MARGIN > _mright:   # 整行宽于可用版心：缩字号到恰好放下
+                    _xf['fnt'] = max(1.0, round(_xf.get('fnt', FONT) * (_mright - MARGIN) / _nat, 2))
+                    _nat = _mright - MARGIN
+                _xf['x0'] = max(0.0, (_mright - _nat - MARGIN) * DPI / 72.0)
+    if _giant_page:
+        for _gf in flow:
+            _gf['fnt'] = 1.0; _gf['is_head'] = False; _gf['tier'] = None; _gf['align'] = 'l'
+    if key in _TOC_PAGE and os.environ.get('TOC_PRE', '1') not in ('0', 'false', 'False'):
+        _tf = _toc_pre_flow(flow)
+        if _tf is not None:
+            flow = _tf
     if key in _TOC_PAGE:   # 目录页:游离纯数字行(与标题行 y 不重叠未并片)→ 追加为上一条目页码片段; 上条已有数字片段则丢弃(防孤行落在版心外)
         _nf7 = []
         for _f7 in flow:
@@ -1194,7 +1337,7 @@ for key in sorted(sl.keys(), key=int):
     _toc_shift = max(0.0, (body_left_px - _toc_ref) * 72.0 / DPI) if _toc_ref > 0 else 0.0   # 目录整体左移量(源目录从 ~52px 起,正文边距 128px → 左移 ~27pt 匹配源绝对位置)
     # 页眉(顶部小字,居中 + 下方分界线)
     for t in headers:
-        body.append('{\\fontsize{' + str(FONT_SM) + 'pt}{' + str(round(FONT_SM*1.2,1)) + 'pt}\\selectfont \\centerline{' + esc(t) + '}}')
+        body.append('{\\fontsize{' + str(1.0 if _giant_page else FONT_SM) + 'pt}{' + str(round((1.0 if _giant_page else FONT_SM)*1.2,1)) + 'pt}\\selectfont \\centerline{' + esc(t) + '}}')
         body.append('\\vspace{2pt}\\hrule')   # 页眉下方分界线(源 running head 样式)
         if not USE_POS:
             body.append('\\vspace{' + str(HDR_GAP) + 'pt}')   # 页眉→正文间距(非位置还原时加;POSITIONAL 由 top_vs 给,不重复→否则首行下移 HDR_GAP 溢出)
@@ -1209,6 +1352,28 @@ for key in sorted(sl.keys(), key=int):
             _n = flow[i+1]
             if not _n['is_head'] and _n['x0'] <= body_left + indent_thr:
                 _n['is_head'] = True; _n['is_cont'] = True; _n['fnt'] = _c['fnt']; _n['align'] = 'l'   # is_cont=续行,不触发新段(与标题同段,行间无空隙)
+    # S4/t232: 反向标题续行——OCR 把章标题折成两行时，首行常被误判正文、次行命中标题；
+    # 首行同块继承次行字号/黑体/居中，避免半行宋体半行黑体。开关 TITLE_CONT=0 关闭。
+    if os.environ.get('TITLE_CONT', '1') not in ('0', 'false', 'False'):
+        for i in range(1, len(flow)):
+            _n = flow[i]
+            if not _n.get('is_head') or _n.get('is_cont'):
+                continue
+            _p = flow[i-1]
+            if _p.get('is_head') or not _p.get('t', '').strip():
+                continue
+            _pt = _p['t'].rstrip()
+            if not _pt or _pt[-1] in TERMINAL:
+                continue
+            _gap = (_n.get('y0', 0) - _p.get('y0', 0)) * 72.0 / DPI
+            _centered = _p.get('x0', 0) > body_left + indent_thr
+            if (0 < _gap <= 1.8 * H_BODY * 72.0 / DPI and _centered
+                    and re.match(r'^[一二三四五六七八九十]+[“"‘]', _pt)
+                    and len(_n.get('t','').strip()) <= max(8, len(_pt)//2)):
+                _p['is_head'] = True; _p['is_cont'] = True
+                _p['fnt'] = _n.get('fnt', _p.get('fnt')); _p['tier'] = _n.get('tier')
+                _p['align'] = 'c'; _n['align'] = 'c'
+                if os.environ.get('TITLE_CONT_DBG'): print('[TITLE_CONT] p%s %r + %r' % (int(key)+1, _pt[:20], _n.get('t','')[:12]), flush=True)
     # ── 位置还原溢出控制:预扫描本页位置化总高,超版心 → 先压空白(顶偏移+段间隙),压光再收 strut ──
     # 位置还原按源 y 落位(顶偏移 + 段间隙)保留结构性留白 → 消除底部空白;但内容+留白超版心会溢成多页(wz1 73页)。
     # 此预扫描用与发射同一 para-start 规则估总高,得两个缩放因子:_pos_gscale(空白)、_pos_sscale(strut,仅万不得已)。
@@ -1311,6 +1476,17 @@ for key in sorted(sl.keys(), key=int):
                     body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}}' + brk + '}')
                 else:                       # 源里左对齐 → 左对齐
                     body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}' + brk + '}')
+                continue
+            if key in _TOC_PAGE and f.get('toc_pre'):
+                _pg = str(f.get('toc_page') or '').strip()
+                _xoff = _toc_shift if '_toc_shift' in locals() else 0.0
+                # 页码列固定 18pt 右对齐；标题/续行都用同一左缘（xoff+26pt），续行不用 parbox。
+                _title_x = _xoff + 18.0 + float(f.get('toc_indent', 0.0))
+                if f.get('toc_cont'):
+                    body.append('{\\fontsize{%spt}{%spt}\\selectfont \\noindent\\hspace*{%.1fpt}{\\CJKfamily{heiti}%s}}' % (fnt, bl, _title_x, _inv(_esc_toc_title(f['t']), f)) + brk + '}')
+                else:
+                    _pgbox = '\\makebox[18pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg))
+                    body.append('{\\fontsize{%spt}{%spt}\\selectfont \\noindent\\hspace*{%.1fpt}%s\\hspace{2pt}\\rule[-0.2ex]{0.4pt}{1.05em}\\hspace{6pt}{\\CJKfamily{heiti}%s}}' % (fnt, bl, _xoff, _pgbox, _inv(_esc_toc_title(f['t']), f)) + brk + '}')
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
@@ -1460,19 +1636,27 @@ for key in sorted(sl.keys(), key=int):
     flush()
     if is_divider:
         body.append('\\vspace*{\\fill}')   # 分隔页底部填充(配合顶部 fill → 标题垂直居中)
+    if os.environ.get('XCLIP', '1') not in ('0', 'false', 'False') and _xguard_page:
+        for _ft in footnotes:
+            _fn = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in (_ft.get('t') or '')) * FONT_SM
+            if _fn > PAGE_W:
+                _ft['fnt'] = max(1.0, round(FONT_SM * PAGE_W / _fn, 2))
     # 脚注区(分界线 + 小字,匹配源;满行也两端对齐)
     if footnotes:
         body.append('\\vspace{6pt}\\hrule width 0.3\\textwidth\\vspace{3pt}')
-        fbl = round(FONT_SM*1.2, 1)
-        body.append('{\\linespread{1}\\fontsize{' + str(FONT_SM) + 'pt}{' + str(fbl) + 'pt}\\selectfont')   # 脚注区整体 \\linespread{1},防全局行距倍数撑大脚注 pitch
         for ft in footnotes:
+            _fsm = 1.0 if _giant_page else ft.get('fnt', FONT_SM)
+            fbl = round(_fsm*1.2, 1)
+            body.append('{\\linespread{1}\\fontsize{' + str(_fsm) + 'pt}{' + str(fbl) + 'pt}\\selectfont')
             inner = esc(ft['t'])
-            _fnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in ft['t']) * FONT_SM
-            if _fnat >= 0.85 * MEASURE:
-                body.append('\\renewcommand{\\CJKglue}{\\hskip 0.25em plus 1em}\\makebox[\\textwidth][s]{' + inner + '}\\par')
+            _fnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in ft['t']) * (1.0 if _giant_page else FONT_SM)
+            if _xguard_page:
+                body.append('\\noindent\\parbox{\\textwidth}{\\raggedright ' + inner + '}\\par}')
+            elif _fnat >= 0.85 * MEASURE:
+                body.append('\\renewcommand{\\CJKglue}{\\hskip 0.25em plus 1em}\\makebox[\\textwidth][s]{' + inner + '}\\par}')
             else:
-                body.append(inner + '\\par')
-        body.append('}')   # 关闭脚注组,恢复正文 \\linespread
+                body.append(inner + '\\par}')
+        # 每行自闭合 fontsize 组,不再额外关闭全局组
     if _page_img_full or _all_text_invis:
         body.append('\\special{pdf:literal direct Q}')
     body.append('\\par\\newpage')

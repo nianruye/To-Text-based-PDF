@@ -1244,3 +1244,28 @@ bash scripts/e2e_smoke.sh --book wz4 --input source_pdf/wz4.pdf --data-dir /tmp/
 | `src/test/unit/test_architecture_guard.py` | `f3ec07fe837592a8085b6e476a521107cc0581a4adc20cbb515abbe70a3cc664` |
 | `src/tools/scan2pdf.py`（当前树） | `d8fda57b083a0af81a13d0afd03c9fe272037b8a796115a0aeb4718569449545` |
 | HEAD | `70a9d70`（未 commit；测试篡改均已恢复） |
+
+# 附：排版评测契约 + verify_typography 终审（t241）
+
+> 审查人：质量审查员　日期：2026-11-11 20:53–21:40
+> **结论：needs_revision（FAIL）**。完整报告见 [docs/typography_eval_review.md](typography_eval_review.md)。
+
+【must-fix】
+- **F1 high**：`render_introduced` 路径几乎不存在（前缀 8 字→source_inherent，否则 unknown；除 CIP 特判外无 render 产出）。实测 wz4 6 条 `。` 行首（spec §8 标 render）当前 **unknown/warn**，不升级 fail → 放水。
+- **F2 high**：`non_body_page` 实现为**单关键词**（md5/filesize/total_pages…）即整页豁免（spec §4.3 要求 ≥3 特征）。探针：正文页含 `md5` → body_lines=0、PASS（正文被吞）。
+- **F3 high**：L1 仅实现 TOC 序号 overlap + 完全越出页幅 + 页数；**M3 页码错位、M4 字符丢失/重复缺失**，M1 普通 span 重叠不判、M2 部分越界不判。
+- **F4 medium**：p5 CIP 单破折号特判与 spec §4.1 相反（源行首本就是 `—` → 应 source_inherent；实现强制 render，注释写明「t239 红侧 p5」）→ 误伤 + 红侧证据失效；单测固化。
+- **F5 medium**：spec §2.1 规则 ID/名称与实现大面积不一致（5.1.2/3/4/5/7/9/10）。
+- **F6 medium**：spec header/§10 仍 planned、工具路径写 `src/tools/typography_eval.py`（实际 `src/test/verify_typography.py`）；README=implemented；§8 基线未冻结（wz4 6 render vs 当前 unknown）。
+- F7 low：§3.1 与 §7 对 L1 exit 自相矛盾；F8 low：GB52 attribution=`vertical_stat` 超出 spec 四类；compliance 1.0 与 277 warn 并存易误读。
+- note：PUNCTUATION/PUNCT_EVAL 未被误改 ✓；t242 改 build_geom（CIP 单 `—`）需与「评测不改渲染」边界分离。
+
+【复算】p12 gap −8.14 ✓；p97 越界 607.6>600.75 ✓；p5 源行 `—北京:…` 证实应为 source_inherent ✓。
+
+【结论】工具当前会**漏报真违规**（F1/F2/F3）并**误伤源书特性**（F4），spec 与实现未对齐（F5/F6）；修复后复验。
+
+（t241 补充）**F11 medium**：`test_verify_typography.py` 当前 **1 failed/17 passed**——`test_real_red_ghbq_title_toc` 依赖可变的 `output/ghbq_full/ghbq_title_toc.pdf`（已重建，旧 gap −8.32/−11.65 不再存在），测试非 hermetic；需冻结 fixtures。
+
+（t251 round-2）**verdict = needs_revision**：t250 已修 nonbody≥3/p5 source_inherent/hermetic/spec 命名；但 **M1 与 spec 方向相反且误伤 wz2(19)/wz1(4) 正常相邻 span**（手工复算 64.2%/64.9% min 重叠）、**M3/M4 仍缺**、§12 wz4_s4 hash 不符（实际 `80d537e2…`）、「wz4 exit0」仅不带 lines 成立（带 lines FAIL/exit1）。详见 [docs/typography_eval_review.md](typography_eval_review.md) §6。
+
+（t256 round-3）**verdict = needs_revision**：M1 诊断化/M3M4 文档化/edge p5/nonbody≥3/§12 基线已修；但 **M2 仍只判整段完全越界**（右缘越出 170pt 探针 PASS；p97 同页部分越界 span 漏判，整段越界 43 条才 hard），新增 **ISBN/CIP non_body 启发式未入 spec 且吞 p2 内容页**，edge `pos` 未接线（行末规则误归因）；unit 774 passed、invariants 首跑 2 failed 复跑 13 passed（非确定）。详见 [docs/typography_eval_review.md](typography_eval_review.md) §7。

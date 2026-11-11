@@ -406,3 +406,19 @@ bash scripts/e2e_smoke.sh \
 - **守卫 token**：`test_spec_conformance.py` 改为完整 token 集合匹配（`\b...\b`），不做子串；fixture 用 `APPLIED_X`/`REPLACED_TOK` 验证 `replaced` 不误匹配。红/绿双侧：临时把 spec `replaced→REPLACED_TOK` → 测试 FAIL；恢复 → 7 passed。
 - **E2E 已知阻断（t208 未回退，t221 处理中）**：当前树 `wz2 --pages 1-6` → exit 6 / gate REJECT / pitch **66.7%**；干净 HEAD（worktree `70a9d70`）同数据 → exit 0 / gate PASS / pitch **100%**、6=6。ghbq 4 页当前树与 HEAD 均 PASS 100%（4 页）。t221 回退后应回到 wz2 PASS 100。
 - 复跑：ghbq 命令两次均 exit0/PASS100/pages4；坏 data-dir exit1 且 summary 带 reasons/log tail。
+
+## 27. t236：目录序号-标题间隙度量 + TITLE_CONT 限制
+
+- **D 度量口径**：目录条目序号到标题的间隙，不用 span bbox 直接相减，必须取
+  「序号 span 末字符可见 bbox」到「标题 span 首个非空白字符 bbox」：
+  - 引号组（`1.“…”`）：1.84pt；
+  - CJK 组（`1.否定…`，标题 span 以空格开头）：10.06pt；
+  - 两组均 ≥1pt。单测 `test_toc_layout.py::test_p11_seq_title_gap_char_level` 锁定。
+- **TITLE_CONT 反向继承法适用范围与限制**：
+  1. 适用于 **2 行及以上链式折行**：后一行被判为标题时，把前一行（及已标 `is_cont` 的链）反向继承字号/黑体/居中；
+  2. 若整块标题**没有任何一行**被 `is_head` 判定命中，则不生效——需要「判定前块级合并」；
+     该根治已转 backlog **#52**（AGENTS.md），不在本开关内伪装解决。
+  3. 开关 `TITLE_CONT=0` 可完全回退到 t232 前行为；默认仅影响标题形态页，正文不受影响。
+- **p97 异常 OCR 行守卫（t236）**：单 OCR 行 poly 高 >3×页字体高，或字数 >100 且高 >> 单行，
+  判为「OCR 整页并行」。默认 `OCR_GIANT_FALLBACK=1`：整页源图 BG（复用 PAGE_IMAGE）+ 文本层降 1pt 不可见，
+  横向 span 受控且保留可搜/行数；`=0` 回退旧单行渲染。p97 修复后 span x1 最大 506.1pt（版心右缘内），104=104。

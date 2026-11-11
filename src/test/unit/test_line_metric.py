@@ -69,3 +69,37 @@ def test_s4_p2_p5_rewrap_merge_pure_function():
     # p5：CIP 短字段（责任/电子/项目）相距较近但属不同逻辑行，容差 10 不误并
     cip = [_ln(100), _ln(116), _ln(132), _ln(148)]
     assert len(vg._logical_lines(cip, 10.0)) == 4
+
+
+def test_p97_fallback_page_all_text_invisible():
+    """t248: p97 OCR 整页并行 fallback 页所有 span ≤1pt（视觉只留源图），页码不重复。"""
+    import os
+    import pytest
+    import fitz
+    pdf = 'output/ghbq_full/ghbq_p97v2.pdf'
+    if not os.path.exists(pdf):
+        pytest.skip('ghbq_p97v2.pdf 未构建')
+    d = fitz.open(pdf)
+    p = d[96]
+    sizes = [s['size'] for b in p.get_text('dict')['blocks'] for l in b.get('lines', []) for s in l.get('spans', []) if s['text'].strip()]
+    assert sizes and max(sizes) <= 2.0, sizes
+    assert len(p.get_images()) == 1
+    d.close()
+
+
+def test_wz4_p2_p428_no_horizontal_overflow():
+    """t249: wz4 p2/p428 文本 span x1 不超过页宽+2（根因守卫结果）。"""
+    import os
+    import pytest
+    import fitz
+    pdf = 'output/wz4/wz4_s4.pdf'
+    if not os.path.exists(pdf):
+        pytest.skip('wz4_s4.pdf 未构建')
+    d = fitz.open(pdf)
+    for pg in (2, 428):
+        p = d[pg - 1]
+        over = [(s['text'], s['bbox'][2]) for b in p.get_text('dict')['blocks']
+                for l in b.get('lines', []) for s in l.get('spans', [])
+                if s['text'].strip() and s['bbox'][2] > p.rect.width + 2]
+        assert not over, (pg, over[:3])
+    d.close()

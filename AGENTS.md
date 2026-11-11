@@ -40,6 +40,13 @@
 
 > 系统有两个 python：`python3` 命中 mineru venv（无 fitz），`/usr/bin/python3` 有 fitz/opencc/xelatex。测试必须用 `/usr/bin/python3`。
 
+**单测必须 hermetic（2026-11-11 定，t237+t241 两次独立命中）**：
+
+- **禁止**断言依赖 `output/`、`tmp_vert/`、`/tmp` 等可变产物——这些目录不在版本控制内，会随任意一次重建而改变内容，导致「单跑绿、全量红」或「昨天绿、今天红」。
+- 需要真实 PDF 做 red/green 基准时，把**最小样本冻结进仓库**：`src/test/fixtures/<name>/`（建议 ≤10 页、带 README 说明来源与期望值），或直接用**合成 fixture**（代码内构造 span/bbox/PDF）。
+- 若确需对未入库产物做集成校验，走 **`scripts/` 下的诊断脚本**或 `verify_*` CLI，**不得放进 `src/test/unit`**。
+- 反例（已修）：`test_real_red_ghbq_title_toc` 读 `output/ghbq_full/ghbq_title_toc.pdf` 断言旧 gap，产物重建后测试反红。
+
 **竖排验证（verify_vert）备注**：
 
 - **实测证据（2026-10-15，wz6 全书 231 页）**：
@@ -108,6 +115,7 @@
 
 | # | issue | 影响范围 | 状态 |
 |---|---|---|---|
+| 52 | **标题续行块级合并（判定前合并，替代事后继承）**（t236）：`TITLE_CONT` 反向继承法只在「折行链中至少一行被判为标题」时生效；若整块标题无任一行命中（如首行/续行都落正文特征），不会合并，仍可能出现半块正文/半块标题。需在 `is_head` 判定**之前**按 y 间距 + 同左边界 + 非新编号把 OCR 折行合并为一个逻辑标题块，再对整块判定字号/字体/对齐。动机：不依赖单行判对，消除反向继承的盲区。风险：改标题判定路径会影响所有横排书的标题字号/行数/分页，必须重跑 ghbq/wz4/wz1/wz2 基线并逐页 diff。状态 planned，不动本轮 t236 已交付行为。 |
 | 10 | `/tmp/seg2_line.*` 并发冲突（geom+classic 同名） | geom L930 + classic L1019 | planned（改路径分 build_name） |
 | ~~7~~ | ~~geom `page_pitch` 方差检查含异常值~~ | ~~geom L129~~ | **不修**（设计差异：实测改 inner 后 pitch 89.9%->15.4%，保守策略对现代书正确） |
 | 11 | `_esc_chars` 两方分叉（geom 删单反斜杠/classic 删双保留单） | `tex_escape.py` | planned（是否统一需 spec 确认） |
