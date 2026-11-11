@@ -342,3 +342,67 @@ geom 构建 + verify_geom 后写 sidecar（与竖排 quality_gate **核心字段
 - **默认零回归**：创建校正文件前 `t203_default` vs `t199_default`：104=104、chars 43,913=43,913、逐页文本 **0 diff**、gate 96.8、`corrected_text.enabled=false`。
 - **wz4 零回归**（无 corrected_text 文件）：677=677、chars 554,341=554,341、逐页文本 **0 diff**、gate **PASS 99.6%**、`enabled=false`。
 - **单测**：`test_corrected_text.py` 6 passed（替换/未知页行/非法值/缺失零回归/坏 JSON/根非 object）；`test_scan2pdf.py` 新增 corrected 进 build + report 审计 1 例（33 passed）。
+
+
+## 25. t208：S4 行数保真低 full_ratio 兜底（实验结果）
+
+- **实现**：`geometry.calibrate()` 在 `full_ratio < HORIZ_FALLBACK_RATIO`（默认 0.10）时启用 fallback：
+  - `cw = median(全部合格行字数)`；`MEASURE_POLY = P90(全部合格行宽)`；`MEASURE = MEASURE_POLY`（不除 OVERBOUND）；
+  - `FONT = MEASURE/cw`；审计 `estimator/fallback_sample_n/fallback_width_pt/fallback_char_median`；
+  - `HORIZ_CW` / `HORIZ_FONT_MEASURE` 显式覆盖优先；`HORIZ_FALLBACK_RATIO=0` 关闭。
+- **ghbq 实测（104 页，fallback）**：
+  - calib：cw25、measure460pt、font18.4、full_ratio0.028、estimator=fallback、warnings=[toc_low_sample]（baseline_font_ratio_out 消失）；
+  - verify_geom：**行数 1:1 35.1%**（目标≥95，未达）、页高误差<5% 19.1%（中位6.5%，目标<2，未达）、overflow **26**（目标0，未达）、pitch **96.8%**（目标≥99，未达）、104=104。
+  - 对照旧公式（无 fallback）：行数35.1%、页高<5% 27.7%、中位5.9%、overflow25、pitch96.8%。
+- **结论**：fallback 只去掉 baseline/font 满行假设与 warning，未达到 S4 行数/页高/overflow 目标；根因不在 cw/FONT 单点：产物 `get_text` 的 21 行/17 行差异含 **同一源行被 OCR 片段 x 间隔拆成多个 span**（如 p32 源行6）及版式行高，需要 build_geom 行合并/验证口径另行处理，超出本任务 in-scope（只 geometry）。
+- **零回归**：wz4 677/chars554341/diff0/gate99.6；wz2 6/chars1469/diff0/gate100；wz1 222/gate97.8；wz1/wz2/wz4 calib `estimator=full_line`、cw/font 与旧公式一致。
+- **单测**：`test_horizontal_calib.py` **10 passed**（fallback/low/full/override/threshold + 原 6 例）。
+
+## 26. 结构性守卫（t215）：E2E 冒烟 + 规格一致性 + 架构守卫
+
+### 26.1 E2E 冒烟脚本
+
+```bash
+bash scripts/e2e_smoke.sh \
+  --book ghbq --input source_pdf/ghbq.pdf \
+  --data-dir output/ghbq_full/_ocr_ghbq \
+  --out /tmp/e2e_ghbq.pdf [--pages 20-23]
+```
+
+- 参数：`--book/--input/--data-dir/--out` 必填，`--pages` 可选（小样本）。
+- 流程：`scan2pdf --skip-ocr --force` → 读 `<out>.report.json` / `<out>.gate.json` → 输出一行 summary：
+  `[e2e] book=... out=... exit=... gate=... pitch=... pages=...`
+- 失败语义：scan2pdf 非 0 **或** gate 非 PASS/AUTO_PASS/MANUAL_ONLY → 脚本退出 1；参数缺失/未知参数 → exit 2。
+- 实测：ghbq 20–23 页 `exit=0 gate=PASS pitch=100.0 pages=4`；坏 data-dir → exit 1（scan2pdf exit 3）。
+
+### 26.2 规格一致性测试（`test_spec_conformance.py`）
+
+守的是「spec 声明 ≠ 实现」：
+- `CORRECTED_TEXT` report 字段（replaced/pages/line_counts/warnings/source/sha256）在 spec 与实现同时存在；
+- `HORIZONTAL_CALIB` selfcheck 码表（pages_mismatch/empty_input/source_of_page_size_missing/dpi_residual_large/font_out_of_range/baseline_font_ratio_out/page_size_overcoverage/page_size_coverage_low/pitch_low_sample/full_sample_low/cw_out_of_range/measure_out_of_range/margin_out_of_range/toc_low_sample/toc_foot_x_out/toc_title_max_out）实现齐备，spec 含自检条款；
+- `PAGE_IMAGE_LAYOUT` env 名与默认值（LAYOUT_HEADINGS/FIGS/TOC、PAGE_IMAGE_PAGES、PAGE_IMAGE_FULL_RATIO=0.40）；
+- `scan2pdf` report 顶层键（tool/version/book/input/out/input_sha256/steps/exit）。
+
+任一 spec 声明但实现缺失 → test fail。
+
+### 26.3 架构守卫（`test_architecture_guard.py`）
+
+- `scan2pdf.build_pdf` 的 geom 分支必须调用 `src/calibration/fit_positional.py`，且该函数体内**不得**出现 `build_geom.py`（防再退化为单趟交付）；
+- `fit_positional.py` 薄壳必须存在且复用 `fit_common.main('build_geom')`（两趟校准入口唯一）。
+
+违规 → test fail，阻止「入口不唯一/绕过两趟校准」再次发生。
+
+### 26.4 运行
+
+```bash
+/usr/bin/python3 -m pytest src/test/unit/test_spec_conformance.py \
+  src/test/unit/test_architecture_guard.py -q
+```
+
+### 26.5 t226：E2E 确定性 / 重复性 / 失败摘要 / 守卫 token 精确化
+
+- **构建确定性**：`scripts/e2e_smoke.sh` 顶部 `export PYTHONHASHSEED=0`；同一命令连续跑 **2 次**（`--repeat` 默认 2），断言两次 exit/pages/gate/pitch 一致；不一致 → 退出 1。不设 seed 不再作为验收场景。
+- **失败摘要**：失败时 summary 含 `reason=`（gate reasons 前两条），并打印 scan2pdf 日志最后 **20 行**，便于定位。
+- **守卫 token**：`test_spec_conformance.py` 改为完整 token 集合匹配（`\b...\b`），不做子串；fixture 用 `APPLIED_X`/`REPLACED_TOK` 验证 `replaced` 不误匹配。红/绿双侧：临时把 spec `replaced→REPLACED_TOK` → 测试 FAIL；恢复 → 7 passed。
+- **E2E 已知阻断（t208 未回退，t221 处理中）**：当前树 `wz2 --pages 1-6` → exit 6 / gate REJECT / pitch **66.7%**；干净 HEAD（worktree `70a9d70`）同数据 → exit 0 / gate PASS / pitch **100%**、6=6。ghbq 4 页当前树与 HEAD 均 PASS 100%（4 页）。t221 回退后应回到 wz2 PASS 100。
+- 复跑：ghbq 命令两次均 exit0/PASS100/pages4；坏 data-dir exit1 且 summary 带 reasons/log tail。
