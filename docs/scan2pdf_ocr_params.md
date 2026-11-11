@@ -118,3 +118,20 @@ PYTHONHASHSEED=0 /usr/bin/python3 src/tools/scan2pdf.py --input source_pdf/ghbq.
 ## 8. 结论
 
 **t212 FAIL**：参数优先级/默认 payload 等价/审计记录/实验可复现性基本成立，页脚条带 7/7、orientation=1 对标题页 0→2/2 已独立复算；但（F1）当前树相对干净 HEAD 的 gate 未保持不变（95.9 vs 96.8 / 99.4 vs 99.6，文本/字符/页数相同，归因 t208），（F2）未固定 `PYTHONHASHSEED` 时构建不可复现（6 页文本差、gate 93.8/95.9）。修复/合入 t208 + 固定 seed 后复验即可签收；实验数据本身无 must-fix（仅 F3 文档口径）。
+
+---
+
+## 9. t268：payload 显式 17 字段
+
+`ocr_book.payload()` 已从 10 字段扩展为官方 17 字段（`ocr_book.PAYLOAD_FIELDS`）：
+`useDocOrientationClassify, useDocUnwarping, useLayoutDetection, useChartRecognition, useSealRecognition, useOcrForImageBlock, mergeTables, relevelTitles, layoutShapeMode, promptLabel, repetitionPenalty, temperature, topP, minPixels, maxPixels, layoutNms, restructurePages`。
+
+默认值对齐 ghbq raw `model_settings` 实测：orientation/unwarp/layoutDetection/chart/seal/ocrForImageBlock/relevel/layoutNms/restructurePages=false，mergeTables=true，layoutShapeMode=auto，promptLabel 由模式决定，repetitionPenalty=1，temperature=0，topP=1，minPixels=147384，maxPixels=2822400。
+
+服务端回声（E1）：
+- 一致：`use_layout_detection=false`、`use_chart_recognition=false`、`use_seal_recognition=false`、`use_ocr_for_image_block=false`、`merge_layout_blocks=true`；
+- 未回显/被忽略：`relevelTitles`、`layoutNms`、`restructurePages`、`temperature/topP/minPixels/maxPixels/repetitionPenalty`；
+- `useSealRecognition=true`（E2）会回显 true，但本样本 lines 无变化；
+- `layoutShapeMode=rect`（E3）不直接回显，但 `return_layout_polygon_points` 变 false，lines 仍无变化。
+
+等价性：E0（旧 10 字段）vs E1（显式 17）8/8 页 lines **0 diff**，标点 P/R 相同（TP286/FP53/FN36, P0.8437/R0.8882）。详见 `docs/punct_ocr_payload.md`。
