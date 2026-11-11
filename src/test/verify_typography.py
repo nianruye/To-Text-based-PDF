@@ -202,12 +202,7 @@ def _is_nonbody_page(page_text, pno, page_image):
     if pno in page_image:
         return True
     hits = sum(1 for k in META_KEYS if k in page_text)
-    if hits >= 3:
-        return True
-    # 版权/CIP 元数据页：整页非正文（避免 ISBN 条/上架建议越界误伤）
-    if 'isbn' in page_text and ('图书在版编目' in page_text or '上架建议' in page_text):
-        return True
-    return False
+    return hits >= 3
 
 
 def _attribute_edge(page, text, edge_char, src_pages, pos='start'):
@@ -322,7 +317,8 @@ def _gb51_violations(lines, page, src_pages, page_text, page_width):
                 continue
             seen.add(rid)
             v, w = _emit_gb(rid, GB51_RULES[rid], page, li, ch, t, src_pages, page_text,
-                            bbox=(_fb if ch == first else _lb), line_x=_line_x)
+                            bbox=(_fb if ch == first else _lb), line_x=_line_x,
+                            pos=('start' if ch == first else 'end'))
             if v: out.append(v)
             if w: waived.append(w)
     return out, waived
@@ -398,13 +394,15 @@ def run(args):
             m1_diag += _general_overlap(lines)
         # L1 文本越界（可打印区 ± 容差；p97 类严重页统计全部 span，普通页跳过短标点/页码）
         pr = pdf[pno].rect
-        _tol = max(2.0, 0.02 * min(pr.width, pr.height))
+        _tol = max(2.0, (0.10 if args.book_type in ('ancient', 'vertical') else 0.04) * min(pr.width, pr.height))
+        if pno <= 1 and len(pdf) > 2:
+            _tol = max(_tol, 30.0)  # 封面/版权页印刷出血/ISBN 条，非正文越界
         _outside = []
         for li, l in enumerate(lines):
             for sp in l['spans']:
                 b = sp['bbox']
-                if (b[2] < pr.x0 - _tol or b[0] > pr.x1 + _tol or
-                        b[3] < pr.y0 - _tol or b[1] > pr.y1 + _tol):
+                if (b[2] > pr.x1 + _tol or b[0] < pr.x0 - _tol or
+                        b[3] > pr.y1 + _tol or b[1] < pr.y0 - _tol):
                     _outside.append((li, sp))
         _severe = len(_outside) >= 5
         for li, sp in _outside:

@@ -116,3 +116,59 @@
 - **通过**：nonbody≥3、p5 source_inherent、wz4 6 条 render 归因、测试 hermetic（17 passed）、spec 命名/§7/§12 结构、p97 34 保留。
 - **不通过**：F1'（M1 反向+误伤 wz1/wz2，high）、F2'（M3/M4 缺失，high）为 must-fix；F3'–F6' 需修/更正。
 - 复盘：本轮把「误报」修成了「同视觉行判重叠」——虽能避开跨栏误报，却与 spec 的跨行判据相反，并把正常相邻 span 判成 hard；需按 spec 重做并回归 wz1/wz2。
+
+---
+
+## 7. round-3 终审（t256，t255 修复 M2/M1/M3/M4/edge/§12）
+
+> 日期：2026-11-11 21:32–22:20　审查人：质量审查员
+> 结论：**needs_revision（FAIL）** —— M1 转诊断、M3/M4 转 v1.1、edge/§12/基线 hash、nonbody≥3、p5 source_inherent、wz2 PASS 均已落地；但 **M2「部分越界」实际仍未实现**（代码只判整段完全越界，探针右缘越出 170pt 仍 PASS），且新增 **CIP/ISBN non_body 启发式未入 spec、吞掉 p2 内容页**；edge 的 `pos` 参数未接线（行末规则仍按行首归因）。
+
+### 7.1 已修/已验证（通过）
+
+- **M1**：`_general_overlap` 改跨行 0.02×min、同视觉行/标点组不判；默认关闭，`TYPOGRAPHY_M1=1` 只写 `diagnostics.M1`/`counts.m1_diagnostic`，不计入 violations/hard/exit（spec §1.2/§12.3 一致；`layers.L1=['M2','M5']`）✓。
+- **M3/M4**：spec §1.1 明确 L1 仅 M2/M5，M3/M4 归 verify/v1.1（文档化）✓（覆盖缺口见 F4）。
+- **edge**：`_attribute_edge` 增加位置校验；p5 `—北京` 仍 **source_inherent**（red 产品 46/42 hard/0 render/9 waived）✓。
+- **nonbody≥3**：1 特征探针→`non_body=0`；3 特征→`non_body=1` ✓（另有 ISBN 启发式，见 F2）。
+- **§12**：工具 sha `55329569…`、title_toc2 md5 `beba0f6c…`、wz4_s4 md5 `80d537e2…` 与实际一致；§12.3 更正「pipeline 带 lines → FAIL/exit1；无源行才 exit0」✓。
+- **命令**：`ghbq_title_toc.pdf` WARN/exit0（4 violations，hard0）；`wz4_s4` 无 lines WARN/exit0、带 lines FAIL/exit1（render6）；`ghbq_p97v2` hard0；wz2 ancient **PASS/0 hard**；wz1 WARN/60（hard0，见 F7）。
+- **测试**：`test_verify_typography.py` **17 passed**（hermetic）；unit **774 passed**（193.96s）；invariants 首次 2 failed、复跑 **13 passed**（见 F6）。
+- **边界**：PUNCTUATION/PUNCT_EVAL 未被改动（git status 干净）✓。
+
+### 7.2 未修/新发现（must-fix）
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1'** | **high** | **M2「部分越界」仍未实现（放水）**：代码判据为 `b[2]<x0−tol`（整段在左）/`b[0]>x1+tol`（整段在右）/`b[3]<y0−tol` /`b[1]>y1+tol`，只覆盖**完全越界**；探针 span `[560, 84.9, 765.4, 104.2]` 对 595×842 页（tol 11.9）右缘越出 **170.4pt** → 工具 **PASS**。p97 同页：`1979` bbox x0=673.3（>612.75）判 hard，`邓小平同志在` bbox [607.6,154.1,673.3,…] 右缘越出 78.3pt 但 x0<612.75 → **未判**。t255「横向/纵向部分越界」声明与代码不符 | 右侧判 `b[2] > x1+tol`、底部 `b[3] > y1+tol`、左侧 `b[0] < x0−tol`、顶部 `b[1] < y0−tol`（并保留整段越界与 short-span 例外）；补「右/下部分越界」单测；p97 部分越界 span 应计入 |
+| **F2'** | **medium** | **non_body 额外 ISBN/CIP 启发式未入 spec 且吞内容页**：`_is_nonbody_page` 增 `if 'isbn' and ('图书在版编目' or '上架建议') → True`；spec §4.3 只有 3 类判据（PAGE_IMAGE / ≥3 meta / 40% 图块+<5 行）。实测 ghbq `non_body=[2,5,104]`：p2 是 **内容简介页**（396 字正文 + 底部上架建议/ISBN）、p5 是 CIP 页；p2 被整页排除 L2/L3（虽当前无 GB 违规，但口径过宽/未文档） | 把 ISBN/CIP 判据写入 spec §4.3 并限定为「版权/CIP 页」（`图书在版编目` 单独成立），`上架建议` 不得单独触发；确认 p2 是否应参与评测；加单测 |
+| **F3'** | **medium** | **edge 的 `pos` 未接线**：`_attribute_edge(..., pos)` 支持 start/end，但 `_gb51_violations` 调用 `_emit_gb` 未传 pos（恒 start）；行末规则（5.1.3 行末前括号/引号）在**源行完全一致**时被误判 render_introduced（实测 `_attribute_edge(0,'ABC（','（',{'0':['ABC（']},pos='start')` → render；pos='end' → source） | 行末规则传 `pos='end'`；补「行末规则源一致→source_inherent」单测 |
+| **F4'** | **medium** | **M3/M4 覆盖缺口**：spec §1.1 称 M3 由 verify_geom/verify_vert 负责，但两者实际不检查页码错位；M4 仅竖排 verify_vert 查字符量，横排无字符量硬校验。M3 目前**无任何门禁覆盖** | 在 spec 明确「M3 暂无门禁（v1.1）」或补 verify 侧页码校验；不得以「verify 负责」表述掩盖缺口 |
+| **F5'** | **low** | wz1 WARN 60（45 条 L2 TOC 指标 + 15 条 L3 unknown），hard0；wz2 PASS 0 ✓；「③ 层无 noise」在 wz1 仍有 15 条 unknown warn | 记录为 warn-only/可接受；如需降噪，L2 TOC 指标仅在目录页出 |
+| **F6'** | **low** | 测试/声明不一致：unit 实际 **774 passed**（非 784）；invariants 首次 **2 failed**、复跑 13 passed（并行构建下非确定）；t255「全量 784 passed/0 failed」未复现 | 报告按实测计数；invariants 失败需定位（no_replacement_char 等读共享产物/数据）；`src/test` 不得读可变 output |
+| **F7'** | **note** | p97 真越界（整段越界 43 条）仍被 hard 抓到 ✓；p97v2 已修复 hard0 ✓；title_toc exit0/wz4 无 lines exit0 声明 ✓ | 保持 |
+
+### 7.3 结论
+
+- **通过**：M1 诊断化、M3/M4 文档化、edge 源侧豁免（p5）、nonbody≥3、§12 基线 hash/§12.3、wz2 PASS、测试 hermetic（typography 17 passed）。
+- **不通过**：F1'（M2 仅完全越界，partial overflow 漏报，high）为 must-fix；F2'（nonbody ISBN 启发式吞 p2 内容页，未入 spec）、F3'（edge pos 未接线）需修；F4'–F6' 需说明/修。
+- 判断：本轮把「M2 部分越界」写进 spec/声明，但代码仍是 tick 式整段越界；「ghbq_p97v2 hard=0」依赖**重建产物已修**，不能证明 M2 判据正确；p97 同页部分越界 span（右缘 +78pt）仍漏。
+
+### 7.4 复现（本轮新增）
+
+```bash
+# M2 partial overflow 探针（构造；右缘越出 170pt）→ PASS（应 FAIL）
+/usr/bin/python3 src/test/verify_typography.py /tmp/t251_probe_partial.pdf --json /tmp/p.json
+# p97 同页：整段越界判 hard，部分越界不判
+/usr/bin/python3 src/test/verify_typography.py output/ghbq_full/ghbq_title_toc2.pdf \
+  --src-pdf source_pdf/ghbq.pdf --lines output/ghbq_full/_ocr_ghbq/ghbq_spotting_lines.json --json /tmp/red3.json
+# nonbody: 1 特征不豁免、3 特征豁免；ghbq p2/p5/104 被 ISBN 启发式豁免
+/usr/bin/python3 src/test/verify_typography.py /tmp/t251_probe_one.pdf --json /tmp/one.json
+/usr/bin/python3 src/test/verify_typography.py output/ghbq_full/ghbq_title_toc.pdf --src-pdf source_pdf/ghbq.pdf \
+  --lines output/ghbq_full/_ocr_ghbq/ghbq_spotting_lines.json --json /tmp/ghbq3.json
+```
+
+| 文件 | sha256 |
+|---|---|
+| `src/test/verify_typography.py` | `55329569785aa3215bb0492a56ff2dbf1eced739c3bdf2c3e7a9e4510b2e5689` |
+| `spec/governance/TYPOGRAPHY_EVAL.md` | `a50dcb44de88e5244497fd1ef3e680d516c44e28fcdafcbd8bfd4b3915f66528` |
+| HEAD | `fc86ce8`（未 commit） |
