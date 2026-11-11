@@ -147,3 +147,44 @@ def test_convert_layout_json_jsonl_order_blocks():
         # legacy 兼容字段仍在
         assert len(pages[0]['prunedResult']['parsing_res_list']) == 2
         assert json.load(open(os.path.join(tmp, 'layout_manifest.json')))['layout_pages'] == 2
+
+
+# ---- t219: OCR 参数化 ----
+def test_payload_default_equals_head():
+    old = {"model": "PaddleOCR-VL-1.6", "optionalPayload": json.dumps({
+        "useLayoutDetection": True, "promptLabel": "ocr", "temperature": 0,
+        "minPixels": 147384, "maxPixels": 2822400, "repetitionPenalty": 1,
+        "topP": 1, "layoutShapeMode": "auto", "useDocUnwarping": False,
+        "useDocOrientationClassify": False})}
+    assert ob.payload(True, 'ocr') == old
+    p = dict(ob.OCR_DEFAULTS)
+    assert ob.payload(True, 'ocr', p) == old
+
+
+def test_resolve_priority_cli_book_default():
+    with tempfile.TemporaryDirectory() as tmp:
+        d = os.path.join(tmp, 'data', 'b'); os.makedirs(d)
+        json.dump({'maxPixels': 4000000, 'orientation': 1,
+                   'unwarp': 1, 'layoutShapeMode': 'rect'}, open(os.path.join(d, 'ocr_params.json'), 'w'))
+        p, src, path, sha = ob.resolve_ocr_params('b', {'max_pixels': 5000000}, root=tmp)
+        assert p['max_pixels'] == 5000000 and src['max_pixels'] == 'cli'
+        assert p['orientation'] == 1 and src['orientation'] == 'book_data'
+        assert p['unwarp'] == 1 and p['layout_shape'] == 'rect'
+        assert p['min_pixels'] == 147384 and src['min_pixels'] == 'default'
+        assert path and len(sha) == 64
+
+
+def test_resolve_defaults_without_book_file():
+    with tempfile.TemporaryDirectory() as tmp:
+        p, src, path, sha = ob.resolve_ocr_params('nope', {}, root=tmp)
+        assert p == ob.OCR_DEFAULTS and path is None
+        assert set(src.values()) == {'default'}
+
+
+def test_payload_custom_params():
+    p = dict(ob.OCR_DEFAULTS, max_pixels=4000000, min_pixels=100000,
+             orientation=1, unwarp=1, layout_shape='rect')
+    d = json.loads(ob.payload(False, 'spotting', p)['optionalPayload'])
+    assert d['maxPixels'] == 4000000 and d['minPixels'] == 100000
+    assert d['useDocOrientationClassify'] is True and d['useDocUnwarping'] is True
+    assert d['layoutShapeMode'] == 'rect'
