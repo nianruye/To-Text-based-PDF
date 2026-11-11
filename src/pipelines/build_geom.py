@@ -1636,27 +1636,24 @@ for key in sorted(sl.keys(), key=int):
     flush()
     if is_divider:
         body.append('\\vspace*{\\fill}')   # 分隔页底部填充(配合顶部 fill → 标题垂直居中)
-    if os.environ.get('XCLIP', '1') not in ('0', 'false', 'False') and _xguard_page:
-        for _ft in footnotes:
-            _fn = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in (_ft.get('t') or '')) * FONT_SM
-            if _fn > PAGE_W:
-                _ft['fnt'] = max(1.0, round(FONT_SM * PAGE_W / _fn, 2))
     # 脚注区(分界线 + 小字,匹配源;满行也两端对齐)
+    # 2026-11-11：回退到 master 口径（整块一个 fontsize 组 + 原折行判据）。
+    # t249 的 _xguard_page→parbox/raggedright 与逐条字号组会给 wz4 23 页脚注插入额外空格
+    # （源 OCR `1987年版第18~19页。` → 产物 `1987 年 版 第 18~19 页。`），已撤销。
+    # 仅保留 p97 所需的「巨行页整页文本 1pt 不可见」。
     if footnotes:
         body.append('\\vspace{6pt}\\hrule width 0.3\\textwidth\\vspace{3pt}')
+        _fsm = 1.0 if _giant_page else FONT_SM
+        fbl = round(_fsm*1.2, 1)
+        body.append('{\\linespread{1}\\fontsize{' + str(_fsm) + 'pt}{' + str(fbl) + 'pt}\\selectfont')   # 脚注区整体 \linespread{1},防全局行距倍数撑大脚注 pitch
         for ft in footnotes:
-            _fsm = 1.0 if _giant_page else ft.get('fnt', FONT_SM)
-            fbl = round(_fsm*1.2, 1)
-            body.append('{\\linespread{1}\\fontsize{' + str(_fsm) + 'pt}{' + str(fbl) + 'pt}\\selectfont')
             inner = esc(ft['t'])
-            _fnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in ft['t']) * (1.0 if _giant_page else FONT_SM)
-            if _xguard_page:
-                body.append('\\noindent\\parbox{\\textwidth}{\\raggedright ' + inner + '}\\par}')
-            elif _fnat >= 0.85 * MEASURE:
-                body.append('\\renewcommand{\\CJKglue}{\\hskip 0.25em plus 1em}\\makebox[\\textwidth][s]{' + inner + '}\\par}')
+            _fnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in ft['t']) * _fsm
+            if _fnat >= 0.85 * MEASURE:
+                body.append('\\renewcommand{\\CJKglue}{\\hskip 0.25em plus 1em}\\makebox[\\textwidth][s]{' + inner + '}\\par')
             else:
-                body.append(inner + '\\par}')
-        # 每行自闭合 fontsize 组,不再额外关闭全局组
+                body.append(inner + '\\par')
+        body.append('}')   # 关闭脚注组,恢复正文 \linespread
     if _page_img_full or _all_text_invis:
         body.append('\\special{pdf:literal direct Q}')
     body.append('\\par\\newpage')
