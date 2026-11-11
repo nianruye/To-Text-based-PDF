@@ -766,3 +766,145 @@ cd /opt/test
 ## CT.4 结论
 
 **t204 验收通过（PASS）**：校正表替换只影响目标页文本（p3 已修正、无原错字）、页数/坐标/门禁不变；未知页/行/非法值 warn 跳过且构建成功；行数不变；report 审计字段完整且 sha 与文件一致；默认/显式两条路径均生效；无校正/空校正零回归，wz4/wz2 正常；tests 6/39/731 全绿。无 must-fix；建议后续把 ghbq 校正表纳入 heldout 数据（避免依赖默认文件存在）。
+
+
+---
+
+# OCR 参数化独立验收（t212）
+
+> 对象：t219 / t209（OCR 5 参数化 + 页脚条带实验）
+> 日期：2026-11-11 13:31–14:10；**只写报告/未改实现/数据、未 commit**（HEAD `70a9d70`，工作树含未提交 t208/t219）
+> 独立报告：`docs/scan2pdf_ocr_params.md`（新增）；证据：`tmp_vert/t219/*`、`/tmp/t212/*`
+
+## OCRP.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | 参数化：CLI > 每书覆盖 > 默认；默认 payload 与 HEAD 等价；report/manifest 记录生效参数与 jobId | **PASS（附 F4）** | 独立临时 root：CLI max=5,000,000(source=cli)、orientation/unwarp/layout=book_data、min=default；`payload` 默认与旧字典逐字节相等；t219 manifest/jobs/effective 含 params/jobId（5 组 jobId 见独立报告）；`--skip-ocr` report 的 ocr_params/ocr_jobs 为 null（F4），OCR 路径由单测覆盖 |
+| 2 | 构建零回归：不传参数 ghbq/wz4 与 HEAD 逐页文本 0 diff、页数/字符/gate 不变 | **FAIL（F1）** | seed=0：当前树 ghbq vs 干净 HEAD 文本 0/104、chars 43,913=43,913，但 **gate 95.9 vs 96.8**；wz4 文本 0/677、chars 554,341，**gate 99.4 vs 99.6**；不传 vs 显式默认 0 diff/gate 同（95.9）→ 参数本身零回归，但「对 HEAD gate 不变」未满足（归因未提交 t208） |
+| 3 | 实验可复现：页脚条带 8 页与 maxPixels/orientation 矩阵原始结果/命中率/字符数写进独立报告 | **PASS（附 F3）** | 独立复算：条带页码 **7/7**（7/19/31/43/55/67/79）、字符 13；矩阵 2.82/ori0 3180、2.82/ori1 含空格 **3204**/非空白 **3190**、4M 3180、4M/ori1 3180；pn 均 7/7；p3 校正行 2.82/ori1 **2/2**，其余 0/2；t219 表 3190 未注明非空白口径（F3） |
+| 4 | 报告建议：哪些参数进默认、预期收益、风险 | **PASS** | 独立报告 §5：页脚条带建议专项通道（样本 7/7，全书 layout 覆盖 97/104，目标补齐但仍需全量实验；配额/耗时风险）；orientation=1 仅标题页专项（0→2/2、+10 非空白字）；4M 无收益；默认不变；先修 hash 非确定性与 t208 基线 |
+| 5 | 单测：参数优先级/payload 等价；pytest 全绿 | **PASS** | `test_ocr_book.py` **10 passed**（payload 等价、优先级、默认无文件、custom）；连同 test_scan2pdf **45 passed**；全量 unit **752 passed**（186.5s） |
+
+## OCRP.2 关键数字（独立复算）
+
+- 优先级/默认：CLI max=5M、book orientation/unwarp/layout、min default；payload 默认==旧 dict。
+- 零回归（`PYTHONHASHSEED=0`）：
+  - 当前树 不传参数 = 显式默认：104 页、chars 43,913、0 diff、gate 95.9%；
+  - 干净 HEAD（git archive 70a9d70）ghbq：104/43,913/96.8%；wz4：677/554,341/99.6%；
+  - 当前树 wz4：677/554,341/99.4%。
+- **非确定性（F2）**：未固定 seed 时同输入两次 gate 93.8 vs 95.9、6 页文本不同（p7/11/56/59/88/104）；t219 的 43,907/93.8 为一次未固定 seed 结果。
+- 实验：条带 7/7、字符 13；矩阵字符/页码/校正行见独立报告；4M jobId `113871553141051392`（ori0）/`113871687459438592`（ori1）。
+- 默认数据未改：`data/ghbq/ocr_params.json` 不存在；实验仅在 `tmp_vert/t219`。
+
+## OCRP.3 结论
+
+**t212 FAIL**：参数化、payload 等价、审计、实验复算与建议均基本成立；但零回归「gate 不变」被未提交 t208 破坏（ghbq 95.9 vs 96.8、wz4 99.4 vs 99.6），且未固定 `PYTHONHASHSEED` 时构建不可复现（F2）。需 t208 合入/回退 + 固定 seed 后复跑；F3/F4/F5 为文档/审计低风险。独立报告见 [scan2pdf_ocr_params.md](scan2pdf_ocr_params.md)。
+
+
+---
+
+# 结构性守卫验收（t216）
+
+> 对象：t215（E2E 冒烟 + 规格一致性 + 架构守卫）
+> 日期：2026-11-11 13:50–14:25；**只写本报告、未改实现/数据、未 commit**（HEAD `70a9d70`，工作树含未提交 t208/t219/t215）
+> 证据：`scripts/e2e_smoke.sh`（`dd9f8e58…`）、`test_spec_conformance.py`（`7e3edeca…`）、`test_architecture_guard.py`（`f3ec07fe…`）、`/tmp/t216/*`
+
+## GUARD.1 PASS/FAIL
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | E2E 脚本独立跑通：ghbq 4 页 + wz2 6 页；成功 summary、失败非零；参数缺失/坏路径清晰报错 | **FAIL（F1/F2）** | ghbq 契约命令首次 exit0 `gate=PASS pitch=100 pages=4`；**同命令第二次 exit6 `页数不 1:1: 6 vs 4`**（不固定 seed）；`PYTHONHASHSEED=0` 下 ghbq 两次均 exit0 PASS100/4 页。**wz2 6 页 exit6 gate=REJECT pitch=66.7**，同一数据用干净 HEAD 代码 exit0 **PASS 100%**、逐页文本相同（F1，t208 回归）。缺参数 exit2、坏 data-dir exit1（`数据配对失败: data-dir 不存在`）清晰 |
+| 2 | 规格一致性测试有效：篡改字段/env → fail，恢复 → pass | **PASS** | 临时删 `replaced`（改为 `APPLIED_X`，去子串）→ `test_corrected_text_report_fields` **FAILED**；临时改 `LAYOUT_FIGS→LAYOUT_FIGX` → `test_page_image_layout_env_defaults` **FAILED**；恢复后 4 passed；文件 sha 复原 |
+| 3 | 架构守卫有效：临时把 scan2pdf geom 分支改回 build_geom → fail，恢复 → pass | **PASS** | 在 `build_pdf` 块插入 `# build_geom.py` → `test_scan2pdf_geom_uses_fit_positional` **FAILED**；恢复后 2 passed；scan2pdf sha 复原 `1c74a460…` |
+| 4 | pytest 全绿（含新测试）；报告追加；不改实现；不 commit | **PASS** | 守卫测试 **6 passed**；全量 unit **752 passed**（190s）；本节报告；临时篡改均已恢复，未 commit |
+
+## GUARD.2 关键证据
+
+### E2E
+
+```bash
+bash scripts/e2e_smoke.sh --book ghbq --input source_pdf/ghbq.pdf \
+  --data-dir output/ghbq_full/_ocr_ghbq --out /tmp/acc_e2e_ghbq.pdf --pages 20-23
+# 第 1 次：exit=0 gate=PASS pitch=100 pages=4
+# 第 2 次（同命令）：exit=6 页数不 1:1: 6 vs 4；summary exit=6 gate=None
+PYTHONHASHSEED=0 bash scripts/e2e_smoke.sh ...（同 ghbq）  # 连续两次 exit0 PASS100/4 页
+bash scripts/e2e_smoke.sh --book wz2 ... --pages 1-6
+# 当前树：exit=6 gate=REJECT pitch=66.7 pages=6
+# 干净 HEAD（git archive 70a9d70）同数据：exit0 gate=PASS pitch=100、文本相同
+```
+
+- 缺参数：`[e2e] 需要 --book/--input/--data-dir/--out`、exit2。
+- 坏 data-dir：`数据配对失败: data-dir 不存在`、exit1。
+- 失败 summary 仅 `exit/gate/pitch/pages`，无日志尾；可读但信息量有限（F4 低）。
+
+### 红/绿篡改（均已恢复，未 commit）
+
+| 篡改 | 结果 | 恢复后 |
+|---|---|---|
+| `CORRECTED_TEXT.md` 全量 `replaced`→`APPLIED_X`（避免子串） | `test_corrected_text_report_fields` FAILED | 4 passed；sha `6d8f390d…` 复原 |
+| `PAGE_IMAGE_LAYOUT.md` `LAYOUT_FIGS`→`LAYOUT_FIGX` | `test_page_image_layout_env_defaults` FAILED | 4 passed；sha `05ed5b69…` 复原 |
+| `scan2pdf.py` `build_pdf` 块加 `# build_geom.py` | `test_scan2pdf_geom_uses_fit_positional` FAILED | 2 passed；sha `1c74a460…` 复原 |
+
+> **F3（低）**：第一次字段篡改用 `replaced→replacedX` 未触发失败（子串仍匹配），说明测试按 token 子串断言；实际回归需删除 token 或用 distinct 值。建议 fixture 用完整 token 删除/替换，避免「假阴性篡改测试」。
+
+## GUARD.3 发现
+
+- **F1（高，must-fix）wz2 6 页回归被 E2E 捕获**：当前树 `gate=REJECT pitch=66.7`，干净 HEAD `PASS 100%`，逐页文本相同；归因未提交 t208 geometry/S4 改动。守卫行为正确，但「wz2 成功 summary」验收不成立。
+- **F2（高，must-fix）E2E 不可重复**：不固定 `PYTHONHASHSEED` 时 ghbq 4 页同命令一次 4 页 PASS、一次 6 页 exit6；固定 seed 后稳定两次。E2E 脚本应设置/要求 `PYTHONHASHSEED=0`，或 build 端消除 hash 依赖；否则守卫本身会随机红。
+- **F3（低）** 篡改测试的子串陷阱（见上），建议 fixture 去子串。
+- **F4（低）** 构建失败时 summary 只有 `gate=None/pitch=None/pages=None`，建议附日志尾部/Reason。
+
+## GUARD.4 字节绑定
+
+| 文件 | sha256 |
+|---|---|
+| `scripts/e2e_smoke.sh` | `dd9f8e58cb36356193363e13c946f7052828658adea59ae60f3ec93bf3511dfe` |
+| `src/test/unit/test_spec_conformance.py` | `7e3edecaeb0c63ee6969761085f1aea257db3c76a97d04ebdee38697e17b0220` |
+| `src/test/unit/test_architecture_guard.py` | `f3ec07fe837592a8085b6e476a521107cc0581a4adc20cbb515abbe70a3cc664` |
+| `src/tools/scan2pdf.py`（复原） | `1c74a4603c1eeb414185dde6b51fb5a07390c553f58f3389dba1da4f06b52ee3` |
+| HEAD | `70a9d70`（未 commit） |
+
+## GUARD.5 结论
+
+**t216 FAIL**：规格一致性/架构守卫红绿双侧均有效、pytest 752 全绿；但 E2E 的 wz2 6 页在当前树 **REJECT 66.7**（干净 HEAD PASS100，文本相同，F1 归因 t208），且 ghbq 同命令不固定 seed 时 4 页/6 页不稳定（F2）。修复/回退 t208、并在 E2E 固定 `PYTHONHASHSEED=0` 后可复验通过；守卫本身可收口（F3/F4 文档/输出改进）。
+
+
+---
+
+# 结构性守卫验收（t227 · round 2）
+
+> 对象：t226（e2e seed/repeat + spec token 守卫 + 失败 summary）
+> 日期：2026-11-11 13:55–14:20；**只写本报告、未改实现/数据、未 commit**（HEAD `70a9d70`，工作树含未提交 t208/t221）
+> 证据：`scripts/e2e_smoke.sh`（`0687a477…`）、`test_spec_conformance.py`（`0315d1ee…`）、`test_architecture_guard.py`（`f3ec07fe…`）、`/tmp/t227/*`
+
+## GUARD2.1 PASS/FAIL（按 captain 口径：F1 已知阻断不重复打回，gate 取 F2/F3/F4）
+
+| # | 验收项 | 结论 | 实测 |
+|---|---|---|---|
+| 1 | E2E 脚本独立跑通：ghbq 4 页 + wz2 6 页；成功 summary、失败非零；参数缺失/坏路径清晰 | **PASS（ghbq；wz2 为 F1 已知阻断）** | ghbq `--repeat 2`：run1/run2 均 exit0 **gate=PASS pitch=100 pages=4**，reason=calib_warn；wz2 6 页仍 exit6 **REJECT 66.7**（F1，见 §GUARD2.2）；缺参数 exit2；坏 data-dir exit3，summary `reason=scan2pdf_rc=3` + 日志尾可见 |
+| 2 | F2：E2E 固定 seed + 两次连续一致 | **PASS** | 脚本顶部 `export PYTHONHASHSEED=0`、`--repeat` 默认 2；ghbq 两次 `pages/pitch/gate` 逐项一致（4/100/PASS），summary 末行标 `(repeatable)` |
+| 3 | F3：规格一致性测试有效（篡改→fail，恢复→pass） | **PASS** | `replaced→REPLACED_TOK`（完整 token）→ `test_corrected_text_report_fields` **FAILED**；`LAYOUT_FIGS→LAYOUT_FIGX` → `test_page_image_layout_env_defaults` **FAILED**；恢复后 **7 passed**；`test_token_matcher_rejects_distinct_value` 明确 `APPLIED_X`/`replacedX` 不匹配 |
+| 4 | F4：失败 summary 含原因/日志尾 | **PASS** | 坏 data-dir：`reason=scan2pdf_rc=3`，且 `[e2e] 最后日志:` 含 `数据配对失败: data-dir 不存在`；缺参数：`[e2e] 需要 --book/--input/--data-dir/--out` exit2 |
+| 5 | 架构守卫有效（红/绿） | **PASS** | `build_pdf` 插入 `# build_geom.py` → `test_scan2pdf_geom_uses_fit_positional` **FAILED**；恢复后 2 passed；scan2pdf sha 复原 |
+| 6 | pytest 全绿（含新测试）；报告追加；不改实现；不 commit | **PASS** | 守卫测试 **7 passed**；全量 unit **753 passed**（195.5s）；本节报告；篡改均已恢复，未 commit |
+
+## GUARD2.2 F1 已知阻断（captain 指示，不再打回）
+
+- 当前工作树：`HORIZ_FALLBACK_RATIO` 代码默认已为 `0`（`src/utils/geometry.py:94`），但 spec §2.3 仍写默认 0.10；ghbq 全量 gate **95.9%**（干净 HEAD 96.8），wz2 1-6 **exit6/REJECT/66.7**（干净 HEAD `70a9d70`：exit0/PASS/100，6=6，逐页文本相同）。
+- 结论：**t221 尚未完整落地/回退**，F1 维持「已知阻断」；本任务按 captain 口径不以 F1 判 fail，GATE 取 F2/F3/F4。
+- 低风险 F5：`HORIZ_FALLBACK_RATIO` spec 默认 0.10 vs 代码默认 0 不一致（t221 收口中），合并后需同步。
+
+## GUARD2.3 字节绑定
+
+| 文件 | sha256 |
+|---|---|
+| `scripts/e2e_smoke.sh` | `0687a4774815f8a8cb90fdba608c254b7725bdb254950df61568b5bad4bda904` |
+| `src/test/unit/test_spec_conformance.py` | `0315d1eefad86f08d8e6d0b50168fa2f703a234d4dd4aa017049f9d189b351e8` |
+| `src/test/unit/test_architecture_guard.py` | `f3ec07fe837592a8085b6e476a521107cc0581a4adc20cbb515abbe70a3cc664` |
+| `src/tools/scan2pdf.py`（复原） | `d8fda57b083a0af81a13d0afd03c9fe272037b8a796115a0aeb4718569449545` |
+| HEAD | `70a9d70`（未 commit） |
+
+## GUARD2.4 结论
+
+**t227 验收通过（PASS，F1 为 captain 指定的已知阻断，待 t221）**：F2（seed+repeat2 一致）、F3（完整 token 红/绿）、F4（失败原因+日志尾）均实测修复；架构守卫红/绿有效；守卫 7 passed、全量 unit 753 passed。wz2 6 页仍被 t208/t221 回归阻断（REJECT 66.7 vs 干净 HEAD PASS100），作为已知阻断跟踪，不在本任务重复打回。

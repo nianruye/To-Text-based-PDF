@@ -1182,3 +1182,65 @@ printf '{"2": {"0": "戈尔巴\\n乔夫"}}' > /tmp/newline_ct.json
 | `output/ghbq_full/review_ghbq_corrected2.pdf` | md5 `f2c2ba5e0b4249159f6c026e593d9d10` / 104 页 |
 | `output/wz4/review_wz4_ct2.pdf` | md5 `0998ecfe360f83a35c856861c4d5e68f` / 677 页 |
 | HEAD | `70fe1a7`（未 commit） |
+
+---
+
+# 附：结构性守卫终审（t217，t215/t216 + t226）
+
+> 审查人：质量审查员　日期：2026-11-11 13:56–14:30
+> 对象：t215（E2E 冒烟 + spec 一致性 + 架构守卫）+ t226 修复（F2/F3/F4）
+> 依据：`docs/scan2pdf_v1.md` §26（含 §26.5）、`AGENTS.md` #49/#50、t226/t227 证据
+> **结论：PASS（有条件）** —— 三类守卫均实测可拦截（红/绿双侧 reviewer 独立复现）；E2E 三环（已有 data-dir→构建→gate）成立（ghbq 20-23 exit0/PASS100/pages4，两次一致；坏 data-dir exit1 带 reason+日志尾）；一致性/架构守卫覆盖 spec 字段与 fit_positional 入口。**任务给定 verify 样例 wz4 1-6 在干净 HEAD 与当前树均 exit6/pitch 50%**（前端页/目录页，非守卫缺陷），需换例/注明；t208 已知阻断（wz2 1-6、HORIZ_FALLBACK_RATIO 默认 0 vs spec 0.10）仍待 t221。
+
+## 0. 复跑（任务给定 verify + 补充）
+
+- **wz4 1-6（任务 verify 命令）**：当前树 `exit=6 gate=REJECT pitch=50.0 pages=6`，reason `verify_geom_fail,pitch_below_floor`；**干净 HEAD（worktree 70a9d70）同命令同结果 exit6/pitch50** → 该 6 页为前端/TOC 类，不可作 E2E 通验样例（非 t215/t226 回归）。
+- **ghbq 20-23（脚本文档样例）**：`exit=0 gate=PASS pitch=100.0 pages=4`，run1/run2 一致（summary `(repeatable)`）。
+- **坏 data-dir**：`exit=1`，summary `reason=scan2pdf_rc=3` + 日志尾「数据配对失败: data-dir 不存在」。
+- **守卫测试**：`test_spec_conformance` + `test_architecture_guard` → **7 passed**。
+- 全量：`test_spec_conformance` 5 例 + `test_architecture_guard` 2 例覆盖 §26.2/§26.3 条款。
+
+## 1. 红/绿双侧（reviewer 独立复现）
+
+| 篡改 | 结果 | 恢复 |
+|---|---|---|
+| spec `CORRECTED_TEXT` 全部 `replaced` → `REPLACED_TOK` | `test_corrected_text_report_fields` **FAILED**（`_has_token('replaced')` 断言失败） | 恢复后 5 passed；sha `OK` |
+| `scan2pdf.build_pdf` geom 块内插入 `# guard tamper: build_geom.py` | `test_scan2pdf_geom_uses_fit_positional` **FAILED**（不得出现 build_geom.py） | 恢复后 2 passed；sha `OK` |
+
+> 注：只替换**单处** `replaced`（其余处仍在）不会红 —— 守卫是「token 是否存在」语义，非逐字段结构断言（见 F2）。
+
+## 2. findings
+
+| id | severity | problem | requiredFix |
+|---|---|---|---|
+| **F1** | medium | **任务给定 verify 样例不可用**：`wz4 --pages 1-6` 在干净 HEAD 与当前树均 exit6/pitch 50%（前端/目录页），不能作为 E2E 通验；docs §26.1 用的是 ghbq 20-23（PASS100） | 换 verify 样例（ghbq 20-23 或 wz4 非 TOC 页）或在 docs/§26.5 注明前端页子集不适用；当前任务 verify 命令本身应更新 |
+| **F2** | low | 守卫是字面/存在性匹配：① 架构守卫在 build_pdf 体内**注释**出现 `build_geom.py` 也会 fail（docs §26.3 确实禁止该子串，属刻意严格，但会误伤说明性注释）；② 一致性测试只查 token 是否存在（单处篡改不红；实现用注释写字段名也可过），不校验字段结构/默认值语义 | 可选：架构守卫改匹配 subprocess argv 构造行/去注释；字段类守卫改用 AST 或断言 report 实际键集合 |
+| **F3** | low | `e2e_smoke.sh` cleanup 删除 `<out 目录>/_scan2pdf_<book>`（共享临时目录）；同目录并发不同 out 的两次运行可能互删 | 临时目录按 out 文件名隔离（或 `--keep-tmp` 提示） |
+| **F4** | known-blocker（captain 指定，t221） | `HORIZ_FALLBACK_RATIO` 代码默认 **0** vs spec **0.10**；当前树 wz2 1-6 exit6/REJECT、ghbq gate 95.9（HEAD PASS）——docs §26.5 已登记，t221 处理中 | 随 t221 回退/对齐；守卫不掩盖（脚本仍返回非零） |
+| **F5** | note | 守卫刻意硬编码文件名（`fit_positional.py`）与 spec token 名：重命名重构会 fail，需同步改守卫+spec（§26.3 契约要求的架构不变量，接受） | 文档注明「重命名需同步守卫」 |
+
+## 3. 结论
+
+**t217 终审 verdict：PASS（有条件）**。
+
+- **通过**：E2E 三环覆盖（已有 data-dir→scan2pdf→report/gate 判定）实测成立；确定性与重复性（PYTHONHASHSEED=0 + 2 次一致）成立；失败摘要含 reason+日志尾；spec 一致性覆盖 CORRECTED_TEXT 字段/CALIB 16 码/PAGE_IMAGE_LAYOUT 5 env 默认/scan2pdf 8 顶层键；架构守卫覆盖 build_pdf 只走 fit_positional + 薄壳复用 fit_common.main；红/绿双侧 reviewer 独立复现；docs §26、AGENTS #49/#50 一致。
+- **条件**：F1（verify 样例）需换例/注明；F2/F3 low 可选加固；F4 为 captain 指定已知阻断（t221），本任务不打回。
+
+## 4. 复现
+
+```bash
+cd /opt/test
+bash scripts/e2e_smoke.sh --book wz4 --input source_pdf/wz4.pdf --data-dir data/wz4 --out /tmp/review_e2e_wz4.pdf --pages 1-6   # 当前树/HEAD 均 exit6 pitch50（F1）
+bash scripts/e2e_smoke.sh --book ghbq --input source_pdf/ghbq.pdf --data-dir output/ghbq_full/_ocr_ghbq --out /tmp/review_e2e_ghbq.pdf --pages 20-23  # exit0 PASS100 pages4
+bash scripts/e2e_smoke.sh --book wz4 --input source_pdf/wz4.pdf --data-dir /tmp/no_such_dir --out /tmp/e2e_bad.pdf --pages 1-6  # exit1 reason=scan2pdf_rc=3
+/usr/bin/python3 -m pytest src/test/unit/test_spec_conformance.py src/test/unit/test_architecture_guard.py -q  # 7 passed
+# 红/绿：spec replaced→REPLACED_TOK / scan2pdf geom 块插 build_geom.py → FAILED；恢复后 sha OK
+```
+
+| 文件 | sha256 / 说明 |
+|---|---|
+| `scripts/e2e_smoke.sh` | `0687a4774815f8a8cb90fdba608c254b7725bdb254950df61568b5bad4bda904` |
+| `src/test/unit/test_spec_conformance.py` | `0315d1eefad86f08d8e6d0b50168fa2f703a234d4dd4aa017049f9d189b351e8` |
+| `src/test/unit/test_architecture_guard.py` | `f3ec07fe837592a8085b6e476a521107cc0581a4adc20cbb515abbe70a3cc664` |
+| `src/tools/scan2pdf.py`（当前树） | `d8fda57b083a0af81a13d0afd03c9fe272037b8a796115a0aeb4718569449545` |
+| HEAD | `70a9d70`（未 commit；测试篡改均已恢复） |
