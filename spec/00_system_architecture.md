@@ -38,10 +38,10 @@
 
 ## 共享基础（所有类型通用）
 
-### 1. OCR 数据层
+### 1. OCR 数据层（当前 `src/tools/ocr_book.py`）
 - **spotting**（行级）：每行文字 + bbox（主数据）
 - **layout**（版面）：image/aside_text/number/paragraph_title 等 block
-- 来源：PaddleOCR-VL-1.6（useLayoutDetection=False/True）
+- 来源：PaddleOCR-VL-1.6（useLayoutDetection=False/True）；`ocr_book` 负责批量/断点/JSONL/raw→coords/lines/layout.json 转换；历史 `run_spotting_ocr.py` 仅历史入口
 
 ### 2. 几何标定
 - 字号 = 满行宽 ÷ 满行字数
@@ -67,6 +67,61 @@
 - LAYJSON image block -> 裁源图贴回
 - in_figure 跳过图内 OCR 行
 - 图说明居中
+
+### 7. LAYJSON / PAGE_IMAGE / corrected_text（当前共享输入）
+- **LAYJSON**：layout raw JSONL/JSON → canonical `<book>_layout.json`（page_key/blocks/bbox/page_width_pt + legacy prunedResult）；`LAYOUT_HEADINGS/FIGS/TOC` 默认关；仅 `--layout` 或显式开关传入。
+- **PAGE_IMAGE_***：`PAGE_IMAGE_PAGES/PREFIX` 手工整页贴图；`PAGE_IMAGE_FULL_RATIO=0.40` 自动整页叠加（源页 raster BG + 文本 3 Tr，可搜）；未达阈值正文图块裁贴。
+- **corrected_text**：`data/<book>/corrected_text.json` 或 `--corrected-text`；0-based page/line 整行替换；coords/页数/行数不变；report 审计 path/sha/replaced/skipped/warnings/line_counts。
+
+## 编排与门禁（scan2pdf / quality_gate / calib / gate sidecar / report）
+
+> 当前端到端主线是 `src/tools/scan2pdf.py`；它把 OCR、数据准备、校正、构建、验证、门禁、报告串起来。
+> 历史 Web(`localhost:8765`)/`build_pdf_v13.py` 不再是主线。
+
+### 端到端数据流
+
+```mermaid
+flowchart LR
+  A[源 PDF] --> B[scan2pdf 判书型/preflight]
+  B --> C[ocr_book: layout + spotting]
+  C --> D[raw JSONL]
+  D --> E[coords/lines + layout.json]
+  E --> F[corrected_text 可选]
+  F --> G[fit_positional 两趟]
+  G --> H[build_geom / build_classic]
+  H --> I[交付 PDF]
+  I --> J[verify_geom]
+  J --> K[quality_gate]
+  K --> L[report + calib + gate sidecar]
+  K --> M[交付/退出码]
+```
+
+### 编排层 `scan2pdf.py`
+
+1. preflight/判书型（axis、版框、纸型、multi_format）；
+2. 数据：`--skip-ocr` 复用 coords/lines，或调 `ocr_book` 生成；
+3. LAYJSON：仅 `--layout`/`LAYOUT_HEADINGS|FIGS|TOC=1` 时 `find_layout()`，默认 disabled；
+4. corrected_text：默认 `data/<book>/corrected_text.json`，存在自动应用；写 patched lines 临时文件；
+5. 构建：横排 `fit_positional.py`/`fit_positional_classic.py` 两趟；竖排 `build_vert.py`；
+6. `verify_geom.py`（横排，带 `--src-pdf`）或 `verify_vert.py`（竖排，带 `--src-pdf`）；
+7. `quality_gate.py` 写 `<out>.gate.json`，report 同步 gate/calib；
+8. 成功才覆盖 `--out`；失败矩阵 exit 2–8。
+
+### 门禁与审计
+
+- **verify_geom**：页数 1:1、logical line 1:1、页高、pitch、blank/overflow、split/missing；`--src-pdf` 必须带（DPI 自适应）。
+- **verify_vert**：页数 1:1、逐页字符量、span+矢量越界、页幅；不进 CI，本地跑。
+- **quality_gate**：读 verify + calib；`calib_warn:*` 非阻断；`calib_fail:*` 使 PASS→MANUAL_ONLY（review_required=true）；multi_format 同样不得 auto pass。
+- **calib.json**：横排 `horizontal-calib-v1`；`estimator/fallback/ink`、cw/measure/font/baseline/margin/coverage/selfcheck/warnings/render。
+- **gate sidecar**：`<out>.gate.json`（verdict/effective/reasons/metrics/calib_warnings/calib_fail/multi_format）。
+- **report**：`<out>.report.json`（input_sha/book_type/pipeline/data/layout/corrected_text/fix/build/gate/calib/exit）。
+
+### 当前已知限制
+
+- 图片验收需显式 `--layout`（默认 scan2pdf 不自动传 LAYJSON）；
+- p10 丛书目录作者列待 S8；
+- 横排 S4 逻辑行 1:1 84.4%（ghbq），未达 95%，build 行合并待续；
+- 竖排验证本地跑，不进 CI；v13/Web 为历史。
 
 ## 各类型专属逻辑
 
@@ -144,6 +199,10 @@
   预期差异页按「该页 OCR 内容特征」自动识别 —— 水印/非中文页、幻觉长行页，不硬编码页号）
 - 全书逐 span + 逐矢量图形 bbox 越界（x∈[0,W] / y∈[0,H]）
 - 页幅对照（可选 `--src-pdf`：输出纸型 vs 源书众数页幅）
+
+### 门禁/审计测试
+- `quality_gate.py`：gate sidecar/verdict/reasons/calib_warn/calib_fail/multi_format；
+- `scan2pdf` report 与 sidecar 字段一致；失败不覆盖 out。
 
 ### 类型专属测试
 - **古籍**：序号对齐（x0 统一）、墨高重叠（pitch=源）、aside 补全、校注上标
