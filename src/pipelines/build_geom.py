@@ -657,9 +657,6 @@ def _toc_pre_flow(flow):
     _cand = [f for f in flow if len(_numfrags(f)) == 1 and len(_parts(f)) >= 2
              and bool(_TOC_ENTRY_START_RE.match(''.join(t for t, _ in _parts(f) if not _TOC_NUM_RE.match(t)).strip()))]
     _raww = [f for f in flow if _TOC_NUM_RE.match((f.get('t') or '').strip())]
-    if len(_cand) >= 3 and not any('CONTENTS' in (f.get('t') or '') for f in flow):
-        # 同 y 数字+标题片段也可能出现在 wz 古籍目录（后置页码）；只认含 CONTENTS 的 ghbq 三栏页。
-        return None
     if len(_cand) < 3:
         # 原始形态：页首（跳过目录标题）必须是数字，紧随标题可识别为条目，且标题后不是立即数字。
         _body = [f for f in flow if not (_norm_core(f.get('t','')).startswith('目录') or _norm_core(f.get('t','')) == 'CONTENTS')]
@@ -680,6 +677,7 @@ def _toc_pre_flow(flow):
         if len(nums) == 1 and titles:   # OCR 把页码+titles 并在同一 y、两个 frag
             nf = dict(f)
             nf['toc_pre'] = True; nf['toc_page'] = nums[0]; nf['is_head'] = False
+            nf['toc_indent'] = 22.0 if re.match(r'^\d+[.．]', nf.get('t','').strip()) else 0.0
             nf['t'] = ''.join(titles); nf['frags'] = None
             cur = nf; out.append(nf)
             continue
@@ -687,6 +685,7 @@ def _toc_pre_flow(flow):
             pending = t; continue
         if pending is not None:
             nf = dict(f); nf['toc_pre'] = True; nf['toc_page'] = pending; nf['is_head'] = False
+            nf['toc_indent'] = 22.0 if re.match(r'^\d+[.．]', nf.get('t','').strip()) else 0.0
             nf['frags'] = None; pending = None; cur = nf; out.append(nf)
         elif cur is not None and not _TOC_ENTRY_START_RE.match(t):
             # 续行保留独立 flow：渲染时与标题首行同 x0（不用 parbox 的隐式缩进）
@@ -698,6 +697,7 @@ def _toc_pre_flow(flow):
             out.append(nf)
         else:
             nf = dict(f); nf['toc_pre'] = True; nf['toc_page'] = ''; nf['is_head'] = False
+            nf['toc_indent'] = 22.0 if re.match(r'^\d+[.．]', nf.get('t','').strip()) else 0.0
             nf['frags'] = None; cur = nf; out.append(nf)
     if pending and cur is not None and not cur.get('toc_page'):
         cur['toc_page'] = pending
@@ -706,14 +706,19 @@ def _toc_pre_flow(flow):
         _ch = [f.get('fnt', PF) for f in _pre if re.match(r'^[一二三四五六七八九十]+[“"‘\s]', (f.get('t') or '').strip())]
         _sec = [f.get('fnt', PF) for f in _pre if re.match(r'^\d+[.．、]', (f.get('t') or '').strip())]
         # 同页同级统一：章标题取同页章级最大字号、节标题取同页节级最小字号（源书章大节小）
-        _chf = max(_ch) if _ch else round(PF * 1.4, 1)
-        _secf = min(_sec) if _sec else round(PF, 1)
+        _chf = round(PF * 1.13, 1)
+        _secf = round(PF, 1)
+        _prevf = None
         for f in _pre:
             _t = (f.get('t') or '').strip()
+            if f.get('toc_cont') and _prevf is not None:
+                f['fnt'] = _prevf
+                continue
             if re.match(r'^[一二三四五六七八九十]+[“"‘\s]', _t):
                 f['fnt'] = round(_chf, 1); f['tier'] = 'part'
             elif re.match(r'^\d+[.．、]', _t):
                 f['fnt'] = round(_secf, 1); f['tier'] = 'section'
+            _prevf = f['fnt']
     return out if any(f.get('toc_pre') for f in out) else None
 
 _TOC_PAGE = set()   # str 页key(主循环守卫/渲染门控用)
@@ -1362,7 +1367,7 @@ for key in sorted(sl.keys(), key=int):
         _tf = _toc_pre_flow(flow)
         if _tf is not None:
             flow = _tf
-    if key in _TOC_PAGE:   # 目录页:游离纯数字行(与标题行 y 不重叠未并片)→ 追加为上一条目页码片段; 上条已有数字片段则丢弃(防孤行落在版心外)
+    if key in _TOC_PAGE and not any(f.get('toc_pre') for f in flow):   # 目录页:游离纯数字行→页码片段；toc_pre 已解析时不再并
         _nf7 = []
         for _f7 in flow:
             if PN_RE.fullmatch(_f7['t'].strip()) and _nf7 and not _f7.get('is_head'):
@@ -1574,14 +1579,19 @@ for key in sorted(sl.keys(), key=int):
                 continue
             if key in _TOC_PAGE and f.get('toc_pre'):
                 _pg = str(f.get('toc_page') or '').strip()
-                _xoff = _toc_shift if '_toc_shift' in locals() else 0.0
-                # 页码列固定 18pt 右对齐；标题/续行都用同一左缘（xoff+26pt），续行不用 parbox。
-                _title_x = _xoff + 18.0 + float(f.get('toc_indent', 0.0))
+                _ind = 22.0 if re.match(r'^\d+[.．]', (f.get('t') or '').strip()) else 0.0
+                _ind = max(_ind, float(f.get('toc_indent', 0) or 0.0))
+                _tx = 47.5 + _ind   # 标题列绝对左缘=body_left+47.5pt；L2 +2字
+                if re.match(r'^\d+[.．]', (f.get('t') or '').strip()):
+                    _tx = 47.5 + 22.0
+                _tw = '\\dimexpr\\textwidth-%.1fpt\\relax' % _tx
+                _hgap = 27.5 + (22.0 if re.match(r'^\d+[.．]', (f.get('t') or '').strip()) else 0.0)
+                _tfont = '\\fontsize{%spt}{%spt}\\selectfont ' % (fnt, bl)
                 if f.get('toc_cont'):
-                    body.append('{\\fontsize{%spt}{%spt}\\selectfont \\noindent\\hspace*{%.1fpt}{\\CJKfamily{heiti}%s}}' % (fnt, bl, _title_x, _inv(_esc_toc_title(f['t']), f)) + brk + '}')
+                    body.append('{\\noindent\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_tx + 3.7, _tw, _tfont, _inv(_esc_toc_title(f['t']), f)) + brk)
                 else:
-                    _pgbox = '\\makebox[18pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg))
-                    body.append('{\\fontsize{%spt}{%spt}\\selectfont \\noindent\\hspace*{%.1fpt}%s\\hspace{2pt}\\rule[-0.2ex]{0.4pt}{1.05em}\\hspace{6pt}{\\CJKfamily{heiti}%s}}' % (fnt, bl, _xoff, _pgbox, _inv(_esc_toc_title(f['t']), f)) + brk + '}')
+                    _pgbox = '\\makebox[18pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg) + '\\char32')
+                    body.append('{\\noindent\\makebox[0pt][l]{}%s\\ \\hspace*{2pt}\\rule[-0.2ex]{0.4pt}{1.05em}\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_pgbox, _hgap, _tw, _tfont, _inv(_esc_toc_title(f['t']), f)) + brk)
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
