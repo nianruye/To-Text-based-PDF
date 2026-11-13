@@ -336,3 +336,16 @@ def test_type_mismatch_fp_fn_counts():
     assert r['per_class']['comma']['fn'] == 1
     assert r['per_class']['period']['fp'] == 1
     assert r['confusion'].get('comma>period') == 1
+
+
+def test_sequence_gap_tolerance_plus_minus_one():
+    """t263：同 gap 无候选时允许 ±1 gap 配对（gold close 在 pred 后一 anchor）。"""
+    r = pb.sequence_eval('甲「乙」丙', '甲「乙丙」')
+    assert r['overall'] == {'tp': 2, 'fp': 0, 'fn': 0, 'precision': 1.0, 'recall': 1.0}
+    assert r['gap_tolerance'] == 1
+
+
+def test_sequence_gap_tolerance_no_extra_fp():
+    """t263：gold 无标点时不得因容差把 pred 标点配成 TP。"""
+    r = pb.sequence_eval('甲乙', '甲「乙')
+    assert r['overall']['tp'] == 0 and r['overall']['fp'] == 1 and r['gap_tolerance'] == 0

@@ -663,7 +663,7 @@ def sequence_eval(gold_text, pred_text):
     # 匹配块到达串尾：补 len(g_anchor)->len(p_anchor)，让串尾标点也能配对
     if blocks and blocks[-1].a + blocks[-1].size == len(g_anchor) and blocks[-1].b + blocks[-1].size == len(p_anchor):
         gap_map[len(g_anchor)] = len(p_anchor)
-    used = set(); pairs = []; per = {}; confusion = {}
+    used = set(); pairs = []; per = {}; confusion = {}; gap_tol = 0; gap_tol_pairs = []
     def bump(cls):
         return per.setdefault(cls, dict(tp=0, fp=0, fn=0, value_ok=0, value_total=0, type_ok=0, type_total=0))
     for gap, cls, value, order, extra in g_tokens:
@@ -681,6 +681,17 @@ def sequence_eval(gold_text, pred_text):
                 if _seq_group(cand[1]) == _seq_group(cls):
                     confusion[(cls, cand[1])] = confusion.get((cls, cand[1]), 0) + 1
                     hit = cand; break
+        # t263：同 gap 无可用候选时，允许 ±1 gap（仅当同 gap 完全无候选）
+        if hit is None and g2 is not None:
+            for _d in (-1, 1):
+                _cands = [pt for pt in p_tokens if pt[0] == g2 + _d and id(pt) not in used]
+                hit = next((x for x in _cands if x[1] == cls), None)
+                if hit is None:
+                    hit = next((x for x in _cands if _seq_group(x[1]) == _seq_group(cls)), None)
+                if hit is not None:
+                    gap_tol += 1
+                    gap_tol_pairs.append(dict(gold_gap=gap, gold_cls=cls, pred_gap=hit[0], pred_cls=hit[1]))
+                    break
         if hit is not None:
             used.add(id(hit))
             pairs.append((order, hit[3]))
@@ -720,7 +731,7 @@ def sequence_eval(gold_text, pred_text):
                              recall=round(tp / (tp + fn), 4) if tp + fn else 0.0),
                 confusion={'%s>%s' % k: v for k, v in confusion.items()},
                 order_swaps=_transpositions(pairs),
-                n_pairs=len(pairs))
+                n_pairs=len(pairs), gap_tolerance=gap_tol, gap_tolerance_pairs=gap_tol_pairs)
 
 
 def sequence_main(args):
@@ -735,6 +746,7 @@ def sequence_main(args):
                confusion={}, order_swaps=0,
                order_swaps_definition='同 gap 多 tokens 按序列配对并计逆序；跨 gap 由单调 gap map 保证非逆序（恒 0）',
                reading_order={'pages': 0, 'unscorable': 0, 'excluded_furniture': 0},
+               gap_tolerance=0, gap_tolerance_pairs=[],
                gate=dict(status='provisional', thresholds_version='v1.2', auto_enabled=False),
                errors=[])
     try:
@@ -765,6 +777,10 @@ def sequence_main(args):
         for k, v in r['confusion'].items():
             out['confusion'][k] = out['confusion'].get(k, 0) + v
         out['order_swaps'] += r['order_swaps']
+        out['gap_tolerance'] += r.get('gap_tolerance', 0)
+        _gtp = r.get('gap_tolerance_pairs', [])
+        for _p in _gtp: _p = _p.setdefault('page', page) if isinstance(_p, dict) else None
+        out['gap_tolerance_pairs'] += _gtp
     for cls, st in agg.items():
         tp, fp, fn = st['tp'], st['fp'], st['fn']
         st['precision'] = round(tp / (tp + fp), 4) if tp + fp else 0.0

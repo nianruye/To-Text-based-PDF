@@ -150,15 +150,21 @@ def test_convert_layout_json_jsonl_order_blocks():
 
 
 # ---- t219: OCR 参数化 ----
-def test_payload_default_equals_head():
-    old = {"model": "PaddleOCR-VL-1.6", "optionalPayload": json.dumps({
-        "useLayoutDetection": True, "promptLabel": "ocr", "temperature": 0,
-        "minPixels": 147384, "maxPixels": 2822400, "repetitionPenalty": 1,
-        "topP": 1, "layoutShapeMode": "auto", "useDocUnwarping": False,
-        "useDocOrientationClassify": False})}
-    assert ob.payload(True, 'ocr') == old
-    p = dict(ob.OCR_DEFAULTS)
-    assert ob.payload(True, 'ocr', p) == old
+def test_payload_17_fields_explicit():
+    d = json.loads(ob.payload(True, 'ocr')['optionalPayload'])
+    assert list(d.keys()) == ob.PAYLOAD_FIELDS
+    assert len(d) == 17
+    assert d['useLayoutDetection'] is True and d['promptLabel'] == 'ocr'
+    assert d['useDocOrientationClassify'] is False and d['useDocUnwarping'] is False
+    assert d['useChartRecognition'] is False and d['useSealRecognition'] is False
+    assert d['useOcrForImageBlock'] is False and d['mergeTables'] is True
+    assert d['relevelTitles'] is False and d['layoutNms'] is False
+    assert d['restructurePages'] is False
+    assert d['layoutShapeMode'] == 'auto'
+    assert d['minPixels'] == 147384 and d['maxPixels'] == 2822400
+    assert d['repetitionPenalty'] == 1 and d['temperature'] == 0 and d['topP'] == 1
+    assert isinstance(d['minPixels'], int) and isinstance(d['useSealRecognition'], bool)
+    assert json.loads(ob.payload(True, 'ocr', dict(ob.OCR_DEFAULTS))['optionalPayload']) == d
 
 
 def test_resolve_priority_cli_book_default():

@@ -657,7 +657,7 @@ B 不读 `gold_v1_20p` 的 item/bbox；输入是**人工转录的阅读序文本
    - anchor gap 映射不上（OCR 字符错/多/少）→ 该 gap 内标点全部 unaligned，gold 侧 FN、pred 侧 FP，
      错误原因 `alignment`，不强行跨 gap 配对；
    - **不得**只用标点序列做 `SequenceMatcher` 硬配对；文字锚点是唯一的槽位依据。
-7. **gap 不做 ±1 容差**：B 无字格，若允许跨 gap 会把标点错位洗成 TP；跨 gap 一律 FP/FN，并在报告列 `unaligned_gap`。
+7. **gap ±1 容差（t263 修订）**：同 gap 优先；同 gap 无**同类/同组**候选时，允许映射到相邻 ±1 gap 的候选（仅用于 anchor 边界/相邻 gap 映射抖动）。±1 只在无同 gap 候选时启用，不得把已错位的标点洗成 TP；报告列 `gap_tolerance` / `gap_tolerance_pairs`。其余跨 gap 仍 FP/FN。wz7 8 页实测：+4 TP/-4 FP/-4 FN（含 2 条额外 p830 真配对），无额外 FP。
 8. **未对齐原因**：`transcription`（gold 转录错）/`alignment`（锚点错/OCR 字差）/`reading_order`（混用/页边）/`missed`（产物漏检）/
    `false_insert`（产物多标点）/`form`（形态差异，不判错）/`type`（类型混淆）。
 

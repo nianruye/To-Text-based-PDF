@@ -91,15 +91,39 @@ def resolve_ocr_params(book, cli=None, root=ROOT):
     return params, sources, (path if os.path.exists(path) else None), sha
 
 
+# 官方 17 字段（t268 显式化；默认值对齐 ghbq raw model_settings 实测）
+PAYLOAD_FIELDS = [
+    'useDocOrientationClassify', 'useDocUnwarping', 'useLayoutDetection',
+    'useChartRecognition', 'useSealRecognition', 'useOcrForImageBlock',
+    'mergeTables', 'relevelTitles', 'layoutShapeMode', 'promptLabel',
+    'repetitionPenalty', 'temperature', 'topP', 'minPixels', 'maxPixels',
+    'layoutNms', 'restructurePages',
+]
+
+
 def payload(layout, prompt, params=None):
     p = dict(OCR_DEFAULTS); p.update(params or {})
-    return {"model": "PaddleOCR-VL-1.6", "optionalPayload": json.dumps({
-        "useLayoutDetection": layout, "promptLabel": prompt, "temperature": 0,
-        "minPixels": int(p['min_pixels']), "maxPixels": int(p['max_pixels']),
-        "repetitionPenalty": 1, "topP": 1,
-        "layoutShapeMode": str(p['layout_shape']),
+    body = {
+        "useDocOrientationClassify": bool(int(p['orientation'])),
         "useDocUnwarping": bool(int(p['unwarp'])),
-        "useDocOrientationClassify": bool(int(p['orientation']))})}
+        "useLayoutDetection": bool(layout),
+        "useChartRecognition": False,
+        "useSealRecognition": os.environ.get('OCR_SEAL_RECOGNITION') == '1',
+        "useOcrForImageBlock": False,
+        "mergeTables": True,
+        "relevelTitles": False,
+        "layoutShapeMode": str(p['layout_shape']),
+        "promptLabel": prompt,
+        "repetitionPenalty": 1,
+        "temperature": 0,
+        "topP": 1,
+        "minPixels": int(p['min_pixels']),
+        "maxPixels": int(p['max_pixels']),
+        "layoutNms": False,
+        "restructurePages": False,
+    }
+    assert list(body.keys()) == PAYLOAD_FIELDS
+    return {"model": "PaddleOCR-VL-1.6", "optionalPayload": json.dumps(body)}
 
 
 
@@ -284,9 +308,13 @@ def run(args):
     _, batches = split_batches(args.input, args.pages_per_batch, pages)
     jobs_path = os.path.join(args.out_dir, 'jobs.json')
     jobs = json.load(open(jobs_path, encoding='utf-8')) if os.path.exists(jobs_path) else {}
+    # 注意（t269）：'spotting' 不在官方 promptLabel 四枚举（ocr/formula/table/chart）内，
+    # 但它是服务端返回 spotting_res schema 的触发器；改成 'ocr' 会使 lines 全空。
     modes = [('layout', True, 'ocr'), ('spotting', False, 'spotting')]
     if args.mode == 'layout': modes = modes[:1]
     elif args.mode == 'spotting': modes = modes[1:]
+    if getattr(args, 'ocr_prompt_label', None):
+        modes = [(m, l, args.ocr_prompt_label) for m, l, _ in modes]
     import requests
     H = {'Authorization': 'bearer ' + tok}
     _cli = dict(max_pixels=getattr(args, 'ocr_max_pixels', None),
@@ -390,6 +418,7 @@ def main(argv=None):
     ap.add_argument('--ocr-orientation', type=int, default=None, choices=[0, 1])
     ap.add_argument('--ocr-unwarp', type=int, default=None, choices=[0, 1])
     ap.add_argument('--ocr-layout-shape', default=None)
+    ap.add_argument('--ocr-prompt-label', default=None, choices=['ocr', 'formula', 'table', 'chart', 'spotting'])
     args = ap.parse_args(argv)
     return run(args)
 
