@@ -409,6 +409,28 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
     env['VERT_MISSED_FIX'] = fix_path if fix_path else '0'
     # 可复现：build 端稳定 hash（消除 set/dict 顺序导致的文本差异）
     env.setdefault('PYTHONHASHSEED', '0')
+    # 每书页级贴图白名单（data/<book>/page_image_pages.json）——数据驱动，代码不写书名分支。
+    _pip = os.path.join(ROOT, 'data', args.book, 'page_image_pages.json')
+    if pipeline == 'geom' and os.path.exists(_pip):
+        try:
+            _pj = json.load(open(_pip, encoding='utf-8'))
+            _pages = [int(x) for x in _pj.get('pages', [])]
+            if _pages:
+                import fitz
+                _pdir = tempfile.mkdtemp(prefix='scan2pdf_pageimg_%s_' % args.book)
+                _src = fitz.open(src_pdf)
+                for _p1 in _pages:
+                    _k = _p1 - 1
+                    if 0 <= _k < _src.page_count:
+                        _pix = _src[_k].get_pixmap(dpi=200)
+                        _pix.save(os.path.join(_pdir, 'pg_%d.png' % _k))
+                _src.close()
+                env['PAGE_IMAGE_PAGES'] = ','.join(str(p1-1) for p1 in _pages)
+                env['PAGE_IMAGE_PREFIX'] = os.path.join(_pdir, 'pg_')
+            else:
+                log('page_image_pages: 空列表，忽略')
+        except Exception as _e:
+            log('page_image_pages 跳过: %s: %s' % (type(_e).__name__, _e))
     # LAYJSON / 图片 passthrough：只有本次 scan2pdf 显式拿到 layout 才开启；默认构建不读
     _lay = getattr(args, 'layout_json', '') or ''
     if _lay and pipeline == 'geom':

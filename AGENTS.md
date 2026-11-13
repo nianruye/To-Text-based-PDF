@@ -116,6 +116,7 @@
 | # | issue | 影响范围 | 状态 |
 |---|---|---|---|
 | 52 | **标题续行块级合并（判定前合并，替代事后继承）**（t236）：`TITLE_CONT` 反向继承法只在「折行链中至少一行被判为标题」时生效；若整块标题无任一行命中（如首行/续行都落正文特征），不会合并，仍可能出现半块正文/半块标题。需在 `is_head` 判定**之前**按 y 间距 + 同左边界 + 非新编号把 OCR 折行合并为一个逻辑标题块，再对整块判定字号/字体/对齐。动机：不依赖单行判对，消除反向继承的盲区。风险：改标题判定路径会影响所有横排书的标题字号/行数/分页，必须重跑 ghbq/wz4/wz1/wz2 基线并逐页 diff。状态 planned，不动本轮 t236 已交付行为。 |
+| 53 | **wz4 p2/p428 个别页文本越界**（已知限制，不修）：p2 封底 ISBN 条码块（`上架建议：政治学`/`ISBN 978-7-208-14040-0`/`9787208140400>`）三行贴到右缘外；p428 版权行 OCR 乱码（` 年 版。版 第`/` 454`/` 页。`）溢出。**不修理由**：`PAGE_IMAGE_PAGES` 页级贴图会让该页高度与正文不同 → 后续页重新分页 → 实测 **+19 页（696 vs 677）**；行级 XCLIP 需动全书折行，实测会给 wz1 带 20-30 页 diff。收益（2 页边缘越界、不影响正文可读）远低于风险（全书重排）。定位：`src/pipelines/build_geom.py` `_PAGE_IMG_PAGES`/`_page_img_full`。状态 planned；`verify_typography` 会持续报这两页 `hard_text_out_of_page`，属**已知可接受**。 |
 | 10 | `/tmp/seg2_line.*` 并发冲突（geom+classic 同名） | geom L930 + classic L1019 | planned（改路径分 build_name） |
 | ~~7~~ | ~~geom `page_pitch` 方差检查含异常值~~ | ~~geom L129~~ | **不修**（设计差异：实测改 inner 后 pitch 89.9%->15.4%，保守策略对现代书正确） |
 | 11 | `_esc_chars` 两方分叉（geom 删单反斜杠/classic 删双保留单） | `tex_escape.py` | planned（是否统一需 spec 确认） |
@@ -148,6 +149,16 @@
 | 47 | **S4 行数保真低 full_ratio 兜底失败**（ghbq full_ratio=2.8%，满行样本 50/1770 导致 cw/FONT 假设不稳；fallback 已实现但验收目标未达） | `src/utils/geometry.py`（`calibrate` fallback + `HORIZ_CW`/`HORIZ_FONT_MEASURE`）、`src/test/unit/test_horizontal_calib.py`、`spec/governance/HORIZONTAL_CALIB.md` §2.3/§4、`docs/scan2pdf_v1.md` §25 | **implemented（fallback），验收 FAIL**（t208：full_ratio<0.10 → cw=median chars、measure=P90 width、font=measure/cw、estimator/fallback 审计、显式覆盖；ghbq calib cw25/measure460/font18.4/warnings 只剩 toc_low_sample；但 verify 行数1:1 **35.1%**（目标≥95）、页高<5% **19.1%**（中位6.5%，目标<2）、overflow **26**（目标0）、pitch **96.8%**（目标≥99）；旧公式行35.1/27.7/5.9/25；目标需 build_geom 行合并/verify 口径，超出 geometry in-scope。wz4/wz2/wz1 zero regression；test_horizontal_calib 10 passed；未 commit） |
 | 49 | **E2E 输入链路无一条命令守卫**（新书/已有 data-dir 的 scan2pdf→构建→verify/gate 需手工拼命令，结构问题 A） | `scripts/e2e_smoke.sh`；`docs/scan2pdf_v1.md` §26 | **已实现**（t215：参数化 book/input/data-dir/out/--pages；一条命令跑 scan2pdf --skip-ocr→读 report/gate→summary；失败/REJECT 非零退出；坏 data-dir 实测 exit 1） |
 | 50 | **入口不唯一 + spec-实现脱节无自动守卫**（结构问题 B/C：geom 可绕过 fit_positional；新 spec 字段/码表可能只在文档） | `src/test/unit/test_architecture_guard.py`；`src/test/unit/test_spec_conformance.py`；`docs/scan2pdf_v1.md` §26 | **已实现**（t215：架构守卫断言 scan2pdf geom 只调 fit_positional、fit_positional 薄壳存在；spec 一致性覆盖 CORRECTED_TEXT/HORIZONTAL_CALIB/PAGE_IMAGE_LAYOUT/scan2pdf report；违规 fail） |
+
+> **判据边界原则（2026-11-11 定）**：**共性问题用根因守卫，个例页用数据/已知限制。**
+> 派单时写「根因守卫、禁止逐页特判」只适用于**跨页复现的共性问题**；若问题只出现在 1-2 页（如 #53），
+> 强行造全局规则必然过度触发 —— 实测 `_xguard_page`（本想只启用 XCLIP）因条件 `x0+w > page_px*0.919`
+> 命中 **wz1 179/222 页（80.6%）**，把 80% 页面变成整页贴图 + 文本层 1pt，直接打红
+> `test_invariants_geom.py::test_small_font_below_body`。
+> 差异化落点优先级：① `data/<book>/*.json` 数据 → ② 已知限制登记 → ③ 最后才是全局规则。
+>
+> **提交纪律（2026-11-11 定）**：`git commit` 不带路径会连同他人 `git add` 暂存的文件一起提交
+> （实测把 `build_geom.py +204 行` 混进了一个评测工具 PR）。**必须 `git add <精确路径>` 后 `git commit -- <精确路径>`**。
 
 ### 公共接口或兼容影响（api-compat）
 
