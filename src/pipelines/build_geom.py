@@ -1579,19 +1579,21 @@ for key in sorted(sl.keys(), key=int):
                 continue
             if key in _TOC_PAGE and f.get('toc_pre'):
                 _pg = str(f.get('toc_page') or '').strip()
-                _ind = 22.0 if re.match(r'^\d+[.．]', (f.get('t') or '').strip()) else 0.0
-                _ind = max(_ind, float(f.get('toc_indent', 0) or 0.0))
-                _tx = 47.5 + _ind   # 标题列绝对左缘=body_left+47.5pt；L2 +2字
-                if re.match(r'^\d+[.．]', (f.get('t') or '').strip()):
-                    _tx = 47.5 + 22.0
+                _t0 = (f.get('t') or '').strip()
+                _l1 = bool(re.match(r'^[一二三四五六七八九十]+', _t0))
+                _l2 = bool(re.match(r'^\d+[.．]', _t0))
+                _ind = 33.0 if _l2 else (66.0 if (not _l1 and not f.get('toc_cont')) else 0.0)
+                _tx = 48.0 + _ind
+                _fnt = fnt
+                _bl = round(_fnt * (1.5 if _l1 else 1.6), 1)
                 _tw = '\\dimexpr\\textwidth-%.1fpt\\relax' % _tx
-                _hgap = 27.5 + (22.0 if re.match(r'^\d+[.．]', (f.get('t') or '').strip()) else 0.0)
-                _tfont = '\\fontsize{%spt}{%spt}\\selectfont ' % (fnt, bl)
+                _tfont = '\\fontsize{%spt}{%spt}\\selectfont ' % (_fnt, _bl)
                 if f.get('toc_cont'):
-                    body.append('{\\noindent\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_tx + 3.7, _tw, _tfont, _inv(_esc_toc_title(f['t']), f)) + brk)
+                    _line = '{\\noindent\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_tx, _tw, _tfont, _inv(_esc_toc_title(f['t']), f))
                 else:
-                    _pgbox = '\\makebox[18pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg) + '\\char32')
-                    body.append('{\\noindent\\makebox[0pt][l]{}%s\\ \\hspace*{2pt}\\rule[-0.2ex]{0.4pt}{1.05em}\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_pgbox, _hgap, _tw, _tfont, _inv(_esc_toc_title(f['t']), f)) + brk)
+                    _pgbox = '\\makebox[30pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg) + '\\char32')
+                    _line = '{\\noindent%s\\hspace*{6pt}\\smash{\\rlap{\\rule[-0.25em]{0.4pt}{4.2em}}}\\hspace*{12pt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_pgbox, _tw, _tfont, _inv(_esc_toc_title(f['t']), f))
+                body.append('\\par' + _line + '\\par')
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
