@@ -122,3 +122,9 @@
 - ghbq 8页：TP282/FP51/FN40 **P0.8468/R0.8758**（与 v2 标点相同；v3 修了形态）
 - gold_sha256：`8423a6a8fa2f0a156c8aad1aa45a37d486c30c16c1943b1e6dde02d7352a2df4`
 - 产物 `output/ghbq_full/ghbq_final_v3.pdf`；worse页5（p70等），已在 AGENTS #54 登记。
+
+## t285 定稿：v12 基线
+
+- product_sha256：`553c5c8ab2da62fa2ac1574634c68c9d8f32b8dd75a815d682202d55e9096064`
+- 产物：`output/ghbq_full/ghbq_final_v12.pdf`（标题 Bold；p1 37.1/19.5、p3 居中、p13 页码、p33 空格、p1 封面图）
+- 标点口径未改：P0.8468/R0.8758（gold sha 不变）。

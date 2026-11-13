@@ -95,3 +95,9 @@ unscorable=[]；order_swaps=1（阅读序一次换位）；by_class：comma TP13
 - ghbq worse 页 5（p64/p65/p70/p86/p93，≤5）：p70 为 OCR 丢 4 个 em dash，其余单字符；均登记 AGENTS #54。
 - pytest 814 passed。
 - 详见 `docs/punct_normalize_adjudicate.md`。
+
+## t285 定稿：v12 新交付基线
+
+- 采用 `output/ghbq_full/ghbq_final_v12.pdf`，sha256 `553c5c8ab2da62fa2ac1574634c68c9d8f32b8dd75a815d682202d55e9096064`；替换 v3。
+- 标题 L1/L2/L3 为 NotoSansCJKjp-Bold；L1 18.7、L2/L3 16.5；p1 37.1/19.5、p3 357.9、p13 页码、p33 空格、p1 封面图保留。
+- 同口径 v3：pitch97.9/页高30.9/底部97.9；v12：pitch98.9/页高29.8/底部97.9；104=104/overflow0/PASS。

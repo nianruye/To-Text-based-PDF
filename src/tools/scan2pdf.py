@@ -8,6 +8,7 @@
 """
 import argparse
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -433,9 +434,30 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
             log('page_image_pages 跳过: %s: %s' % (type(_e).__name__, _e))
     # LAYJSON / 图片 passthrough：只有本次 scan2pdf 显式拿到 layout 才开启；默认构建不读
     _lay = getattr(args, 'layout_json', '') or ''
+    _hg = None
+    def _heading_guard(path):
+        """通用标题守卫：3<=paragraph_title<=80、>=90%<=40字、至少1个L1；不看书名。"""
+        try:
+            d = json.load(open(path, encoding='utf-8'))
+            n = nshort = nl1 = 0
+            for pg in d:
+                for b in pg.get('prunedResult', {}).get('parsing_res_list', []):
+                    if b.get('block_label') != 'paragraph_title':
+                        continue
+                    t = str(b.get('block_content') or '').strip()
+                    n += 1
+                    if len(t) <= 40: nshort += 1
+                    if re.match(r'^[一二三四五六七八九十]+(?:[ \u3000“”‘’]|$)', t): nl1 += 1
+            ok = (3 <= n <= 80) and (nshort >= 0.9 * max(1, n)) and nl1 >= 1
+            why = 'ok' if ok else 'blocks=%d short=%d l1=%d' % (n, nshort, nl1)
+            return dict(enabled=ok, blocks=n, short=nshort, l1=nl1, reason=why)
+        except Exception as e:
+            return dict(enabled=False, blocks=0, short=0, l1=0, reason='parse_error:%s' % e)
     if _lay and pipeline == 'geom':
         env['LAYJSON'] = _lay
-        env.setdefault('LAYOUT_HEADINGS', '0')
+        _hg = _heading_guard(_lay)
+        env.setdefault('LAYOUT_HEADINGS', '1' if _hg['enabled'] else '0')
+        log('标题守卫: enabled=%s blocks=%s short=%s l1=%s reason=%s' % (_hg['enabled'], _hg['blocks'], _hg['short'], _hg['l1'], _hg['reason']))
         env.setdefault('LAYOUT_FIGS', '1' if getattr(args, 'layout', False) else '0')
         env.setdefault('LAYOUT_TOC', '1' if getattr(args, 'layout', False) else '0')
         env.setdefault('PAGE_IMAGE_FULL_RATIO', '0.40')
@@ -450,7 +472,7 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
                                                        fix_path or '0'))
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, cwd=ROOT, env=env)
     ok = p.returncode == 0 and os.path.exists(out_tmp) and os.path.getsize(out_tmp) > 0
-    return ok, dict(pipeline=pipeline, returncode=p.returncode, cmd=' '.join(cmd),
+    return ok, dict(pipeline=pipeline, returncode=p.returncode, cmd=' '.join(cmd), headings=_hg,
                     stdout_tail='\n'.join((p.stdout or '').strip().splitlines()[-8:]),
                     stderr_tail='\n'.join((p.stderr or '').strip().splitlines()[-8:]))
 

@@ -104,3 +104,16 @@ def test_p97_giant_ocr_page_within_measure(doc):
              for l in b.get('lines', []) for s in l['spans'])
     assert x1 <= 506.75 + 2.0, x1
     d3.close()
+
+
+def test_layout_title_level_mapping():
+    """t277: paragraph_title 前缀 -> L1/L2/L3（只影响层级，不改字号）。"""
+    from _loader import load
+    ns = load('build_geom.py', {'_layout_title_level'})
+    f = ns['_layout_title_level']
+    assert f('一 “人道的民主的社会主义”理论和路线的形成与发展') == 1
+    assert f('三“人道的民主的社会主义”主要理论观点') == 1
+    assert f('四 几点结论') == 1
+    assert f('1.“人道的民主的社会主义”理论与路线的酝酿和准备') == 2
+    assert f('2. 否定现实社会主义') == 2
+    assert f('群众性集会和游行示威此起彼伏') == 3

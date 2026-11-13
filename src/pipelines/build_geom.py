@@ -375,14 +375,19 @@ if SRC:   # 启发式补 LAYJSON 漏检页(只对图页/乱码页跑,防 wz2 注
             _figs[_k] = [[x0*LDPI/DPI, y0*LDPI/DPI, x1*LDPI/DPI, y1*LDPI/DPI] for (y0, y1, x0, x1) in _bands]
             _nb += 1
     if _nb: print(f"[书影带] {_nb} 页从 OCR 推断图块(补 LAYJSON 漏检)")
-# 标题块映射(LAYOUT_HEADINGS=1 启用:用版面模型 doc_title/paragraph_title 标签驱动标题检测,带 # 级别)。默认关,启发式兜底——不影响未开启的书(wz1 等)
-USE_LAY_HEAD = os.environ.get('LAYOUT_HEADINGS', '') in ('1', 'true', 'True', 'toc')
-_LAY_HEAD_TOC_ONLY = os.environ.get('LAYOUT_HEADINGS', '') == 'toc'
+# 标题块映射(默认:有 LAYJSON 即启用 paragraph_title 驱动;LAYOUT_HEADINGS=0 可关)。
+# 无 LAYJSON 的书完全走原启发式；具体页/块过滤见 _build_layout_head_blocks。
+_LAYOUT_HEAD_ENV = os.environ.get('LAYOUT_HEADINGS', '')
+USE_LAY_HEAD = (bool(LAYJSON and os.path.exists(LAYJSON)) if _LAYOUT_HEAD_ENV == ''
+                else _LAYOUT_HEAD_ENV not in ('0', 'false', 'False'))
+_LAY_HEAD_TOC_ONLY = _LAYOUT_HEAD_ENV == 'toc'
 _FONT_FAM = {'hei': 'heiti', 'song': 'song', 'kai': 'kai'}
 _TITLE_CJK = _FONT_FAM.get(os.environ.get('FONT_TITLE', 'hei'), 'heiti')   # 章标题字体: hei=黑体(默认) / song=宋体(mgfdmg) / kai=楷体
 _SUBTITLE_CJK = _FONT_FAM.get(os.environ.get('FONT_SUBTITLE', 'hei'), 'heiti')   # 节标题字体: hei=黑体(默认) / song=宋体 / kai=楷体(wz1 三级标题)
 def _hf(f):
-    '按标题档选字体: part/title=章字体, section=节字体'
+    '按标题档选字体: part/title=章字体, section=节字体; layout 子标题固定 heiti'
+    if f.get('lay_head'):
+        return 'heiti'
     return _SUBTITLE_CJK if f.get('tier') == 'section' else _TITLE_CJK
 _PAGE_IMG_PAGES = set(int(x) for x in os.environ.get('PAGE_IMAGE_PAGES', '').split(',') if x.strip())   # 贴图页(封面/扉页/版权页): 直接渲染原扫描图
 _page_img_forced = False   # 显式贴图页：仍走正常文本层（1pt/3Tr），只额外铺源图
@@ -395,7 +400,37 @@ if _toc_rules_f and os.path.exists(_toc_rules_f):
     except Exception as _e:
         print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
-_head_blocks = {}   # page_key -> [(bbox_142dpi, #级别)]
+_head_blocks = {}   # page_key -> [(bbox_142dpi, level)]
+_head_texts = {}    # page_key -> [(normalized text, level)]
+_head_line_map = {} # page_key -> {line_index: level}
+_layout_head_excluded = []   # 审计：被排除的 paragraph_title 块
+
+
+def _layout_title_level(t):
+    """LAYJSON paragraph_title 文本 -> 层级（只影响缩进/字重，不改字号）。
+    L1: 中文数字+空格/全角空格；L2: N./N．；L3: 无编号短句。"""
+    t = (t or '').strip()
+    if re.match(r'^[一二三四五六七八九十]+(?:[ \u3000“”‘’]|$)', t):
+        return 1
+    if re.match(r'^\d+[.．]', t):
+        return 2
+    return 3
+
+
+def _layout_head_page_skip(blocks):
+    """正文标题页过滤：TOC / CIP / 纯数字 aside 页。"""
+    texts = [str(b.get('block_content') or '') for b in blocks]
+    if any('图书在版编目' in x or 'CIP' in x for x in texts):
+        return 'cip'
+    if any(b.get('block_label') == 'header' and ('目录' in str(b.get('block_content') or '')
+           or 'CONTENTS' in str(b.get('block_content') or '').upper()) for b in blocks):
+        return 'toc'
+    asides = [str(b.get('block_content') or '').strip() for b in blocks if b.get('block_label') == 'aside_text']
+    if asides and all(a and a.replace('\n', '').strip().isdigit() for a in asides):
+        return 'toc_aside'
+    return None
+
+
 if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
     try: _ld
     except NameError: _ld = json.load(open(LAYJSON, encoding='utf-8'))
@@ -409,25 +444,64 @@ if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
                 any(_b.get('block_label')=='aside_text' for _b in _bl) or
                 (any(_b.get('block_label')=='doc_title' for _b in _bl) and _ntext >= 5)):
                 _toc_pages.add(_pi)
+    _kept = _excl = 0
     for _pi, _pg in enumerate(_ld):
         if _LAY_HEAD_TOC_ONLY and _pi not in _toc_pages: continue
+        _bl = _pg.get('prunedResult',{}).get('parsing_res_list',[])
+        _why = _layout_head_page_skip(_bl)
         _hb = []
-        for _b in _pg.get('prunedResult',{}).get('parsing_res_list',[]):
-            if _b.get('block_label') in ('doc_title','paragraph_title','title') and _b.get('block_bbox'):
-                _c = _b.get('block_content', '')
-                _lvl = len(_c) - len(_c.lstrip('#'))   # 前导 # 数 = 级别(doc_title=1, ##目录=2, ####章名=4)
-                if _lvl == 0: _lvl = 3   # 无 # 标记的 title 块默认中等
-                _bb = _lay_bbox_142(_b['block_bbox'], _pg)
-                if _bb: _hb.append((_bb, _lvl))
+        for _b in _bl:
+            if _b.get('block_label') != 'paragraph_title' or not _b.get('block_bbox'):
+                continue
+            _c = _b.get('block_content', '') or ''
+            _reason = _why
+            if not _reason and len(_c.strip()) > 40:
+                _reason = 'long>40'
+            if _reason:
+                _excl += 1
+                _layout_head_excluded.append(dict(page=_pg.get('page') or _pi + 1, text=_c[:80], reason=_reason))
+                continue
+            _bb = _lay_bbox_142(_b['block_bbox'], _pg)
+            if _bb:
+                _lvl = _layout_title_level(_c)
+                _hb.append((_bb, _lvl)); _kept += 1
+                _head_texts.setdefault(str(_pi), []).append((re.sub(r'\s+', '', _c), _lvl))
         if _hb: _head_blocks[str(_pi)] = _hb
-    print(f"[标题·layout] 加载 {len(_head_blocks)} 页含标题块(LAYOUT_HEADINGS=1,layout 优先+启发式补充)")
-def _layout_head_level(x0, y0, w, h, key):
-    '该行中心落在某 layout 标题块内 → 返回 # 级别;否则 None。缩放 _s=DPI/LDPI: 行坐标尺度=自适应 DPI(wz1 200dpi), 块尺度=LDPI≈142 → 1.408; 同批次书(mgfdmg 141/142)≈1。±8px 容差兜噪声'
-    if key not in _head_blocks: return None
-    cx, cy = x0 + w/2, y0 + h/2; _s = DPI/LDPI; _tol = 16   # 16px: 旧 LAYJSON 块 bbox(142dpi 估算)与行坐标经缩放后有 ±10px 系统偏差, 8 太紧致边缘漏判   # 容差:142dpi 下行距~28px,8px 够不到相邻正文行
-    for _bb, _lvl in _head_blocks[key]:
-        if _bb[0]*_s - _tol <= cx <= _bb[2]*_s + _tol and _bb[1]*_s - _tol <= cy <= _bb[3]*_s + _tol: return _lvl
+        if _hb and str(_pi) in _head_texts:
+            _ls = [re.sub(r'\s+', '', x) for x in sl.get(str(_pi), [])]
+            for _bt, _bl in _head_texts[str(_pi)]:
+                for _i0 in range(len(_ls)):
+                    _acc = ''
+                    for _j0 in range(_i0, len(_ls)):
+                        _acc += _ls[_j0]
+                        if not _bt.startswith(_acc): break
+                        if _acc == _bt:
+                            for _k0 in range(_i0, _j0 + 1): _head_line_map.setdefault(str(_pi), {})[_k0] = _bl
+                            break
+                    if _acc == _bt: break
+    print(f"[标题·layout] 保留 {_kept} / 排除 {_excl} 个 paragraph_title；{len(_head_blocks)} 页")
+    try:
+        json.dump(dict(kept=_kept, excluded=_excl, pages=len(_head_blocks), excluded_items=_layout_head_excluded),
+                  open(OUT + '.headings.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    except Exception as _e:
+        print('[标题·layout] 审计写入失败: %s' % _e)
+def _layout_head_level(x0, y0, w, h, key, text=''):
+    """标题行以文本为准：OCR 行归一化后是块文本的前缀/后缀/相等（支持块拆成多行）。
+    不做 bbox 重叠兜底，避免标题块 bbox 吃掉相邻正文行。"""
+    if not text or key not in _head_texts:
+        return None
+    _nt = re.sub(r'\s+', '', text)
+    _nt = re.sub(r'^(\d+)[.．]', r'\1', _nt)   # OCR 常丢 N. 的点；对齐块文本
+    if not _nt:
+        return None
+    for _bt, _bl in _head_texts[key]:
+        _bt = re.sub(r'^(\d+)[.．]', r'\1', _bt)
+        if _nt == _bt:
+            return _bl
+        if len(_nt) >= 3 and (_bt.startswith(_nt) or _bt.endswith(_nt)):
+            return _bl
     return None
+
 # 边栏旁注(竖排书名/卷名 aside_text):eso-pic 绝对定位贴回边栏。每页清叠加防累积
 def _layout_toc_page(_blocks):
     """LAYJSON 页是否 TOC：header 含目录/CONTENTS，或 aside 全是纯数字页码列。"""
@@ -1221,12 +1295,12 @@ for key in sorted(sl.keys(), key=int):
         # 目录是出版方排的层级权威; 首字模式只起缩小范围作用, 不单独定罪
         is_subhead_cn = bool(_sh_pre) and bool(_sh_rest) and _sh_pre[0] in '一二三四五六七八九十' and len(core) >= 2 and len(t.strip()) < 25 and not re.search(r'[。！？]$', t.strip()) and _core_in_toc_map(core)
         is_head_heur = ((bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_big or (is_centered and is_tall) or is_subhead or is_subhead_cn or (h > H_BODY and len(t.strip()) < 8 and not re.search(r'[。！？]$', t.strip()))) and not TOC_ENTRY_RE.search(t)   # 启发式(目录条目不算标题);LAYOUT_HEADINGS 开时仅作无 layout 书的兜底;居中短行(h>H_BODY+len<8+非句尾)如'序言'也判标题; toc_map 改模糊匹配(目录/正文 OCR 不一致容错)
-        _lay_lvl = _layout_head_level(x0, y0, w, h, key) if USE_LAY_HEAD else None   # layout 版面标签(LAYOUT_HEADINGS=1 时),级别=#数
+        _lay_lvl = _layout_head_level(x0, y0, w, h, key, t) if USE_LAY_HEAD else None
         if USE_LAY_HEAD:
             # layout 优先 + 目录兜底 + (一)(二)模式兜底: 旧 LAYJSON 缺块/块 label 标错(text)/坐标偏差都会漏标题;
             # 目录(toc_map)是独立权威(出版方排的层级), 但三级标题(如"(一)19世纪...")常不在源书目录(目录只列到二级) →
             # 只能靠 (一)(二) 强模式信号(带括号序号+非满宽, 误判风险低); 视觉启发式(is_big/居中)不放宽(防 mgfdmg 正文误判回归)
-            is_head = (_lay_lvl is not None) or (bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_subhead
+            is_head = (_lay_lvl is not None) or (bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_subhead or ((key not in _head_blocks) and is_head_heur)
         else:
             is_head = is_head_heur
         if is_head and flow and flow[-1].get('is_figrow'):
@@ -1245,6 +1319,9 @@ for key in sorted(sl.keys(), key=int):
                 _tier = ('part' if _lay_lvl <= 1 else ('title' if _lay_lvl == 2 else 'section')) if _lay_lvl is not None else _head_level(t, is_big)
             _rf = (_reg.get(r.get('region'), {}).get('font', FONT) / FONT) if (USE_REGION and r.get('region')) else _pm   # 区域化:标题按其区域字号比缩放(注释区标题也小);否则本页 pm
             head_size = round(tier_size.get(_tier, FONT) * _rf, 1)
+            if _lay_lvl is not None:   # L2/L3 同正文；L1 源书放大 ~1.13×正文
+                head_size = round(PF * 1.13, 1) if _lay_lvl == 1 else PF
+                _tier = 'section'
         else:
             head_size = _reg.get(r.get('region'), {}).get('font', PF) if USE_REGION else PF   # 区域化:正文用其区域字号(混合页正文大字/注释小字各拿对的);否则本页 PF
             if _COVER_FURN and ('www.' in t or t.strip().startswith('定价') or '定价：' in t):
@@ -1253,7 +1330,8 @@ for key in sorted(sl.keys(), key=int):
                 head_size = round(PF * 0.5, 1)   # p5 CIP 末行/拆出的右侧字段：小字号，避免进入正文行数
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
-        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
+        if os.environ.get('HEAD_DBG') and int(key)+1 in (61,84,14,33,23,27,15) and (is_head or _lay_lvl is not None): print('HEADDBG flow p%d lay=%s head=%s tier=%s fnt=%.2f t=%r' % (int(key)+1, _lay_lvl, is_head, _tier, head_size, t[:40]))
+        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'lay_head': bool(_lay_lvl is not None), 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
     if _CIP_PAGE and os.environ.get('CIP_DASH_FIX', '0') in ('1', 'true', 'True'):   # t242 p5 可选；默认关以保证 wz 零回归
         for _cf in flow:
             _ct = (_cf.get('t') or '').strip()
@@ -1309,7 +1387,7 @@ for key in sorted(sl.keys(), key=int):
             else:
                 _nf.append(_f); _i += 1
         flow = _nf
-    if sum(1 for f in flow if f['is_head']) > 4:   # 一页>4标题 = 列表页(目录/编委/索引),非散文→全降级正文(否则每条标题字号+间距撑爆页)
+    if sum(1 for f in flow if f['is_head']) > 4 and not any(f.get('lay_head') for f in flow if f['is_head']):   # 一页>4启发式标题=列表页；layout paragraph_title 可超过4（p61 有5个真实块）
         for f in flow: f['is_head'] = False; f['fnt'] = FONT
     if sum(1 for f in flow if (TOC_ENTRY_RE.search(f['t']) or (f.get('frags') and any(_t.strip().isdigit() for _t,_ in f['frags'])))) > 5:   # 目录页:多条带页码 → 全降级(章节标题也按 title+dotfill+页码 渲染)
         # 层级字号: 部分/附录/导论(0档)大, 章(1档)中, 节/一/二(2档)小 → 还原源目录父子层级
@@ -1339,11 +1417,9 @@ for key in sorted(sl.keys(), key=int):
         headers = [_best] if _best_r >= 0.6 else []   # 无共识匹配(正文首行 y 6-10% 误入拼接, 如 wz4 p5) → 不渲染页眉, 正文行在 flow 正常渲染
     else:
         headers = []
-    is_divider = bool(flow) and all(f['is_head'] for f in flow) and not footnotes   # 仅标题无正文/脚注=分隔页(分标题页)→标题垂直居中(源在页中,非顶部)
+    is_divider = bool(flow) and all(f['is_head'] or f.get('is_figrow') for f in flow) and not footnotes   # 仅标题无正文/脚注=分隔页(分标题页)→标题垂直居中(源在页中,非顶部)
     # F2: image-page 不整页隐藏；图外 doc_title 按源 y 渲染（p3 标题在白区），仅图内 span 由 _line_invis 处理。
     _has_body_block = any((_b.get('block_label') in ('text','content')) for _b in (_ld[int(key)].get('prunedResult',{}).get('parsing_res_list',[]) if LAYJSON and os.path.exists(LAYJSON) and int(key) < len(_ld) and USE_LAY_FIGS else []))
-    if _page_figs_bg:
-        is_divider = False   # 图像页不做垂直居中（p3 doc_title 源 bbox 在 image 上方）
     _all_text_invis = bool(_page_img_forced)
     if key in _TOC_PAGE:   # F14b 目录页缩进基准=全部非数字片段最左 x0(作者粘连行/回填行 frags 常缺, 逐片段取不到则退回行 x0)
         _rc14 = [_fr14[1] for _f14 in flow for _fr14 in (_f14.get('frags') or []) if not _fr14[0].strip().isdigit() and _fr14[1] > 0]
@@ -1451,7 +1527,7 @@ for key in sorted(sl.keys(), key=int):
             _gap = (para[0]['y0'] - prev_y[0]) * 72.0 / DPI - round(para[0]['fnt']*1.2, 1)   # 段间位置还原(非区域化):距上段末行的源 y 间隙(\\ 只给 fnt×1.2,补差值)。REGION_LAYOUT 时跳过——strut 已给均匀行距=源,源段间无额外间隙,再加 vspace 会叠加→溢页
             _gap = max(0.0, min(_gap, para[0]['fnt']*2.5)) * _pos_gscale   # ×gscale:溢出页按比例收段间隙
             if _gap > 0.5: body.append('\\vspace{%.1fpt}' % _gap)
-        if (not USE_POS) and any(f['is_head'] for f in para):
+        if (not USE_POS) and any(f['is_head'] and not f.get('lay_head') for f in para):
             body.append('\\vspace{' + str(HEAD_GAP) + 'pt}')   # 标题段前间距(源标题上下都有空隙);位置还原时改由源 y 增量给出,不加
         for j, f in enumerate(para):
             prev_y[0] = f.get('y0', prev_y[0])   # 更新页级上一行 y0(跨段位置还原用)
@@ -1473,6 +1549,8 @@ for key in sorted(sl.keys(), key=int):
                 f['is_head'] = False
                 if os.environ.get('TOC_DBG'): print('F26DBG p%s %r' % (key, f['t'][:30]))
             if f['is_head'] and key not in _TOC_PAGE:   # 目录页无标题:全行走 _toc 点线(防 toc_map 误判条目为正文标题)
+                _hstr = _strut if f.get('lay_head') else ''
+                _hbold = '\\bfseries' if f.get('lay_head') else ''
                 frags = f.get('frags')
                 if frags and len(frags) > 1:
                     # 多片段标题连续排版:拼接全部片段文本,按 align 走普通标题渲染。
@@ -1484,15 +1562,15 @@ for key in sorted(sl.keys(), key=int):
                     _ht = ''.join(_txt for _txt, _ in frags)
                     _nat_w = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in _ht) * fnt   # 自然宽(CJK 1em/拉丁 0.5em)
                     if _nat_w >= 0.85 * MEASURE:   # 拼接后超宽(表格行多片拼接)-> makebox[s] 收缩齐版心,防溢出/折行变高
-                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][s]{{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(_ht), f) + '}}' + brk + '}')
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][s]{' + _hstr + _hbold + '{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(_ht), f) + '}}' + brk + '}')
                     elif f.get('align') == 'c':   # 源里居中 -> 居中(读源位置,非统一规则)
-                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(_ht), f) + '}}' + brk + '}')
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _hstr + _hbold + '{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(_ht), f) + '}}' + brk + '}')
                     else:                       # 源里左对齐 -> 左对齐
-                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(_ht), f) + '}' + brk + '}')
+                        body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _hstr + _hbold + '{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(_ht), f) + '}' + brk + '}')
                 elif f.get('align') == 'c':   # 源里居中 → 居中(读源位置,非统一规则)
-                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}}' + brk + '}')
+                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _hstr + _hbold + '{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}}' + brk + '}')
                 else:                       # 源里左对齐 → 左对齐
-                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont {\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}' + brk + '}')
+                    body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _hstr + _hbold + '{\\CJKfamily{' + _hf(f) + '}' + _inv(_esc_heading(f['t']), f) + '}' + brk + '}')
                 continue
             if key in _TOC_PAGE and f.get('toc_pre'):
                 _pg = str(f.get('toc_page') or '').strip()
@@ -1609,7 +1687,7 @@ for key in sorted(sl.keys(), key=int):
             else:   # 短行/段末 → makebox[l](左对齐满宽框,与满行同构 hbox);不套 makebox 会让纯文本行与 makebox 行纵向堆叠行距不同→段末短行处行距塌缩
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][l]{' + _strut + indent + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
         body.append('\\par')
-        if (not USE_POS) and any(f['is_head'] for f in para):   # 标题段后加间距(匹配源);位置还原时由源 y 增量给
+        if (not USE_POS) and any(f['is_head'] and not f.get('lay_head') for f in para):   # 标题段后加间距(匹配源);位置还原时由源 y 增量给
             body.append('\\vspace{' + str(HEAD_GAP) + 'pt}')
     _i = 0
     while _i < len(flow):
@@ -1684,7 +1762,7 @@ for key in sorted(sl.keys(), key=int):
         _pp_applied = True
     if flow and not is_divider:   # 密集页(目录/名单/索引,行数超版)自适应行距:源本就排得密,按比例收紧 linespread
         _fig_h = sum((max((fb[1][3]-fb[1][1])*72/LDPI for fb in f['figs']) if f['figs'] else 0) for f in flow if f.get('is_figrow'))   # 图块预留高度(固定,不随 linespread 缩)
-        fixed = (HDR_GAP if headers else 0) + sum(2*HEAD_GAP for f in flow if f['is_head']) + (12 if footnotes else 0) + _fig_h   # 不随 linespread 缩放的固定间距(标题前后各一个 HEAD_GAP)+ 图高
+        fixed = (HDR_GAP if headers else 0) + sum(2*HEAD_GAP for f in flow if f['is_head'] and not f.get('lay_head')) + (12 if footnotes else 0) + _fig_h   # 不随 linespread 缩放的固定间距(标题前后各一个 HEAD_GAP)+ 图高
         scalable = (FONT_SM*1.2*_lsb if headers else 0) + sum(f['fnt']*1.2*_lsb for f in flow if not f.get('is_figrow')) + (len(footnotes)*FONT_SM*1.2 if footnotes else 0)   # 随 linespread 缩放的行高(图块除外)
         est_h = fixed + scalable
         TEXT_H = PAGE_H - 42   # top12 + bottom30
