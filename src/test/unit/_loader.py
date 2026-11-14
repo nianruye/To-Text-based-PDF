@@ -93,14 +93,31 @@ def load(filename, func_names, const_names=(), mocks=None):
     funcs = set(func_names)
     consts = set(const_names)
 
+    # 2026-11-15 架构第 1 步：部分纯函数已搬到 pipelines/layout_model.py，
+    # build_geom.py 只做 import。源文件里找不到的，回退到 layout_model.py 提取
+    # （保持测试语义不变：仍只测纯函数，不执行模块顶层副作用）。
+    trees = [(p, tree)]
+    _lm = _PIPES / 'layout_model.py'
+    if _lm.exists():
+        try:
+            trees.append((_lm, ast.parse(_lm.read_text(encoding='utf-8'))))
+        except SyntaxError:
+            pass
+
+    def _collect(kind):
+        for src_path, src_tree in trees:
+            for node in src_tree.body:
+                if isinstance(node, kind):
+                    yield src_path, node
+
     # 先常量：函数默认参数求值依赖常量已就位
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and (set(_assign_names(node)) & consts):
-            _exec_node(node, p, ns)
+    for _sp, node in _collect(ast.Assign):
+        if set(_assign_names(node)) & consts and node.targets[0].id not in ns:
+            _exec_node(node, _sp, ns)
 
     # 再函数
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name in funcs:
-            _exec_node(node, p, ns)
+    for _sp, node in _collect(ast.FunctionDef):
+        if node.name in funcs and node.name not in ns:
+            _exec_node(node, _sp, ns)
 
     return ns
