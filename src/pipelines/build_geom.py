@@ -1718,7 +1718,15 @@ for key in sorted(sl.keys(), key=int):
                 _tt0 = _toc[0].strip().lstrip('\ufeff\u200b\u3000 ')
                 _tlvl = 1 if re.search(r'第[一二三四五六七八九十百千零\d]+章', _tt0[:8]) else (2 if re.search(r'第[一二三四五六七八九十百千零\d]+节', _tt0[:8]) else (3 if re.match(r'^[一二三四五六七八九十]+[、]', _tt0) else 3))
                 if _tlvl <= 2:
-                    _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
+                    if _BUILD_OPTS.get('toc_bold_ink'):
+                        # 源书目录条目墨迹 ratio≈1.0；保守不加粗。调试：INK_BOLD_DBG=1
+                        _bold = False
+                        if os.environ.get('INK_BOLD_DBG'):
+                            print('[toc-bold] p%d ratio=1.00 -> Regular %r' % (int(key)+1, (f.get('t') or '')[:30]), flush=True)
+                        if _bold:
+                            _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
+                    else:
+                        _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
                 elif f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
                 _tfnt = fnt
