@@ -1,3 +1,9 @@
 {
- "footnote_wrap": true
+ "footnote_wrap": true,
+ "image_pages": [
+  5
+ ],
+ "structured_toc_pages": [
+  18
+ ]
 }
