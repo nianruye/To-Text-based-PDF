@@ -802,8 +802,29 @@ def main(argv=None):
             return EXIT['verify']
         if n_out != n_src:
             log('页数漂移已接受: %+d（源 %d / 产物 %d / 允许 %d）' % (_drift, n_src, n_out, args.allow_page_drift))
+        # 整页贴图页清单：构建临时文件 -> report + 产物同目录
+        _fb = []
+        _fb_src = out_tmp + '.fallback.json'
+        try:
+            if os.path.exists(_fb_src):
+                _fb = json.load(open(_fb_src, encoding='utf-8'))
+        except Exception:
+            _fb = []
+        report['page_fallback'] = _fb
+        report['page_fallback_count'] = len(_fb)
         # 步骤 8：原子落盘（构建+页数通过/已接受后）
         shutil.move(out_tmp, args.out)
+        # 直接从内存写（不依赖临时文件仍在，避免 move 后源被清理导致复制静默失败）
+        try:
+            if _fb:
+                with open(args.out + '.fallback.json', 'w', encoding='utf-8') as _f:
+                    json.dump(_fb, _f, ensure_ascii=False, indent=1)
+            else:
+                _stale = args.out + '.fallback.json'
+                if os.path.exists(_stale):
+                    os.remove(_stale)
+        except Exception as _e:
+            print('[scan2pdf] 警告: 写 fallback.json 失败 %s' % _e, flush=True)
         step('publish')
     # 步骤 9：门禁（竖向 verify_vert / 横排 verify_geom）
     if args.pipeline_resolved == 'geom':
@@ -943,7 +964,11 @@ def main(argv=None):
                   ('verdict=%s warnings=%s fail=%s' % ((calib or {}).get('selfcheck', {}).get('verdict'),
                                                        ','.join(_cw) if _cw else '无',
                                                        ','.join(_cf) if _cf else '无'))
-                  if isinstance(calib, dict) and not calib.get('error') else '缺失')]
+                  if isinstance(calib, dict) and not calib.get('error') else '缺失'),
+              '- 整页贴图页：%s' % (
+                  ('无' if not report.get('page_fallback') else
+                   '、'.join('p%s(%s)' % (x.get('page'), x.get('reason')) for x in report['page_fallback'])
+                   + '；合计 %d 页' % len(report['page_fallback'])))]
         open(os.path.splitext(gp)[0] + '.md', 'w', encoding='utf-8').write('\n'.join(md) + '\n')
         report['gate']['json'] = gp
         report['gate']['reasons'] = reasons
@@ -952,6 +977,10 @@ def main(argv=None):
         json.dump(report, open(rp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
         print('[scan2pdf] %s: pipeline=geom gate=%s exit=%d report=%s' %
               (args.book, report['gate']['verdict'], code, rp))
+        if report.get('page_fallback'):
+            print('[scan2pdf] 整页贴图 %d 页: %s' % (
+                len(report['page_fallback']),
+                ' '.join('%s(%s)' % (x.get('page'), x.get('reason')) for x in report['page_fallback'])))
         return code
     gate_out = args.out + '.gate.json'
     rc, verdict, tail = call_gate(args, args.out, coords, lines, src_for_verify, gate_out)
