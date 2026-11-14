@@ -81,3 +81,45 @@ token 文件不存在时页面明确返回 400「缺少 OCR token」，不静默
 - 子进程无输出时，页面仍显示「构建中 + 已用时间」，不再空白
 - 实测 rebuild ghbq：11.9s 时显示 `构建中 / OCR 版面分析`，13.1s 完成；日志逐行可见
 - 更新代码后需重启 uvicorn；重启会丢失内存中的进行中任务，旧任务链接会 404，需重新提交
+
+## 2026-11-14 追加：上传管线选择
+
+用户确认 wz8 是**横排书**，但 `--pipeline auto` 判成 vertical，导致 build_vert 762→871 页失败。
+
+上传页新增「排版管线」下拉：
+
+- 自动判断（默认）
+- 横排 geom
+- 竖排 vert
+
+命令会追加 `--pipeline geom|vert|auto`；横排书被误判时选「横排 geom」。操作台已重启，旧任务丢失，需重新上传。
+
+## 2026-11-14 追加：允许页数漂移
+
+上传页新增「允许页数漂移」（默认 5），命令追加：
+
+```bash
+--allow-page-drift 5
+```
+
+- 默认 `0` = 严格 1:1，现有 7 本书不受影响。
+- `abs(out-src) <= N` 时继续落盘产物，report/gate 记录 `src_pages / out_pages / page_drift / drift_allowed`。
+- gate verdict = **PASS_WITH_DRIFT**；`.gate.md` 醒目显示漂移行。
+- 操作台任务页显示 `源页数 / 产物页数 / 差异页数`；成功任务可下载。
+
+实测：
+- wz8 + drift5：`/tmp/wz8_drift.pdf` **765 页**，gate **PASS_WITH_DRIFT**，exit 0；文本 575003 字符 > OCR 538120（106.9%）。
+- wz8 不带 drift：仍 `页数不 1:1: 765 vs 762（允许漂移 0）`，exit 6，无产物。
+- 小样本上传（wz2 p1-6，pipeline auto，drift5）：51.6s，src6/out6/diff0，产物可下载（gate REJECT 是样本/门禁问题，不是漂移）。
+
+## 2026-11-15 追加：完整日志与诊断卡（t319）
+
+- 每个任务完整 stdout+stderr 追加写 `output/local_console/logs/<task_id>.log`（首行完整命令），任务结束仍在。
+- 任务页新增「诊断卡」：calib font/source/cw/measure/dpi/baseline/ratio/warnings/selfcheck；gate verdict/reasons；src/out/diff 页数；pitch/split/overflow；report pipeline/axis/layout/chars。
+- 失败/门禁拒绝：页面顶部红框列出 `页数不 1:1|构建失败|OCR 失败|exit N|FAIL|gate=REJECT` 摘要（最多10条）。
+- 下载：完整日志 `/log/<id>`、`/gate/<id>`、中间/最终 PDF `/artifact/<id>`。
+- 历史任务：最近 10 个持久化到 `output/local_console/tasks.json`；重启后仍可点进详情。
+- 实测：
+  - 成功 ghbq 任务 `a620c62a391d`：诊断卡 font16.5/cw25/PASS/pages104=104。
+  - 门禁拒绝样本 `0c7771e1fccf`（wz8fail，pitch50%）：诊断卡 REJECT + reasons，页面 HTML 已保存 `docs/local_console_failure_task.html`。
+  - 完整日志、tasks.json 均存在。

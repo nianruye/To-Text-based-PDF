@@ -402,6 +402,8 @@ if _toc_rules_f and os.path.exists(_toc_rules_f):
         print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
 _head_blocks = {}   # page_key -> [(bbox_142dpi, level)]
+_layout_text = {}   # page_key -> [normalized layout text-block content]
+_layout_doc_pages = set()   # pages containing doc_title (new-book multi-line chapter title)
 _head_texts = {}    # page_key -> [(normalized text, level)]
 _head_line_map = {} # page_key -> {line_index: level}
 _layout_head_excluded = []   # 审计：被排除的 paragraph_title 块
@@ -450,10 +452,17 @@ if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
         if _LAY_HEAD_TOC_ONLY and _pi not in _toc_pages: continue
         _bl = _pg.get('prunedResult',{}).get('parsing_res_list',[])
         _why = _layout_head_page_skip(_bl)
+        _layout_text[str(_pi)] = [re.sub(r'\s+', '', str(_b.get('block_content') or ''))
+                                  for _b in _bl if _b.get('block_label') == 'text']
+        if any(_b.get('block_label') == 'doc_title' for _b in _bl):
+            _layout_doc_pages.add(str(_pi))
         _hb = []
+        _has_pt = any(_x.get('block_label') == 'paragraph_title' for _x in _bl)
         for _b in _bl:
-            if _b.get('block_label') != 'paragraph_title' or not _b.get('block_bbox'):
+            if _b.get('block_label') not in ('paragraph_title', 'doc_title') or not _b.get('block_bbox'):
                 continue
+            if _b.get('block_label') == 'doc_title' and not _has_pt:
+                continue   # 非章节页的封面/丛书名 doc_title；仅章节页（同时有 paragraph_title）纳入
             _c = _b.get('block_content', '') or ''
             _reason = _why
             if not _reason and len(_c.strip()) > 40:
@@ -464,7 +473,7 @@ if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
                 continue
             _bb = _lay_bbox_142(_b['block_bbox'], _pg)
             if _bb:
-                _lvl = _layout_title_level(_c)
+                _lvl = 0 if _b.get('block_label') == 'doc_title' else _layout_title_level(_c)
                 _hb.append((_bb, _lvl)); _kept += 1
                 _head_texts.setdefault(str(_pi), []).append((re.sub(r'\s+', '', _c), _lvl))
         if _hb: _head_blocks[str(_pi)] = _hb
@@ -499,7 +508,7 @@ def _layout_head_level(x0, y0, w, h, key, text=''):
         _bt = re.sub(r'^(\d+)[.．]', r'\1', _bt)
         if _nt == _bt:
             return _bl
-        if len(_nt) >= 3 and (_bt.startswith(_nt) or _bt.endswith(_nt)):
+        if len(_nt) >= 3 and (_bt.startswith(_nt) or _bt.endswith(_nt) or _nt in _bt):
             return _bl
     return None
 
@@ -1336,6 +1345,10 @@ for key in sorted(sl.keys(), key=int):
         is_subhead_cn = bool(_sh_pre) and bool(_sh_rest) and _sh_pre[0] in '一二三四五六七八九十' and len(core) >= 2 and len(t.strip()) < 25 and not re.search(r'[。！？]$', t.strip()) and _core_in_toc_map(core)
         is_head_heur = ((bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_big or (is_centered and is_tall) or is_subhead or is_subhead_cn or (h > H_BODY and len(t.strip()) < 8 and not re.search(r'[。！？]$', t.strip()))) and not TOC_ENTRY_RE.search(t)   # 启发式(目录条目不算标题);LAYOUT_HEADINGS 开时仅作无 layout 书的兜底;居中短行(h>H_BODY+len<8+非句尾)如'序言'也判标题; toc_map 改模糊匹配(目录/正文 OCR 不一致容错)
         _lay_lvl = _layout_head_level(x0, y0, w, h, key, t) if USE_LAY_HEAD else None
+        _lay_text_hit = False
+        if USE_LAY_HEAD and _lay_lvl is None and key in _layout_doc_pages and key in _layout_text:
+            _ntx = re.sub(r'\s+', '', t)
+            _lay_text_hit = any(len(_ntx) >= 3 and _ntx in _tx for _tx in _layout_text.get(key, []) if _tx)
         if USE_LAY_HEAD:
             # layout 优先 + 目录兜底 + (一)(二)模式兜底: 旧 LAYJSON 缺块/块 label 标错(text)/坐标偏差都会漏标题;
             # 目录(toc_map)是独立权威(出版方排的层级), 但三级标题(如"(一)19世纪...")常不在源书目录(目录只列到二级) →
@@ -1343,6 +1356,8 @@ for key in sorted(sl.keys(), key=int):
             is_head = (_lay_lvl is not None) or (bool(core) and len(core) >= 2 and _core_in_toc_map(core)) or is_subhead or ((key not in _head_blocks) and is_head_heur)
         else:
             is_head = is_head_heur
+        if _lay_text_hit:
+            is_head = False   # LAYJSON text 块内的行，不再被居中/大字启发式误判成标题
         if is_head and flow and flow[-1].get('is_figrow'):
             is_head = False   # 图块正下方的单行(图说明,常含书名如"《工资、价格和利润》法文版")=非标题 → 降正文(保留居中渲染)
         if is_head:
@@ -1359,9 +1374,10 @@ for key in sorted(sl.keys(), key=int):
                 _tier = ('part' if _lay_lvl <= 1 else ('title' if _lay_lvl == 2 else 'section')) if _lay_lvl is not None else _head_level(t, is_big)
             _rf = (_reg.get(r.get('region'), {}).get('font', FONT) / FONT) if (USE_REGION and r.get('region')) else _pm   # 区域化:标题按其区域字号比缩放(注释区标题也小);否则本页 pm
             head_size = round(tier_size.get(_tier, FONT) * _rf, 1)
-            if _lay_lvl is not None:   # L2/L3 同正文；L1 源书放大 ~1.13×正文
-                head_size = round(PF * 1.13, 1) if _lay_lvl == 1 else PF
-                _tier = 'section'
+            if _lay_lvl is not None:   # L2/L3 同正文；L1 源书放大 ~1.13×正文；doc_title=1.36×
+                head_size = (round(PF * 1.36, 1) if _lay_lvl == 0 else
+                             (round(PF * 1.13, 1) if _lay_lvl == 1 else PF))
+                _tier = 'part' if _lay_lvl == 0 else 'section'
         else:
             head_size = _reg.get(r.get('region'), {}).get('font', PF) if USE_REGION else PF   # 区域化:正文用其区域字号(混合页正文大字/注释小字各拿对的);否则本页 PF
             if _COVER_FURN and ('www.' in t or t.strip().startswith('定价') or '定价：' in t):
@@ -1371,7 +1387,7 @@ for key in sorted(sl.keys(), key=int):
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
         if os.environ.get('HEAD_DBG') and int(key)+1 in (61,84,14,33,23,27,15) and (is_head or _lay_lvl is not None): print('HEADDBG flow p%d lay=%s head=%s tier=%s fnt=%.2f t=%r' % (int(key)+1, _lay_lvl, is_head, _tier, head_size, t[:40]))
-        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'lay_head': bool(_lay_lvl is not None), 'align': 'c' if (is_centered or is_big or _is_fc) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
+        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'lay_head': bool(_lay_lvl is not None), 'align': 'c' if (is_centered or is_big or _is_fc or _lay_lvl == 0) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
     if _CIP_PAGE and os.environ.get('CIP_DASH_FIX', '0') in ('1', 'true', 'True'):   # t242 p5 可选；默认关以保证 wz 零回归
         for _cf in flow:
             _ct = (_cf.get('t') or '').strip()
@@ -1550,6 +1566,7 @@ for key in sorted(sl.keys(), key=int):
                 _rem = _cap - _fn_h
                 if _strut_h > 0:
                     _pos_sscale = max(0.62, min(1.0, _rem / _strut_h))
+                    if os.environ.get('HORIZ_NO_SSHRINK') in ('1','true','True'): _pos_sscale = 1.0
     if is_divider:
         body.append('\\vspace*{\\fill}')   # 分隔页:顶部填充(标题垂直居中)
     elif USE_POS and _top_vs * _pos_gscale > 1:

@@ -161,7 +161,11 @@ def infer_axis_from_coords(coords_path, sample=6):
         import statistics
         co = json.load(open(coords_path, encoding='utf-8'))
         ws, hs = [], []
-        for k in list(co)[:sample]:
+        _keys = sorted(co.keys(), key=lambda x: int(x))
+        # 跳过封面/扉页（前 6 页）再取样；wz8 前几页是竖排封面，正文第 3 页起横排
+        _start = min(6, max(0, len(_keys) - 1))
+        _use = _keys[_start:_start + max(sample, 8)]
+        for k in _use:
             for pts in (co.get(k) or []):
                 if not pts: continue
                 xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
@@ -550,6 +554,7 @@ def main(argv=None):
     ap.add_argument('--skip-ocr', action='store_true')
     ap.add_argument('--token-file', default='/tmp/paddle_token')
     ap.add_argument('--pages', default='')
+    ap.add_argument('--allow-page-drift', type=int, default=0, help='允许页数漂移绝对值；默认0=严格1:1')
     ap.add_argument('--force', action='store_true')
     ap.add_argument('--ocr-pages-per-batch', type=int, default=50)
     ap.add_argument('--ocr-max-pixels', type=int, default=None)
@@ -787,10 +792,17 @@ def main(argv=None):
         except Exception:
             n_out = n_src = 0
         report['pages_out'] = n_out; report['pages_src'] = n_src
-        if n_out != n_src:
-            log('页数不 1:1: %d vs %d' % (n_out, n_src)); report['exit'] = EXIT['verify']
+        _drift = n_out - n_src
+        report['page_drift'] = _drift
+        report['drift_allowed'] = bool(abs(_drift) <= int(getattr(args, 'allow_page_drift', 0) or 0))
+        report['allow_page_drift'] = int(getattr(args, 'allow_page_drift', 0) or 0)
+        if n_out != n_src and not report['drift_allowed']:
+            log('页数不 1:1: %d vs %d（允许漂移 %s）' % (n_out, n_src, args.allow_page_drift))
+            report['exit'] = EXIT['verify']
             return EXIT['verify']
-        # 步骤 8：原子落盘（构建+页数通过后）
+        if n_out != n_src:
+            log('页数漂移已接受: %+d（源 %d / 产物 %d / 允许 %d）' % (_drift, n_src, n_out, args.allow_page_drift))
+        # 步骤 8：原子落盘（构建+页数通过/已接受后）
         shutil.move(out_tmp, args.out)
         step('publish')
     # 步骤 9：门禁（竖向 verify_vert / 横排 verify_geom）
@@ -806,8 +818,14 @@ def main(argv=None):
                               overflow_pages=vm.get('overflow_pages'),
                               stdout_tail=vm.get('stdout_tail'))
         v_ok = bool(vm.get('pass_'))
-        report['gate']['verdict'] = 'PASS' if v_ok else 'REJECT'
-        ve, vnote = effective_verdict(report['gate']['verdict'], bt['multi_format'])
+        if report.get('drift_allowed') and report.get('page_drift'):
+            v_ok = True
+            report['gate']['verdict_override_reason'] = 'page_drift_allowed'
+        report['gate']['verdict'] = 'PASS_WITH_DRIFT' if (report.get('drift_allowed') and report.get('page_drift')) else ('PASS' if v_ok else 'REJECT')
+        if report.get('drift_allowed') and report.get('page_drift'):
+            ve, vnote = 'PASS_WITH_DRIFT', ''
+        else:
+            ve, vnote = effective_verdict(report['gate']['verdict'], bt['multi_format'])
         report['gate']['verdict_effective'] = ve
         report['review_required'] = bool(bt['multi_format'])
         report['auto_pass_forbidden'] = bool(bt['multi_format'])
@@ -837,7 +855,12 @@ def main(argv=None):
             for line in (vm.get('stdout_tail') or '').splitlines():
                 if 'FAIL' in line:
                     reasons.append(line.strip()[:160])
+        if report.get('drift_allowed') and report.get('page_drift'):
+            reasons = ['page_drift_accepted_%+d' % report['page_drift']] + reasons
         gm = dict(book=args.book, mode='geom', tool='verify_geom',
+                  src_pages=report.get('pages_src'), out_pages=report.get('pages_out'),
+                  page_drift=report.get('page_drift'), drift_allowed=report.get('drift_allowed'),
+                  allow_page_drift=report.get('allow_page_drift'),
                   pitch_floor=vm.get('floor'), pitch_ok_pct=vm.get('pitch_ok_pct'),
                   pages=pages_n, pages_src=pages_src,
                   split=(0 if pages_n == pages_src else max(0, pages_n - pages_src)),
@@ -912,6 +935,9 @@ def main(argv=None):
                   vm.get('pitch_ok_pct'), pages_n, pages_src, gate_doc['metrics']['split'],
                   vm.get('overflow_pages')),
               '- reasons：%s' % (', '.join(reasons) if reasons else '（无）'),
+              ('- **页数漂移 %+d（源 %s / 产物 %s），已按 --allow-page-drift %s 接受**' %
+               (report['page_drift'], report.get('pages_src'), report.get('pages_out'), report.get('allow_page_drift')))
+              if report.get('drift_allowed') and report.get('page_drift') else '- 页数：1:1（无漂移）',
               '- multi_format：%s' % (report.get('multi_format_note') or '无（单纸型）'),
               '- calib：%s' % (
                   ('verdict=%s warnings=%s fail=%s' % ((calib or {}).get('selfcheck', {}).get('verdict'),

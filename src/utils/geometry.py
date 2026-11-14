@@ -155,6 +155,45 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
             if 10 < b - a < 80: pitches.append(b - a)
     _pitch_med = statistics.median(pitches) * 72 / DPI if pitches else None
     BASELINE = round(_pitch_med, 1) if _pitch_med is not None else round(FONT*1.5, 1)
+    _font_source = ('env' if (os.environ.get('HORIZ_FONT_MEASURE') or os.environ.get('FONT_SCALE')) else ('fallback_ink' if _ink_applied else ('fallback' if _estimator == 'fallback' else 'formula')))
+    _cw_source = ('env' if os.environ.get('HORIZ_CW') else ('fallback' if _estimator == 'fallback' else 'coords'))
+    # t317：样本不足/公式失效时，font / baseline/font / cw 可能落到垃圾区间；
+    # 只要同一份标定里的 ink_font 可信，就用它兜底（不改变已有正常书）。
+    _ratio = (BASELINE / FONT) if FONT else 0
+    _bad_font = (not (6.0 <= FONT <= 20.0))
+    _bad_cw = (not (5 <= cw <= 80))
+    if (os.environ.get('HORIZ_INK_FALLBACK', '0') not in ('0','false','False')
+        or (os.environ.get('CALIB_BOOK') and not os.environ.get('FONT_SCALE'))) and _bad_font:
+        _charw_pt = None
+        try:
+            _cand = [w / c * 72.0 / DPI for w, c in zip(widths, chars) if c > 0 and w > 0]
+            if _cand:
+                _charw_pt = round(statistics.median(_cand), 2)
+        except Exception:
+            pass
+        if _charw_pt and 6.0 <= _charw_pt <= 20.0:
+            print(f"[标定·fallback] font={FONT} → char_width={_charw_pt}", flush=True)
+            FONT = _charw_pt; _font_source = 'ink_charwidth_fallback'; _ink_applied = True
+        elif _ink_font and 6.0 <= _ink_font / 1.42 <= 20.0:
+            _f2 = round(_ink_font / 1.42, 1)
+            print(f"[标定·fallback] font={FONT} → ink/1.42={_f2}", flush=True)
+            FONT = _f2; _font_source = 'ink_fallback'; _ink_applied = True
+        if _font_source.startswith('ink_') or _font_source == 'body_median_fallback':
+            # 标定走兜底的新书：禁用防溢出 strut 压缩，否则 27→24.9 行距双峰
+            os.environ['HORIZ_NO_SSHRINK'] = '1'
+        else:
+            _fb_body = round(statistics.median(heights) * 72.0 / DPI / 0.88, 1) if heights else FONT
+            if 6.0 <= _fb_body <= 20.0:
+                print(f"[标定·fallback] font={FONT} → body_median={_fb_body}", flush=True)
+                FONT = _fb_body; _font_source = 'body_median_fallback'
+            else:
+                _font_source = 'fallback_untrusted'
+        _ratio = (BASELINE / FONT) if FONT else 0
+    if FONT and _bad_cw:
+        _cw_new = int(round(MEASURE / FONT)) if FONT else cw
+        if 5 <= _cw_new <= 80:
+            cw = _cw_new; _cw_source = 'fallback_median'
+            print(f"[标定·fallback] cw → {cw} (measure={MEASURE}, font={FONT})", flush=True)
     LINESPREAD = round(BASELINE / (FONT * 1.2), 3)
     FONT_SM = round(FONT * 0.78, 1)
     H_BODY = statistics.median(heights) if heights else 36
@@ -176,7 +215,7 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
                 coverage_threshold=_coverage_threshold,
                 coverage_degraded=bool(_coverage_degraded),
                 source_of_page_size=_source_page,
-                cw_sample_n=_full_n, cw_source=('env' if os.environ.get('HORIZ_CW') else ('fallback' if _estimator == 'fallback' else 'coords')),
+                cw_sample_n=_full_n, cw_source=_cw_source,
                 full_lines=_full_n, full_ratio=_full_ratio,
                 estimator=_estimator, fallback_threshold=_fb_thresh,
                 fallback_sample_n=(_fb or {}).get('sample_n'),
@@ -184,7 +223,7 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
                 fallback_char_median=(_fb or {}).get('char_median'),
                 measure_source=('fallback_uncut' if _estimator == 'fallback' else 'full_line_overbound'),
                 font_scale=float(os.environ.get('FONT_SCALE', '1.0')),
-                font_source=('env' if (os.environ.get('HORIZ_FONT_MEASURE') or os.environ.get('FONT_SCALE')) else ('fallback_ink' if _ink_applied else ('fallback' if _estimator == 'fallback' else 'formula'))),
+                font_source=_font_source,
                 ink_font=_ink_font, ink_applied=_ink_applied, ink_reject=_ink_reject,
                 baseline_source=('coords' if pitches else 'fallback'),
                 pitch_sample_n=len(pitches), pitch_median_pt=round(_pitch_med, 3) if _pitch_med is not None else None)
