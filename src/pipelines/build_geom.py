@@ -308,6 +308,7 @@ if _toc_rules_f and os.path.exists(_toc_rules_f):
         print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
 _BUILD_OPTS = {}
+_AUTO_FALLBACK = []
 try:
     _book_opts = os.environ.get('CALIB_BOOK', '')
     for _op in (os.path.join('config', 'books', _book_opts + '.json'),
@@ -1113,6 +1114,16 @@ for key in sorted(sl.keys(), key=int):
     _page_figs = extract_figs(key)
     _page_figs_bg = bool(_page_figs and USE_LAY_FIGS)   # LAYOUT_FIGS: BG overlay, 不占流/不翻页
     _page_img_full = bool(_page_figs_bg and SRC and _image_page_full(_lay_img_cov.get(key, 0.0)))
+    _auto_fb_reason = None
+    if LAYJSON and os.path.exists(LAYJSON) and int(key) < len(_ld):
+        _blks = _ld[int(key)].get('prunedResult', {}).get('parsing_res_list', [])
+        _vt = sum(1 for _b in _blks if _b.get('block_label') == 'vertical_text')
+        _img_n = sum(1 for _b in _blks if _b.get('block_label') == 'image')
+        if _vt >= 2 and _img_n >= 1:
+            _auto_fb_reason = 'handwriting_layout(vt=%d)' % _vt
+            _page_img_full = True
+            _AUTO_FALLBACK.append(dict(page=int(key)+1, reason=_auto_fb_reason))
+            print('[fallback] p%d %s -> 整页贴图+文本3Tr' % (int(key)+1, _auto_fb_reason), flush=True)
     if int(key) + 1 in _BUILD_OPTS.get('image_pages', []):
         _page_img_full = True   # 数据开关：手稿/影印页整页贴图 + 文字3Tr隐藏
     gk = str(int(key) + pn_off); pn_ext = pntab.get(gk, ''); pn_ocr = ''
@@ -1867,6 +1878,10 @@ if os.path.exists(_src):
     except Exception as _e:
         print('[normalize] 审计写入失败: %s' % _e)
     print(f"[normalize] punct_fullwidth changes={len(_NORM_CHANGES)} audit={_norm_path}")
+    try:
+        json.dump(_AUTO_FALLBACK, open(OUT + '.fallback.json','w',encoding='utf-8'), ensure_ascii=False, indent=1)
+    except Exception:
+        pass
     try:
         json.dump(_ink_bold_audit, open(OUT + '.inkbold.json','w',encoding='utf-8'), ensure_ascii=False, indent=1)
     except Exception as _e:
