@@ -41,6 +41,7 @@ pn_off = int(os.environ.get('PAGENUM_OFFSET', '0'))
 pntab = load_pntab()
 TOC_ENTRY_RE = re.compile(r'[.·…．]{2,}\s*\d{1,4}\s*$')   # 目录条目:"标题....页码"(点引导+数字)→ 不是标题,是目录正文
 FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')
+FN_NOTE_RE = re.compile(r'^[〔\[(（]\s*[一二三四五六七八九十百千零\d]+\s*[〕\])）]')
 def _heading_core(t):
     t = t.strip()
     t = re.sub(r'^第[一二三四五六七八九十百千零\d]+(?:部分|[章节编篇])', '', t)
@@ -657,6 +658,40 @@ def _toc_pre_flow(flow):
     _cand = [f for f in flow if len(_numfrags(f)) == 1 and len(_parts(f)) >= 2
              and bool(_TOC_ENTRY_START_RE.match(''.join(t for t, _ in _parts(f) if not _TOC_NUM_RE.match(t)).strip()))]
     _raww = [f for f in flow if _TOC_NUM_RE.match((f.get('t') or '').strip())]
+    # 块分离形态：前 k 行连续纯数字，其后为标题块；按顺序配对（第 i 数字<->第 i 条目）
+    _nb = [f for f in flow if _norm_core(f.get('t','')) not in ('目录','CONTENTS')]
+    _k = 0
+    while _k < len(_nb) and _TOC_NUM_RE.match((_nb[_k].get('t') or '').strip()):
+        _k += 1
+    if _k >= 5:
+        _nums = [(_nb[_i].get('t') or '').strip() for _i in range(_k)]
+        _tl = _nb[_k:]
+        _starts = []
+        for _f in _tl:
+            _t = (_f.get('t') or '').strip()
+            if re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节篇编]|[一二三四五六七八九十]+[、.．]|\d+[.．、])', _t):
+                _starts.append(_f)
+        if len(_starts) >= 3:
+            _out = [f for f in flow if _norm_core(f.get('t','')) in ('目录','CONTENTS')]
+            _cur = None; _idx = 0
+            for _f in _tl:
+                _t = (_f.get('t') or '').strip()
+                _is_start = any(_f is _x for _x in _starts)
+                if _is_start:
+                    _nf = dict(_f); _nf['toc_pre'] = True; _nf['toc_block'] = True
+                    _nf['toc_page'] = _nums[_idx] if _idx < len(_nums) else ''
+                    _nf['is_head'] = False; _nf['frags'] = None; _cur = _nf; _idx += 1; _out.append(_nf)
+                elif _cur is not None:
+                    _nf = dict(_f); _nf['toc_pre'] = True; _nf['toc_block'] = True; _nf['toc_cont'] = True
+                    _nf['toc_page'] = ''; _nf['is_head'] = False; _nf['frags'] = None; _out.append(_nf)
+            return _out
+    # 页码方向判别（frags 与独立行统一）：数字 x0 中位 < 标题 x0 中位才是前置
+    _num_x = [x for f in flow for _t, x in _parts(f) if _TOC_NUM_RE.match(str(_t).strip())]
+    _title_x = [x for f in flow for _t, x in _parts(f) if not _TOC_NUM_RE.match(str(_t).strip()) and len(str(_t).strip()) >= 2]
+    if len(_num_x) < 2 or len(_title_x) < 2:
+        return None
+    if not (statistics.median(_num_x) < statistics.median(_title_x) - 8.0):
+        return None
     if len(_cand) < 3:
         # 原始形态：页首（跳过目录标题）必须是数字，紧随标题可识别为条目，且标题后不是立即数字。
         _body = [f for f in flow if not (_norm_core(f.get('t','')).startswith('目录') or _norm_core(f.get('t','')) == 'CONTENTS')]
@@ -1579,21 +1614,29 @@ for key in sorted(sl.keys(), key=int):
                 continue
             if key in _TOC_PAGE and f.get('toc_pre'):
                 _pg = str(f.get('toc_page') or '').strip()
+                if f.get('toc_block'):
+                    _t0 = (f.get('t') or '').strip()
+                    _lvl = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _t0) else (2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|\d+[.．、])', _t0) else 3)
+                    _fnt = 16.5 if _lvl == 1 else 14.0
+                    _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
+                    _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, round(_fnt*1.5,1), _inv(_esc_toc_title(f['t']), f))
+                    if _pg and not f.get('toc_cont'):
+                        _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
+                    _l += '}'
+                    body.append('\\par' + _l + '\\par')
+                    continue
                 _t0 = (f.get('t') or '').strip()
                 _l1 = bool(re.match(r'^[一二三四五六七八九十]+', _t0))
-                _l2 = bool(re.match(r'^\d+[.．]', _t0))
-                _ind = 33.0 if _l2 else (66.0 if (not _l1 and not f.get('toc_cont')) else 0.0)
-                _tx = 48.0 + _ind
-                _fnt = fnt
-                _bl = round(_fnt * (1.5 if _l1 else 1.6), 1)
-                _tw = '\\dimexpr\\textwidth-%.1fpt\\relax' % _tx
-                _tfont = '\\fontsize{%spt}{%spt}\\selectfont ' % (_fnt, _bl)
-                if f.get('toc_cont'):
-                    _line = '{\\noindent\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_tx, _tw, _tfont, _inv(_esc_toc_title(f['t']), f))
-                else:
-                    _pgbox = '\\makebox[30pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg) + '\\char32')
-                    _line = '{\\noindent%s\\hspace*{6pt}\\smash{\\rlap{\\rule[-0.25em]{0.4pt}{4.2em}}}\\hspace*{12pt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_pgbox, _tw, _tfont, _inv(_esc_toc_title(f['t']), f))
-                body.append('\\par' + _line + '\\par')
+                _l2 = bool(re.match(r'^\d+[.．、]', _t0))
+                _lvl = 1 if _l1 else (2 if _l2 else 3)
+                _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
+                _fnt = 18.7 if _lvl == 1 else 16.5
+                _bl = round(_fnt * (1.5 if _lvl == 1 else 1.6), 1)
+                _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, _bl, _inv(_esc_toc_title(f['t']), f))
+                if _pg and not f.get('toc_cont'):
+                    _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
+                _l += '}'
+                body.append('\\par' + _l + '\\par')
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
