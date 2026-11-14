@@ -1216,6 +1216,8 @@ for key in sorted(sl.keys(), key=int):
     _page_figs = extract_figs(key)
     _page_figs_bg = bool(_page_figs and USE_LAY_FIGS)   # LAYOUT_FIGS: BG overlay, 不占流/不翻页
     _page_img_full = bool(_page_figs_bg and SRC and _image_page_full(_lay_img_cov.get(key, 0.0)))
+    if int(key) + 1 in _BUILD_OPTS.get('image_pages', []):
+        _page_img_full = True   # 数据开关：手稿/影印页整页贴图 + 文字3Tr隐藏
     gk = str(int(key) + pn_off); pn_ext = pntab.get(gk, ''); pn_ocr = ''
     rows = []
     for i in range(len(sl[key])):
