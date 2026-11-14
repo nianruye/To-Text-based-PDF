@@ -481,6 +481,39 @@ def build_pdf(args, coords, lines, src_pdf, out_tmp, fix_path):
                     stderr_tail='\n'.join((p.stderr or '').strip().splitlines()[-8:]))
 
 
+def _calib_trust(out):
+    """标定可信度：ok / warn / fail（读 build 产出的 calib.json，兜底后值）。"""
+    import json as _json
+    cp = str(out) + '.calib.json'
+    d = {}
+    try:
+        if os.path.exists(cp):
+            d = _json.load(open(cp, encoding='utf-8'))
+    except Exception:
+        d = {}
+    font = (d.get('font') or {}).get('pt')
+    base = (d.get('baseline') or {}).get('pt')
+    ratio = (base / font) if font and base else None
+    sc = (d.get('selfcheck') or {}).get('verdict')
+    warns = [w.get('code') for w in (d.get('warnings') or []) if w.get('code')]
+    # fail 只用于「灾难性标定」（如 wz8 曾出 font=4.0pt 全文）。
+    # baseline/font 比值的正常范围很宽（实测 ghbq 34.2/16.5=2.07 是合理的大行距），
+    # 把它当 fail 会把**我们最好的一本 PASS 书**（ghbq pitch 98.9%）拒掉 → 只当 warn。
+    _FONT_LO, _FONT_HI = 6.0, 20.0
+    _RATIO_LO, _RATIO_HI = 1.10, 2.60
+    fail = bool((font is not None and not (_FONT_LO <= float(font) <= _FONT_HI)) or
+                (ratio is not None and not (_RATIO_LO <= float(ratio) <= _RATIO_HI)) or
+                sc == 'fail')
+    if fail:
+        trust = 'fail'
+    elif warns or sc == 'warn':
+        trust = 'warn'
+    else:
+        trust = 'ok'
+    return trust, warns, dict(font_pt=font, baseline_pt=base, ratio=(round(ratio, 3) if ratio else None),
+                              selfcheck=sc, calib_path=cp)
+
+
 def effective_verdict(verdict, multi_format):
     """severity 口径：多纸型至少 MANUAL_ONLY（不 AUTO_PASS）。
     说明：severity ≥ MANUAL_ONLY 表示 MANUAL_ONLY 与 REJECT 都满足；REJECT 更严、不被弱化。"""
@@ -812,6 +845,18 @@ def main(argv=None):
             _fb = []
         report['page_fallback'] = _fb
         report['page_fallback_count'] = len(_fb)
+        _trust, _cwarn, _ctdetail = _calib_trust(args.out)
+        report['calib_trust'] = _trust
+        report['calib_warnings'] = _cwarn
+        report['calib_trust_detail'] = _ctdetail
+        if _trust == 'warn':
+            log('标定可信度 warn: %s' % (','.join(_cwarn) or _ctdetail.get('selfcheck')))
+        elif _trust == 'fail':
+            log('标定可信度 fail: font=%s ratio=%s selfcheck=%s' % (
+                _ctdetail.get('font_pt'), _ctdetail.get('ratio'), _ctdetail.get('selfcheck')))
+        if _trust == 'fail' and os.environ.get('CALIB_STRICT', '0') in ('1', 'true', 'True'):
+            log('CALIB_STRICT=1 且标定 fail → 拒绝构建，不写产物')
+            return EXIT['verify']
         # 步骤 8：原子落盘（构建+页数通过/已接受后）
         shutil.move(out_tmp, args.out)
         # 直接从内存写（不依赖临时文件仍在，避免 move 后源被清理导致复制静默失败）
@@ -948,6 +993,8 @@ def main(argv=None):
                         note='横排门禁：verify_geom（必须带 --src-pdf 自适应 DPI）；核心字段与竖排对齐（非全 schema）')
         gp = args.out + '.gate.json'
         json.dump(gate_doc, open(gp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        _ct_line = '- 标定可信度：%s%s' % (report.get('calib_trust', 'ok'),
+            ('（%s）' % ','.join(report.get('calib_warnings') or [])) if report.get('calib_warnings') else '')
         md = ['# 横排质量门禁 · %s' % args.book, '',
               '- 结论：**%s**（effective=%s，review_required=%s）' % (
                   report['gate']['verdict'], ve, bool(bt['multi_format'])),
@@ -968,7 +1015,8 @@ def main(argv=None):
               '- 整页贴图页：%s' % (
                   ('无' if not report.get('page_fallback') else
                    '、'.join('p%s(%s)' % (x.get('page'), x.get('reason')) for x in report['page_fallback'])
-                   + '；合计 %d 页' % len(report['page_fallback'])))]
+                   + '；合计 %d 页' % len(report['page_fallback']))),
+              _ct_line]
         open(os.path.splitext(gp)[0] + '.md', 'w', encoding='utf-8').write('\n'.join(md) + '\n')
         report['gate']['json'] = gp
         report['gate']['reasons'] = reasons
