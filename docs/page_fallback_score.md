@@ -73,3 +73,12 @@
 1. 降级清单只写 `<out>.fallback.json`，**未进 report/gate**（用户看不到哪几页是图）
 2. 只覆盖「方向不一致」一类异常；**乱码页/表格页/公式页**未覆盖
 3. 6 本书未逐本重跑（靠「无 layout json 不走该路径」推断无影响）
+
+## 报告可见性（t343）
+
+- report.json：`page_fallback` / `page_fallback_count`；wz9 p5 -> `[{"page":5,"reason":"orientation_mismatch(vt=2,img=1)"}]`。
+- gate.md：「整页贴图页」一节；wz9 `p5(orientation_mismatch(vt=2,img=1))；合计 1 页`；ghbq 为「无」。
+- stdout：`[scan2pdf] 整页贴图 1 页: 5(orientation_mismatch(vt=2,img=1))`。
+- fallback 清单复制到产物同目录 `<out>.fallback.json`。
+- ghbq report page_fallback=[]，104页；wz9 82页。
+- 产物 output/uploaded/wz9_vis.pdf + report/gate。
