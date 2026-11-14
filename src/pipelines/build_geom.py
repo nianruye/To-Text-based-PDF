@@ -401,6 +401,17 @@ if _toc_rules_f and os.path.exists(_toc_rules_f):
     except Exception as _e:
         print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
+_BUILD_OPTS = {}
+try:
+    _book_opts = os.environ.get('CALIB_BOOK', '')
+    for _op in (os.path.join('config', 'books', _book_opts + '.json'),
+                os.path.join('data', _book_opts, 'build_opts.json'),
+                os.path.join('output', 'uploaded', '_ocr_' + _book_opts, 'build_opts.json')):
+        if _book_opts and os.path.exists(_op):
+            _BUILD_OPTS = json.load(open(_op, encoding='utf-8'))
+            break
+except Exception:
+    _BUILD_OPTS = {}
 INK_BOLD = os.environ.get('INK_BOLD', '1') not in ('0','false','False')
 INK_BOLD_RATIO = float(os.environ.get('INK_BOLD_RATIO', '1.30'))
 _ink_bold_audit = []
@@ -1006,6 +1017,16 @@ def _fieldish(t):
 def _body_esc(t, f, key, nbsp=False):
     """正文/字段转义；CIP 字段里的空格改成不可断 ~，防 makebox 内被 xeCJK 拆成多行。"""
     _s = _esc_with_missing(t, f, key)
+    def _circ(m):
+        _c = m.group(0); _fam = 'symbolfont' if 0x2460 <= ord(_c) <= 0x2469 else 'symbolfontb'
+        return '{\\raisebox{0.45em}{\\' + _fam + ' ' + _c + '}}'
+    if _BUILD_OPTS.get('circle_font'):
+        def _circ_m(m):
+            _n = int(m.group(1)); _c = chr(0x245F + _n)
+            _fam = 'symbolfont' if _n <= 10 else 'symbolfontb'
+            return '{\\raisebox{0.45em}{\\' + _fam + ' ' + _c + '}}'
+        _s = re.sub(r'\\textcircled\{(\d+)\}', _circ_m, _s)
+        _s = re.sub(r'[①-⑳]', _circ, _s)
     if nbsp and _fieldish(t) and '/ ' in t:
         _s = _s.replace(' ', '~')
     return _s
@@ -1176,7 +1197,9 @@ else:
     BODY_FONT = NOTE_FONT = FONT
 _prev_pn = None   # 跨页页码(单调性过滤 pn_ocr 用,排除目录页误识)
 for key in sorted(sl.keys(), key=int):
-    _pp = page_pitch(key) if PER_PAGE_PITCH else None   # 提前算源 pitch(flush 用 bl=_pp,绕过 \linespread 对大字不生效致 pitch 偏小)
+    _pp = page_pitch(key) if PER_PAGE_PITCH else None
+    _eng_txt = ''.join(sl.get(key, []))
+    _eng_ratio = (sum(1 for c in _eng_txt if c.isascii() and c.isalpha()) / max(1, len(_eng_txt)))   # 提前算源 pitch(flush 用 bl=_pp,绕过 \linespread 对大字不生效致 pitch 偏小)
     # 图页/乱码页(书影封面等 OCR 只识零星大写/繁体,主体是图片)→ 整页贴源原图
     if SRC and is_garbage_page(sl.get(key, [])) and key not in _figs:   # 有书影带的页走带处理(裁图块+保留上下文字),不整页贴
         gk = str(int(key) + pn_off); pn = pntab.get(gk, '')
@@ -1316,6 +1339,14 @@ for key in sorted(sl.keys(), key=int):
     else:
         _pm = 1.0
     PF = round(FONT * _pm, 1)   # 本页正文字号(PAGE_FONT 关时=FONT)
+    if _eng_ratio >= 0.55 and len([x for x in sl.get(key, []) if x.strip()]) >= 30:
+        # 拉丁文本：0.5em/字符估算自然行宽；font = 版心 / (最长行字符数×0.5)，不再乘 PF×0.78
+        _eng_max = max((len(x.strip()) for x in sl.get(key, []) if x.strip()), default=0)
+        _eng_fit = round(MEASURE / max(1.0, _eng_max * 0.5), 1)
+        if _eng_fit >= 5.0:
+            PF = min(PF, _eng_fit)
+            print(f'[英文] p{int(key)+1} max_chars={_eng_max} latin_font={PF}pt (无 PF*0.78)', flush=True)
+
     if key in _TOC_PAGE:
         _pn_ocr_use = pn_ocr   # F21 目录页页码独立序列(1 起), 不过单调性过滤(正文→目录突变会被误杀)
     else:
@@ -1528,7 +1559,7 @@ for key in sorted(sl.keys(), key=int):
         for _can in CANON_HDRS:
             _r = difflib.SequenceMatcher(None, _hm, _can).ratio()
             if _r > _best_r: _best_r, _best = _r, _can
-        headers = [_best] if _best_r >= 0.6 else []   # 无共识匹配(正文首行 y 6-10% 误入拼接, 如 wz4 p5) → 不渲染页眉, 正文行在 flow 正常渲染
+        headers = [_best] if _best_r >= 0.6 else []   # 无共识匹配# 无共识匹配时 headers 为空，正文正常渲染
     else:
         headers = []
     is_divider = bool(flow) and all(f['is_head'] or f.get('is_figrow') for f in flow) and not footnotes   # 仅标题无正文/脚注=分隔页(分标题页)→标题垂直居中(源在页中,非顶部)
@@ -1909,16 +1940,45 @@ for key in sorted(sl.keys(), key=int):
         _fsm = 1.0 if _giant_page else FONT_SM
         fbl = round(_fsm*1.2, 1)
         body.append('{\\linespread{1}\\fontsize{' + str(_fsm) + 'pt}{' + str(fbl) + 'pt}\\selectfont')   # 脚注区整体 \linespread{1},防全局行距倍数撑大脚注 pitch
+        _FOOTNOTE_WRAP = bool(_BUILD_OPTS.get('footnote_wrap'))
         for ft in footnotes:
-            inner = esc(ft['t'])
-            _fnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in ft['t']) * _fsm
-            if _fnat >= 0.85 * MEASURE:
+            _raw = ft['t']
+            _mk = re.match(r'^([①-⑳])', _raw)
+            if _mk and _FOOTNOTE_WRAP:
+                _mfs = round(_fsm * 0.72, 1)
+                inner = '{\\fontsize{' + str(_mfs) + 'pt}{' + str(round(_mfs*1.15,1)) + 'pt}\\selectfont ' + esc(_mk.group(1)) + '}' + esc(_raw[len(_mk.group(1)):])
+            else:
+                inner = esc(_raw)
+                if not _FOOTNOTE_WRAP:
+                    inner = re.sub(r'[①-⑩]', lambda m: '\\textcircled{' + str(ord(m.group(0)) - 0x245F) + '}', inner)
+            _fnat = sum((1.0 if ord(c) > 0x2e80 else 0.5) for c in _raw) * _fsm
+            if _FOOTNOTE_WRAP and _fnat >= 0.85 * MEASURE:
+                # 脚注按版心宽度真正折行；不可用 makebox[s]（长行会被拉出右缘）
+                body.append('\\noindent\\parbox{0.82\\textwidth}{\\raggedright ' + inner + '}\\par')
+            elif _fnat >= 0.85 * MEASURE:
                 body.append('\\renewcommand{\\CJKglue}{\\hskip 0.25em plus 1em}\\makebox[\\textwidth][s]{' + inner + '}\\par')
             else:
                 body.append(inner + '\\par')
         body.append('}')   # 关闭脚注组,恢复正文 \linespread
     if _page_img_full or _all_text_invis:
         body.append('\\special{pdf:literal direct Q}')
+    if not flow:
+        body.append('\\null')   # 任意源页无可见流时也强制产生一页（防页序前移）
+        _ftxt = [x.strip() for x in sl.get(key, []) if x.strip()] if int(key) == 0 else []
+        if _ftxt:
+            _fxs = [((min(q[0] for q in _pts) + max(q[0] for q in _pts)) / 2) for _pts in co.get(key, []) if _pts]
+            _figx = [(min(_b[0], _b[2]), max(_b[0], _b[2])) for _fp, _b in (_page_figs or [])]
+            _vis_cap = bool(_figx and _fxs and any(x0 <= (_fxs[0] * 200.0 / LDPI) <= x1 for x0, x1 in _figx))
+            if _vis_cap:
+                # image 页的水平图注：可见渲染在图下方（不是 1pt 3Tr）
+                body.append('\\vspace*{\\fill}')
+                for _fl in _ftxt:
+                    body.append('{\\fontsize{9pt}{11pt}\\selectfont ' + esc(_fl) + '}\\par')
+            else:
+                body.append('\\special{pdf:literal direct q 3 Tr}')
+                for _fl in _ftxt:
+                    body.append('{\\fontsize{1pt}{1.2pt}\\selectfont ' + esc(_fl) + '}\\par')
+                body.append('\\special{pdf:literal direct Q}')
     body.append('\\par\\newpage')
     page_tex = '\n'.join(body)
     # ── 改动1:本页行距基准 _lsb —— PER_PAGE_PITCH 时按源实测 pitch 反推,否则全局 LINESPREAD ──
@@ -1953,6 +2013,7 @@ if os.environ.get('POS_EST_LOG'):
     json.dump(_pos_est, open(os.environ['POS_EST_LOG'], 'w'))   # 导出各源页位置化估高,供 fit_positional 两趟校准
 
 latex = build_latex('geom', PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex)
+latex = latex.replace('\\begin{document}', '\\newfontfamily\\symbolfont{DejaVu Sans}\n\\newfontfamily\\symbolfontb{Noto Sans CJK SC}\n\\begin{document}', 1)
 tex_path = '/tmp/seg2_line.tex'
 open(tex_path, 'w', encoding='utf-8').write(latex)
 subprocess.run(['xelatex', '-interaction=nonstopmode', '-output-directory=/tmp', tex_path], capture_output=True)
