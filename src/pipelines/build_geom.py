@@ -39,7 +39,7 @@ print(f"[几何] cw={cw} measure={MEASURE} font={FONT} baseline={BASELINE} 小�
 
 pn_off = int(os.environ.get('PAGENUM_OFFSET', '0'))
 pntab = load_pntab()
-TOC_ENTRY_RE = re.compile(r'[.·…．]{2,}\s*\d{1,4}\s*$')   # 目录条目:"标题....页码"(点引导+数字)→ 不是标题,是目录正文
+TOC_ENTRY_RE = re.compile(r'[.·…．⋯]{2,}\s*\d{1,4}(?:\s*[-—–~]\s*\d{1,4})?\s*$')   # 目录条目:"标题....页码"(点引导+数字)→ 不是标题,是目录正文
 FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')
 FN_NOTE_RE = re.compile(r'^[〔\[(（]\s*[一二三四五六七八九十百千零\d]+\s*[〕\])）]')
 def _heading_core(t):
@@ -1658,6 +1658,7 @@ for key in sorted(sl.keys(), key=int):
     _special3 = '\\special{pdf:literal direct q 3 Tr}'
     _specialQ = '\\special{pdf:literal direct Q}'
     prev_y = [None]   # 页级上一行 y0(跨段位置还原:段间 \vspace 用)
+    _toc_has_page = any(TOC_ENTRY_RE.search((f.get('t') or '')) and re.search(r'\d[—–~-]\d', (f.get('t') or '')) for f in flow)
     def flush():
         if not para: return
         if USE_POS and key not in _TOC_PAGE and prev_y[0] is not None and para[0].get('y0', 0) > prev_y[0] and not os.environ.get('REGION_LAYOUT','') in ('1','true','True'):   # F29 目录页无段间 vspace(条目连续, 源书目录行距均匀)
@@ -1753,13 +1754,13 @@ for key in sorted(sl.keys(), key=int):
                 continue
             _toc = None
             if not f['is_head'] or key in _TOC_PAGE:
-                _m = re.match(r'^(.*\S)\s*[.·…．⋯]{2,}\s*(\d{1,4})\s*$', f['t'])   # 形态①:一行"title……页码"
+                _m = re.match(r'^(.*\S)\s*[.·…．⋯]{2,}\s*(\d{1,4}(?:\s*[-—–~]\s*\d{1,4})?)\s*$', f['t'])   # 形态①:一行"title……页码"
                 if _m: _toc = (_m.group(1), _m.group(2))
                 if _toc is None and key in _TOC_PAGE and (re.match(r'^第?[一二三四五六七八九十百千零\d]+(?:部分|编|篇)', f['t'].strip()) or f['t'].strip().endswith(('部分', '编'))) and not re.search(r'\d', f['t']) and len(f['t'].strip()) <= _TOC_CAL.get('title_max', 14):
                     # F19 部/编级标题(wz3"先秦两汉部分""第一编…"): 源书居中大字无页码, 不进 _toc 点线链(防 P1 回填误给页码)
                     body.append('{\\fontsize{' + str(round(fnt * 0.92, 1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + esc(f['t'].strip()) + '}' + brk + '}')
                     continue
-                if _toc is None and _TOC_PN and key in _TOC_PAGE:   # 形态⓪回填:页码整批漏识的目录行(无点线无数字片段),core 命中标题→页码表 → 登记为点线条目
+                if _toc is None and _TOC_PN and key in _TOC_PAGE and not _toc_has_page:   # 形态⓪回填:页码整批漏识的目录行(无点线无数字片段),core 命中标题→页码表 → 登记为点线条目
                     _ck0 = _norm_core(f['t'])
                     if _ck0 in _TOC_PN: _toc = (f["t"].strip(), str(_TOC_PN[_ck0]))
                 if _toc is None and f.get('frags'):   # 形态②:title 片段 + 页码片段(分开的同 y poly,合并后成多片段)
@@ -1820,7 +1821,8 @@ for key in sorted(sl.keys(), key=int):
                     _lf15 = [_fr for _fr in _fs15 if _fr not in _rf15]
                     if _lf15 and _rf15 and sum(len(_fr[0]) for _fr in _lf15) <= 14:   # 左列须像标题(≤14字), 否则不动(整行都是作者级长文本)
                         _toc = (' '.join(_fr[0].strip() for _fr in _lf15), '　'.join(_fr[0].strip() for _fr in _rf15))   # 右列(作者+页码)片段间全角空格, xeCJK 吞半角
-                _toc_title = esc(_toc[0]).replace(' ', '\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
+                _tdisp = re.sub(r'第\s*([一二三四五六七八九十百千零\d]+)\s*(章|节)', r'第\1\2', _toc[0].strip())
+                _toc_title = esc(_tdisp).replace(' ', '\\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
                 _tt0 = _toc[0].strip().lstrip('\ufeff\u200b\u3000 ')
                 _tlvl = 1 if re.search(r'第[一二三四五六七八九十百千零\d]+章', _tt0[:8]) else (2 if re.search(r'第[一二三四五六七八九十百千零\d]+节', _tt0[:8]) else (3 if re.match(r'^[一二三四五六七八九十]+[、]', _tt0) else 3))
                 if _tlvl <= 2:
@@ -1834,7 +1836,7 @@ for key in sorted(sl.keys(), key=int):
                 _nat = sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt
                 if _nat > MEASURE * 0.82:
                     _tfnt = round(fnt * (MEASURE * 0.82) / _nat, 1)   # 超长条目(如 24 字)缩字号让位页码, 行高(bl)不变保行距统一
-                body.append('{\\fontsize{' + str(_tfnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _pre + _box + '{' + _strut + _ind + _toc_title + '\\,\\dotfill\\,' + esc(_toc[1]) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(_tfnt) + 'pt}{' + str(bl) + 'pt}\\selectfont ' + _pre + _box + '{' + _strut + _ind + _toc_title + '\\,\\dotfill\\,' + esc(re.sub(r'(?<=\d)\s*[-—–~]\s*(?=\d)', '—', str(_toc[1]))) + '}' + brk + '}')
                 continue
             # 缩进按源 x0 还原(弃写死 2em): 段首行缩进=源 x0-版心左, 段内行悬挂缩进同源。
             # 容差 6px(=0.5字@200dpi, OCR x0 噪声)内归 0; 短行自然留白右侧, 与源书一致。
