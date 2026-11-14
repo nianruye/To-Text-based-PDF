@@ -401,6 +401,9 @@ if _toc_rules_f and os.path.exists(_toc_rules_f):
     except Exception as _e:
         print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
+INK_BOLD = os.environ.get('INK_BOLD', '1') not in ('0','false','False')
+INK_BOLD_RATIO = float(os.environ.get('INK_BOLD_RATIO', '1.30'))
+_ink_bold_audit = []
 _head_blocks = {}   # page_key -> [(bbox_142dpi, level)]
 _layout_text = {}   # page_key -> [normalized layout text-block content]
 _layout_doc_pages = set()   # pages containing doc_title (new-book multi-line chapter title)
@@ -495,6 +498,61 @@ if USE_LAY_HEAD and LAYJSON and os.path.exists(LAYJSON):
                   open(OUT + '.headings.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     except Exception as _e:
         print('[标题·layout] 审计写入失败: %s' % _e)
+def _ink_bold_lines(key, co_page, sl_page, page_h_px):
+    if not INK_BOLD or not SRC or not co_page:
+        return {}
+    try:
+        import fitz, statistics
+        doc = fitz.open(SRC); pi = int(key)
+        if pi < 0 or pi >= doc.page_count:
+            doc.close(); return {}
+        pix = doc[pi].get_pixmap(dpi=300, colorspace=fitz.csGRAY, alpha=False); doc.close()
+        W, H = pix.width, pix.height; buf = pix.samples; scale = 300.0 / float(DPI)
+        def _stroke(pts):
+            xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+            x0 = max(0, int(min(xs)*scale)); x1 = min(W, int(max(xs)*scale)+1)
+            y0 = max(0, int(min(ys)*scale)); y1 = min(H, int(max(ys)*scale)+1)
+            if x1 <= x0 or y1 <= y0: return None
+            runs = []
+            for yy in range(y0, y1):
+                base = yy*W; run = 0
+                for xx in range(x0, x1):
+                    if buf[base+xx] < 180: run += 1
+                    else:
+                        if run: runs.append(run)
+                        run = 0
+                if run: runs.append(run)
+            return statistics.median(runs) if runs else None
+        hs = [max(p[1] for p in pts)-min(p[1] for p in pts) for pts in co_page if pts]
+        if not hs: return {}
+        hmed = statistics.median(hs)
+        body_idx = {i for i,h in enumerate(hs) if 0.90*hmed <= h <= 1.10*hmed}
+        strokes = {}; base = []
+        for i, pts in enumerate(co_page):
+            if not pts: continue
+            st = _stroke(pts)
+            if st is None: continue
+            strokes[i] = st
+            if i in body_idx: base.append(st)
+        if not base: return {}
+        bmed = statistics.median(base); out = {}
+        for i, st in strokes.items():
+            h = hs[i]; ratio = st/bmed
+            _txt = (sl_page[i] if i < len(sl_page) else '').strip()
+            if len(_txt) < 4 or re.fullmatch(r'[\d\s.．、，。；：！？（）()]+', _txt):
+                continue
+            if PN_RE.fullmatch(_txt):
+                continue
+            if abs(h / hmed - 1.0) > 0.20:
+                continue
+            if ratio >= INK_BOLD_RATIO and 0.90 <= h/hmed <= 1.15:
+                out[i] = (st, round(ratio,3))
+                _ink_bold_audit.append(dict(page=int(key)+1,line=i,text=(sl_page[i] if i<len(sl_page) else '')[:80],stroke=st,ratio=round(ratio,3),h=round(h,1)))
+        return out
+    except Exception as e:
+        print('[ink-bold] skip %s: %s' % (key,e), flush=True); return {}
+
+
 def _layout_head_level(x0, y0, w, h, key, text=''):
     """标题行以文本为准：OCR 行归一化后是块文本的前缀/后缀/相等（支持块拆成多行）。
     不做 bbox 重叠兜底，避免标题块 bbox 吃掉相邻正文行。"""
@@ -1567,6 +1625,28 @@ for key in sorted(sl.keys(), key=int):
                 if _strut_h > 0:
                     _pos_sscale = max(0.62, min(1.0, _rem / _strut_h))
                     if os.environ.get('HORIZ_NO_SSHRINK') in ('1','true','True'): _pos_sscale = 1.0
+    if INK_BOLD and key in _layout_doc_pages and key not in _TOC_PAGE:
+        _ibl = _ink_bold_lines(key, co.get(key, []), sl.get(key, []), page_px_h)
+        if _ibl and _layout_text.get(key):
+            _first_blk = _layout_text[key][0]
+            _fi = [i for i in _ibl if i < len(sl.get(key, [])) and re.sub(r'\s+', '', sl[key][i]) in _first_blk]
+            _anchor = min(_fi) if _fi else min(_ibl)
+            _ibl = {i: v for i, v in _ibl.items() if abs(i - _anchor) <= 2}
+        if len(_ibl) < 2:
+            _ibl = {}
+        if _ibl:
+            _ibtext = {re.sub(r'\s+', '', sl.get(key, [])[i]) for i in _ibl if i < len(sl.get(key, []))}
+            for _f in flow:
+                if re.sub(r'\s+', '', _f.get('t') or '') in _ibtext and not _f.get('is_head'):
+                    _f['ink_bold'] = True
+            # 同一 LAYJSON text 块内已判出加粗行 → 该块其余行同步加粗（wz8_1 p18 二级标题整块 3 行）
+            for _blk in _layout_text.get(key, []):
+                if any(_nt and _nt in _blk for _nt in _ibtext):
+                    for _f in flow:
+                        _ntx = re.sub(r'\s+', '', _f.get('t') or '')
+                        if _ntx and _ntx in _blk and not _f.get('is_head'):
+                            _f['ink_bold'] = True
+            print('[ink-bold] p%d %d行' % (int(key)+1, len(_ibl)), flush=True)
     if is_divider:
         body.append('\\vspace*{\\fill}')   # 分隔页:顶部填充(标题垂直居中)
     elif USE_POS and _top_vs * _pos_gscale > 1:
@@ -1598,6 +1678,7 @@ for key in sorted(sl.keys(), key=int):
             else:
                 bl = round(fnt*1.2, 1); _strut = ''
             brk = ' \\\\' if j < len(para)-1 else ''
+            _inkbold = '\\bfseries\\CJKfamily{heiti}' if f.get('ink_bold') else ''
             if key in _TOC_PAGE and _norm_core(f['t']) == '目录':   # F17a 目录页大标题(源书「目　录」字间空格+居中; is_head 行绕过 _toc 块)
                 _m17 = '\\enspace{}'.join(list(_norm_core(f['t'])))
                 body.append('{\\fontsize{' + str(round(f['fnt']*1.22,1)) + 'pt}{' + str(round(f['fnt']*1.22*1.3,1)) + 'pt}\selectfont \centerline{' + _m17 + '}' + brk + '}')
@@ -1767,9 +1848,9 @@ for key in sorted(sl.keys(), key=int):
             _grid = os.environ.get('GRID_PITCH', '') in ('1', 'true', 'True')   # 固定字距(旧 GRID_PITCH 开关,makebox[l]);USE_REGION 改用 CJKglue plus 0em 实现等价固定字距(见前导 _cjk_glue)
             if _nat_w >= 0.85 * MEASURE:
                 _mb = 'l' if _grid else 's'   # 默认 makebox[s];固定字距靠 CJKglue plus 0em(不拉伸)实现——满行收缩齐右、短行自然 ragged,字距恒定≈字号
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _mb + ']{' + _strut + indent + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][' + _mb + ']{' + _strut + indent + _inkbold + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
             else:   # 短行/段末 → makebox[l](左对齐满宽框,与满行同构 hbox);不套 makebox 会让纯文本行与 makebox 行纵向堆叠行距不同→段末短行处行距塌缩
-                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][l]{' + _strut + indent + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
+                body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][l]{' + _strut + indent + _inkbold + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
         body.append('\\par')
         if (not USE_POS) and any(f['is_head'] and not f.get('lay_head') for f in para):   # 标题段后加间距(匹配源);位置还原时由源 y 增量给
             body.append('\\vspace{' + str(HEAD_GAP) + 'pt}')
@@ -1892,6 +1973,10 @@ if os.path.exists(_src):
     except Exception as _e:
         print('[normalize] 审计写入失败: %s' % _e)
     print(f"[normalize] punct_fullwidth changes={len(_NORM_CHANGES)} audit={_norm_path}")
+    try:
+        json.dump(_ink_bold_audit, open(OUT + '.inkbold.json','w',encoding='utf-8'), ensure_ascii=False, indent=1)
+    except Exception as _e:
+        print('[ink-bold] audit write fail', _e)
     print(f"[完成] {OUT}")
 else:
     print("[失败] xelatex 未生成 PDF,查 /tmp/seg2_line.log")
