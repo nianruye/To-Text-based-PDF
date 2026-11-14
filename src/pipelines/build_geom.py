@@ -1948,7 +1948,9 @@ for key in sorted(sl.keys(), key=int):
             _mk = re.match(r'^([①-⑳])', _raw)
             if _mk and _FOOTNOTE_WRAP:
                 _mfs = round(_fsm * 0.72, 1)
-                inner = '{\\fontsize{' + str(_mfs) + 'pt}{' + str(round(_mfs*1.15,1)) + 'pt}\\selectfont ' + esc(_mk.group(1)) + '}' + esc(_raw[len(_mk.group(1)):])
+                _mch = _mk.group(1)
+                _mfam = 'symbolfont' if 0x2460 <= ord(_mch) <= 0x2469 else 'symbolfontb'
+                inner = '{\\fontsize{' + str(_mfs) + 'pt}{' + str(round(_mfs*1.15,1)) + 'pt}\\selectfont {\\' + _mfam + ' ' + _mch + '}}' + esc(_raw[len(_mch):])
             else:
                 inner = esc(_raw)
                 if not _FOOTNOTE_WRAP:
