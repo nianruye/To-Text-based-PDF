@@ -1120,7 +1120,7 @@ for key in sorted(sl.keys(), key=int):
         _vt = sum(1 for _b in _blks if _b.get('block_label') == 'vertical_text')
         _img_n = sum(1 for _b in _blks if _b.get('block_label') == 'image')
         if _vt >= 2 and _img_n >= 1:
-            _auto_fb_reason = 'handwriting_layout(vt=%d)' % _vt
+            _auto_fb_reason = 'orientation_mismatch(vt=%d,img=%d)' % (_vt, _img_n)
             _page_img_full = True
             _AUTO_FALLBACK.append(dict(page=int(key)+1, reason=_auto_fb_reason))
             print('[fallback] p%d %s -> 整页贴图+文本3Tr' % (int(key)+1, _auto_fb_reason), flush=True)
