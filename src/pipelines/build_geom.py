@@ -41,6 +41,7 @@ pn_off = int(os.environ.get('PAGENUM_OFFSET', '0'))
 pntab = load_pntab()
 TOC_ENTRY_RE = re.compile(r'[.·…．]{2,}\s*\d{1,4}\s*$')   # 目录条目:"标题....页码"(点引导+数字)→ 不是标题,是目录正文
 FN_CIRCLE = set('①②③④⑤⑥⑦⑧⑨⑩')
+FN_NOTE_RE = re.compile(r'^[〔\[(（]\s*[一二三四五六七八九十百千零\d]+\s*[〕\])）]')
 def _heading_core(t):
     t = t.strip()
     t = re.sub(r'^第[一二三四五六七八九十百千零\d]+(?:部分|[章节编篇])', '', t)
@@ -657,6 +658,40 @@ def _toc_pre_flow(flow):
     _cand = [f for f in flow if len(_numfrags(f)) == 1 and len(_parts(f)) >= 2
              and bool(_TOC_ENTRY_START_RE.match(''.join(t for t, _ in _parts(f) if not _TOC_NUM_RE.match(t)).strip()))]
     _raww = [f for f in flow if _TOC_NUM_RE.match((f.get('t') or '').strip())]
+    # 块分离形态：前 k 行连续纯数字，其后为标题块；按顺序配对（第 i 数字<->第 i 条目）
+    _nb = [f for f in flow if _norm_core(f.get('t','')) not in ('目录','CONTENTS')]
+    _k = 0
+    while _k < len(_nb) and _TOC_NUM_RE.match((_nb[_k].get('t') or '').strip()):
+        _k += 1
+    if _k >= 5:
+        _nums = [(_nb[_i].get('t') or '').strip() for _i in range(_k)]
+        _tl = _nb[_k:]
+        _starts = []
+        for _f in _tl:
+            _t = (_f.get('t') or '').strip()
+            if re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节篇编]|[一二三四五六七八九十]+[、.．]|\d+[.．、])', _t):
+                _starts.append(_f)
+        if len(_starts) >= 3:
+            _out = [f for f in flow if _norm_core(f.get('t','')) in ('目录','CONTENTS')]
+            _cur = None; _idx = 0
+            for _f in _tl:
+                _t = (_f.get('t') or '').strip()
+                _is_start = any(_f is _x for _x in _starts)
+                if _is_start:
+                    _nf = dict(_f); _nf['toc_pre'] = True; _nf['toc_block'] = True
+                    _nf['toc_page'] = _nums[_idx] if _idx < len(_nums) else ''
+                    _nf['is_head'] = False; _nf['frags'] = None; _cur = _nf; _idx += 1; _out.append(_nf)
+                elif _cur is not None:
+                    _nf = dict(_f); _nf['toc_pre'] = True; _nf['toc_block'] = True; _nf['toc_cont'] = True
+                    _nf['toc_page'] = ''; _nf['is_head'] = False; _nf['frags'] = None; _out.append(_nf)
+            return _out
+    # 页码方向判别（frags 与独立行统一）：数字 x0 中位 < 标题 x0 中位才是前置
+    _num_x = [x for f in flow for _t, x in _parts(f) if _TOC_NUM_RE.match(str(_t).strip())]
+    _title_x = [x for f in flow for _t, x in _parts(f) if not _TOC_NUM_RE.match(str(_t).strip()) and len(str(_t).strip()) >= 2]
+    if len(_num_x) < 2 or len(_title_x) < 2:
+        return None
+    if not (statistics.median(_num_x) < statistics.median(_title_x) - 8.0):
+        return None
     if len(_cand) < 3:
         # 原始形态：页首（跳过目录标题）必须是数字，紧随标题可识别为条目，且标题后不是立即数字。
         _body = [f for f in flow if not (_norm_core(f.get('t','')).startswith('目录') or _norm_core(f.get('t','')) == 'CONTENTS')]
@@ -1579,19 +1614,35 @@ for key in sorted(sl.keys(), key=int):
                 continue
             if key in _TOC_PAGE and f.get('toc_pre'):
                 _pg = str(f.get('toc_page') or '').strip()
-                _ind = 22.0 if re.match(r'^\d+[.．]', (f.get('t') or '').strip()) else 0.0
-                _ind = max(_ind, float(f.get('toc_indent', 0) or 0.0))
-                _tx = 47.5 + _ind   # 标题列绝对左缘=body_left+47.5pt；L2 +2字
-                if re.match(r'^\d+[.．]', (f.get('t') or '').strip()):
-                    _tx = 47.5 + 22.0
-                _tw = '\\dimexpr\\textwidth-%.1fpt\\relax' % _tx
-                _hgap = 27.5 + (22.0 if re.match(r'^\d+[.．]', (f.get('t') or '').strip()) else 0.0)
-                _tfont = '\\fontsize{%spt}{%spt}\\selectfont ' % (fnt, bl)
-                if f.get('toc_cont'):
-                    body.append('{\\noindent\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_tx + 3.7, _tw, _tfont, _inv(_esc_toc_title(f['t']), f)) + brk)
-                else:
-                    _pgbox = '\\makebox[18pt][r]{\\fontsize{%spt}{%spt}\\selectfont %s}' % (round(FONT_SM,1), round(FONT_SM*1.2,1), esc(_pg) + '\\char32')
-                    body.append('{\\noindent\\makebox[0pt][l]{}%s\\ \\hspace*{2pt}\\rule[-0.2ex]{0.4pt}{1.05em}\\hspace*{%.1fpt}\\parbox[t]{%s}{\\raggedright %s%s}}' % (_pgbox, _hgap, _tw, _tfont, _inv(_esc_toc_title(f['t']), f)) + brk)
+                if f.get('toc_block'):
+                    _t0 = (f.get('t') or '').strip()
+                    _lvl = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _t0) else (2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|\d+[.．、])', _t0) else 3)
+                    _fnt = 15.4 if _lvl == 1 else 14.0
+                    _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
+                    _ttex = _inv(_esc_toc_title(f['t']), f)
+                    if _lvl <= 2:
+                        _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
+                    _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, round(_fnt*1.5,1), _ttex)
+                    if _pg and not f.get('toc_cont'):
+                        _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
+                    _l += '}'
+                    body.append('\\par' + _l + '\\par')
+                    continue
+                _t0 = (f.get('t') or '').strip()
+                _l1 = bool(re.match(r'^[一二三四五六七八九十]+', _t0))
+                _l2 = bool(re.match(r'^\d+[.．、]', _t0))
+                _lvl = 1 if _l1 else (2 if _l2 else 3)
+                _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
+                _fnt = 18.7 if _lvl == 1 else 16.5
+                _bl = round(_fnt * (1.5 if _lvl == 1 else 1.6), 1)
+                _ttex = _inv(_esc_toc_title(f['t']), f)
+                if _lvl <= 2:
+                    _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
+                _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, _bl, _ttex)
+                if _pg and not f.get('toc_cont'):
+                    _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
+                _l += '}'
+                body.append('\\par' + _l + '\\par')
                 continue
             if f.get('is_figcaption'):   # 图说明(figure_title block)→ 居中,不查行宽(短行也居中)
                 body.append('{\\fontsize{' + str(fnt) + 'pt}{' + str(bl) + 'pt}\\selectfont \\makebox[\\textwidth][c]{' + _strut + _inv(_body_esc(f['t'], f, key, _CIP_PAGE), f) + '}' + brk + '}')
@@ -1672,10 +1723,16 @@ for key in sorted(sl.keys(), key=int):
                     if _lf15 and _rf15 and sum(len(_fr[0]) for _fr in _lf15) <= 14:   # 左列须像标题(≤14字), 否则不动(整行都是作者级长文本)
                         _toc = (' '.join(_fr[0].strip() for _fr in _lf15), '　'.join(_fr[0].strip() for _fr in _rf15))   # 右列(作者+页码)片段间全角空格, xeCJK 吞半角
                 _toc_title = esc(_toc[0]).replace(' ', '\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
-                if f.get('toc_hei'):
+                _tt0 = _toc[0].strip().lstrip('\ufeff\u200b\u3000 ')
+                _tlvl = 1 if re.search(r'第[一二三四五六七八九十百千零\d]+章', _tt0[:8]) else (2 if re.search(r'第[一二三四五六七八九十百千零\d]+节', _tt0[:8]) else (3 if re.match(r'^[一二三四五六七八九十]+[、]', _tt0) else 3))
+                if _tlvl <= 2:
+                    _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
+                elif f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
                 _tfnt = fnt
-                if _tfnt > _TOC_CAL.get('font_line', PF * 1.25): _tfnt = PF   # F18 目录条目字号回落(线=该书目录条目字号中位×1.15, F22 自校准)
+                if _tlvl == 1: _tfnt = round(fnt * 1.08, 1)
+                elif _tlvl == 2: _tfnt = round(fnt * 1.02, 1)
+                if _tlvl == 3 and _tfnt > _TOC_CAL.get('font_line', PF * 1.25): _tfnt = PF   # F18 目录条目字号回落(线=该书目录条目字号中位×1.15, F22 自校准)
                 _nat = sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt
                 if _nat > MEASURE * 0.82:
                     _tfnt = round(fnt * (MEASURE * 0.82) / _nat, 1)   # 超长条目(如 24 字)缩字号让位页码, 行高(bl)不变保行距统一
