@@ -1617,9 +1617,12 @@ for key in sorted(sl.keys(), key=int):
                 if f.get('toc_block'):
                     _t0 = (f.get('t') or '').strip()
                     _lvl = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _t0) else (2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|\d+[.．、])', _t0) else 3)
-                    _fnt = 16.5 if _lvl == 1 else 14.0
+                    _fnt = 15.4 if _lvl == 1 else 14.0
                     _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
-                    _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, round(_fnt*1.5,1), _inv(_esc_toc_title(f['t']), f))
+                    _ttex = _inv(_esc_toc_title(f['t']), f)
+                    if _lvl <= 2:
+                        _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
+                    _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, round(_fnt*1.5,1), _ttex)
                     if _pg and not f.get('toc_cont'):
                         _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
                     _l += '}'
@@ -1632,7 +1635,10 @@ for key in sorted(sl.keys(), key=int):
                 _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
                 _fnt = 18.7 if _lvl == 1 else 16.5
                 _bl = round(_fnt * (1.5 if _lvl == 1 else 1.6), 1)
-                _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, _bl, _inv(_esc_toc_title(f['t']), f))
+                _ttex = _inv(_esc_toc_title(f['t']), f)
+                if _lvl <= 2:
+                    _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
+                _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, _bl, _ttex)
                 if _pg and not f.get('toc_cont'):
                     _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
                 _l += '}'
@@ -1717,10 +1723,16 @@ for key in sorted(sl.keys(), key=int):
                     if _lf15 and _rf15 and sum(len(_fr[0]) for _fr in _lf15) <= 14:   # 左列须像标题(≤14字), 否则不动(整行都是作者级长文本)
                         _toc = (' '.join(_fr[0].strip() for _fr in _lf15), '　'.join(_fr[0].strip() for _fr in _rf15))   # 右列(作者+页码)片段间全角空格, xeCJK 吞半角
                 _toc_title = esc(_toc[0]).replace(' ', '\enspace ')   # CJK 文本空格被 xeCJK 忽略, 转 enspace 还原"一 历史背景"序号间距
-                if f.get('toc_hei'):
+                _tt0 = _toc[0].strip().lstrip('\ufeff\u200b\u3000 ')
+                _tlvl = 1 if re.search(r'第[一二三四五六七八九十百千零\d]+章', _tt0[:8]) else (2 if re.search(r'第[一二三四五六七八九十百千零\d]+节', _tt0[:8]) else (3 if re.match(r'^[一二三四五六七八九十]+[、]', _tt0) else 3))
+                if _tlvl <= 2:
+                    _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
+                elif f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'
                 _tfnt = fnt
-                if _tfnt > _TOC_CAL.get('font_line', PF * 1.25): _tfnt = PF   # F18 目录条目字号回落(线=该书目录条目字号中位×1.15, F22 自校准)
+                if _tlvl == 1: _tfnt = round(fnt * 1.08, 1)
+                elif _tlvl == 2: _tfnt = round(fnt * 1.02, 1)
+                if _tlvl == 3 and _tfnt > _TOC_CAL.get('font_line', PF * 1.25): _tfnt = PF   # F18 目录条目字号回落(线=该书目录条目字号中位×1.15, F22 自校准)
                 _nat = sum(1.0 if ord(c) > 0x2e80 else 0.5 for c in _toc[0]) * fnt
                 if _nat > MEASURE * 0.82:
                     _tfnt = round(fnt * (MEASURE * 0.82) / _nat, 1)   # 超长条目(如 24 字)缩字号让位页码, 行高(bl)不变保行距统一
