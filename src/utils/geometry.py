@@ -164,9 +164,23 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
     _bad_cw = (not (5 <= cw <= 80))
     if (os.environ.get('HORIZ_INK_FALLBACK', '0') not in ('0','false','False')
         or (os.environ.get('CALIB_BOOK') and not os.environ.get('FONT_SCALE'))) and _bad_font:
-        if _ink_font and 6.0 <= _ink_font <= 20.0:
-            print(f"[标定·fallback] font={FONT} ratio={_ratio:.2f} → ink_font={_ink_font}", flush=True)
-            FONT = _ink_font; _font_source = 'ink_fallback'; _ink_applied = True
+        _charw_pt = None
+        try:
+            _cand = [w / c * 72.0 / DPI for w, c in zip(widths, chars) if c > 0 and w > 0]
+            if _cand:
+                _charw_pt = round(statistics.median(_cand), 2)
+        except Exception:
+            pass
+        if _charw_pt and 6.0 <= _charw_pt <= 20.0:
+            print(f"[标定·fallback] font={FONT} → char_width={_charw_pt}", flush=True)
+            FONT = _charw_pt; _font_source = 'ink_charwidth_fallback'; _ink_applied = True
+        elif _ink_font and 6.0 <= _ink_font / 1.42 <= 20.0:
+            _f2 = round(_ink_font / 1.42, 1)
+            print(f"[标定·fallback] font={FONT} → ink/1.42={_f2}", flush=True)
+            FONT = _f2; _font_source = 'ink_fallback'; _ink_applied = True
+        if _font_source.startswith('ink_') or _font_source == 'body_median_fallback':
+            # 标定走兜底的新书：禁用防溢出 strut 压缩，否则 27→24.9 行距双峰
+            os.environ['HORIZ_NO_SSHRINK'] = '1'
         else:
             _fb_body = round(statistics.median(heights) * 72.0 / DPI / 0.88, 1) if heights else FONT
             if 6.0 <= _fb_body <= 20.0:
