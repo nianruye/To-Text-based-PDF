@@ -1198,6 +1198,33 @@ else:
 _prev_pn = None   # 跨页页码(单调性过滤 pn_ocr 用,排除目录页误识)
 for key in sorted(sl.keys(), key=int):
     _pp = page_pitch(key) if PER_PAGE_PITCH else None
+    if (int(key) + 1 in _BUILD_OPTS.get('structured_toc_pages', []) and LAYJSON
+            and os.path.exists(LAYJSON) and int(key) < len(_ld)):
+        _blocks = _ld[int(key)].get('prunedResult', {}).get('parsing_res_list', [])
+        _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
+        for _b in _blocks:
+            _lab = _b.get('block_label'); _txt = str(_b.get('block_content') or '').strip()
+            if not _txt or _lab == 'number': continue
+            if _lab == 'doc_title':
+                for _ln in _txt.splitlines():
+                    if _ln.strip() == 'Contents':
+                        _bd.append('\\centerline{\\fontsize{18pt}{22pt}\\selectfont\\bfseries Contents}\\vspace{4pt}')
+                    else:
+                        _bd.append('\\centerline{\\fontsize{8pt}{10pt}\\selectfont ' + esc(_ln.strip()) + '}\\vspace{2pt}')
+            elif _lab == 'paragraph_title':
+                _bd.append('\\noindent{\\bfseries\\fontsize{12pt}{15pt}\\selectfont ' + esc(_txt) + '}\\par\\vspace{3pt}')
+            elif _lab == 'text':
+                _lines = _txt.splitlines() or [_txt]
+                for _ln in _lines:
+                    _ln = _ln.strip()
+                    if not _ln: continue
+                    _pm = re.search(r'\s*/\s*(\d+)\s*$', _ln)
+                    _pg = _pm.group(1) if _pm else ''
+                    _body = re.sub(r'\s*/\s*\d+\s*$', '', _ln).strip()
+                    _bd.append('\\noindent\\hangindent=3em\\hangafter=1\\fontsize{11pt}{14pt}\\selectfont ' + esc(_body) + (('\\hfill ' + _pg) if _pg else '') + '\\par\\vspace{2pt}')
+        _bd.append('}\\par\\newpage')
+        pages_tex.append('\n'.join(_bd))
+        continue
     _eng_txt = ''.join(sl.get(key, []))
     _eng_ratio = (sum(1 for c in _eng_txt if c.isascii() and c.isalpha()) / max(1, len(_eng_txt)))   # 提前算源 pitch(flush 用 bl=_pp,绕过 \linespread 对大字不生效致 pitch 偏小)
     # 图页/乱码页(书影封面等 OCR 只识零星大写/繁体,主体是图片)→ 整页贴源原图
