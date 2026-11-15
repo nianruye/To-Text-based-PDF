@@ -1124,8 +1124,11 @@ for key in sorted(sl.keys(), key=int):
             _page_img_full = True
             _AUTO_FALLBACK.append(dict(page=int(key)+1, reason=_auto_fb_reason))
             print('[fallback] p%d %s -> 整页贴图+文本3Tr' % (int(key)+1, _auto_fb_reason), flush=True)
-    if int(key) + 1 in _BUILD_OPTS.get('image_pages', []):
-        _page_img_full = True   # 数据开关：手稿/影印页整页贴图 + 文字3Tr隐藏
+    if int(key) + 1 in _BUILD_OPTS.get('image_pages', []) or _BUILD_OPTS.get('fidelity_mode'):
+        # 数据开关：手稿/影印页整页贴图 + 文字3Tr隐藏。
+        # fidelity_mode=True → 全书每页都用此模式（标定不可靠时的保真交付：
+        # 视觉=源扫描件、全文可搜、页数 1:1，优于「重排但行距错」）。
+        _page_img_full = True
     gk = str(int(key) + pn_off); pn_ext = pntab.get(gk, ''); pn_ocr = ''
     rows = []
     for i in range(len(sl[key])):
@@ -1144,8 +1147,8 @@ for key in sorted(sl.keys(), key=int):
         if poly:
             xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
             y0 = min(ys)
-            if PN_RE.fullmatch(t) and ((y0 > page_px_h * 0.80 and (key not in _TOC_PAGE or (page_px * _TOC_CAL['foot_x'][0] < min(xs) < page_px * _TOC_CAL['foot_x'][1]))) or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):   # F20 目录页也收页脚(x居中; 右缘x>85%是条目页码不收)
-                pn_ocr = re.sub(r'[^\d]', '', t)   # OCR 页码: 底部数字(目录页跳过——底部数字是条目页码/wz1"Ⅰ"非页脚) + 顶部书眉式页码(wz4 正文页码在页顶右角)
+            if PN_RE.fullmatch(t) and ((y0 > page_px_h * 0.80 and (key not in _TOC_PAGE or (page_px * _TOC_CAL['foot_x'][0] < min(xs) < page_px * _TOC_CAL['foot_x'][1]))) or (y0 < page_px_h * 0.10 and t.isdigit() and len(t) <= 4)):   # F20 目录页也收页脚(右缘x>85%是条目页码不收)
+                pn_ocr = re.sub(r'[^\d]', '', t)
             _line_invis = False
             if _page_figs and in_figure(min(xs), y0, max(xs)-min(xs), max(ys)-min(ys), key, t):
                 if not USE_LAY_FIGS:
