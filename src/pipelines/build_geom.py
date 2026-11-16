@@ -1130,6 +1130,7 @@ for key in sorted(sl.keys(), key=int):
                     _cur['c'].append(_t)
         if _cur is not None: _entries.append(_cur)
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
+        _bd.append('\\vspace*{223pt}')
         if _title:
             _bd.append('\\centerline{\\fontsize{20pt}{24pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
         for _ei, _e in enumerate(_entries):
@@ -1137,13 +1138,21 @@ for key in sorted(sl.keys(), key=int):
             _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
             _fs = 15.0 if _bold else (13.0 if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else 12.0)
             _pg = _e.get('p') or ''
-            _line = '\\noindent\\hbox to \\textwidth{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '')
-            _line += esc(_ht) + ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}\\par'
-            _bd.append(_line)
+            if not _pg and len(_ht) <= 8:
+                _ct = '\\enspace{}'.join(list(_ht))
+                _line = '\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '') + _ct + '}'
+            else:
+                _line = '\\noindent\\hbox to \\textwidth{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '')
+                _line += esc(_ht) + ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}'
+            _bd.append(_line + '\\par')
             if _cont:
-                _bd.append('\\noindent\\hspace*{2em}{\\fontsize{11pt}{13pt}\\selectfont ' + esc(_cont) + '}\\par')
+                if not _pg and len(_cont) <= 8:
+                    _cc = '\\enspace{}'.join(list(_cont))
+                    _bd.append('\\centerline{\\fontsize{11pt}{13pt}\\selectfont ' + _cc + '}\\par')
+                else:
+                    _bd.append('\\noindent\\hspace*{2em}{\\fontsize{11pt}{13pt}\\selectfont ' + esc(_cont) + '}\\par')
             if _ei < len(_entries)-1:
-                _bd.append('\\vfill')
+                _bd.append('\\vspace{16pt}')
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     _eng_txt = ''.join(sl.get(key, []))
