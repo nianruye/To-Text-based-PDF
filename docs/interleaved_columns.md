@@ -25,3 +25,8 @@ p58 x0=683.38 y0=1174.83 '河南洛阳出土隋'
 - 产物 output/uploaded/wz10_split.pdf（不含视觉定位改动）。
 
 未改gold/punct_eval；未push/commit。
+
+## t367 相对间隙尝试（未交付）
+
+- 试 `x=339.2` 绝对定位 + 标记 x>600 侧行；p58 图注仍出现在 x=371.4/355/342.9，未整体移到339，页数60。
+- 改动已回退至 t365 检测版；未改gold/punct_eval；未push/commit。

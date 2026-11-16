@@ -1350,6 +1350,16 @@ for key in sorted(sl.keys(), key=int):
                 continue
         _m.append(r)
     rows = _m
+    _colk = 1.0
+    if _side_ids:
+        _adv = []
+        for _r in rows:
+            _t2 = (_r.get('t') or '').strip()
+            if len(_t2) >= 12 and _r.get('_reg_id') not in _side_ids and _r.get('w'):
+                _adv.append(_r['w'] / len(_t2))
+        if _adv:
+            _adv_pt = statistics.median(_adv) * 72.0 / DPI
+            _colk = max(0.5, min(1.2, FONT / _adv_pt)) if _adv_pt else 1.0
     for _r in rows:
         _inf = False
         try:
@@ -1920,7 +1930,7 @@ for key in sorted(sl.keys(), key=int):
     while _i < len(flow):
         f = flow[_i]
         if f.get('is_col_frag'):
-            _fx = (f.get('_src_x0') or 0) * 72.0 / DPI
+            _fx = MARGIN + ((f.get('_src_x0') or 0) * 72.0 / DPI - MARGIN) * _colk
             _fy = PAGE_H - ((f.get('_src_y0') or 0) + (f.get('_src_h') or 0)) * 72.0 / DPI
             _ffs = round(f.get('fnt', FONT_SM), 1) or FONT_SM
             body.append('\\AddToShipoutPictureFG{\\put(%.1f,%.1f){\\fontsize{%spt}{%spt}\\selectfont %s}}' % (_fx, _fy, _ffs, round(_ffs*1.35, 1), esc(f.get('t', ''))))
