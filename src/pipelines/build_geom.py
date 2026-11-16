@@ -1545,6 +1545,7 @@ for key in sorted(sl.keys(), key=int):
                 _p['align'] = 'c'; _n['align'] = 'c'
                 if os.environ.get('TITLE_CONT_DBG'): print('[TITLE_CONT] p%s %r + %r' % (int(key)+1, _pt[:20], _n.get('t','')[:12]), flush=True)
     _pos_gscale = 1.0; _pos_sscale = 1.0; _top_vs = 0.0
+    _PITCHDBG = os.environ.get('PITCH_DBG', '')
     if USE_POS and flow and not is_divider and not USE_REGION:
         _fy = next((f['y0'] for f in flow if f.get('y0', 0) > 0), 0)   # 含 figrow(书影带可能是页首元素,排除会误取下文 y0→top_vs 巨大溢出)
         _hdr_h = (FONT_SM * 1.2 + 2.4) if headers else 0   # 有页眉:页眉行高+vspace2+hrule0.4,减去防正文下移溢出
@@ -1583,6 +1584,13 @@ for key in sorted(sl.keys(), key=int):
                 if _strut_h > 0:
                     _pos_sscale = max(0.62, min(1.0, _rem / _strut_h))
                     if os.environ.get('HORIZ_NO_SSHRINK') in ('1','true','True'): _pos_sscale = 1.0
+        if _PITCHDBG and str(int(key)+1) in _PITCHDBG.split(','):
+            try:
+                with open('/tmp/pitchdbg.log','a',encoding='utf-8') as _dbgf:
+                    _dbgf.write('[PITCHDBG] p%s USE_POS=%s PF=%.2f top_vs=%.1f strut_h=%.1f gap_h=%.1f total=%.1f cap=%.1f gscale=%.3f sscale=%.3f nlines=%d hdr_h=%.1f\n' % (
+                        int(key)+1, USE_POS, PF, _top_vs, _strut_h, _gap_h, _total, _cap, _pos_gscale, _pos_sscale, len(flow), _hdr_h))
+            except Exception:
+                pass
     if INK_BOLD and key in _layout_doc_pages and key not in _TOC_PAGE:
         _ibl = _ink_bold_lines(key, co.get(key, []), sl.get(key, []), page_px_h)
         if _ibl and _layout_text.get(key):
