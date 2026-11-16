@@ -1167,8 +1167,12 @@ for key in sorted(sl.keys(), key=int):
                 _ct = '\\enspace{}'.join(list(_ht))
                 _line = '\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '') + _ct + '}'
             else:
-                _line = '\\noindent\\hbox to \\textwidth{\\hspace*{%.1fpt}\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_ind, _fs, _fs*1.35, '\\bfseries ' if _bold else '')
-                _line += esc(_ht2) + ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}'
+                _line = '\\noindent\\hbox to \\textwidth{\\hspace*{%.1fpt}\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (_ind, _fs, _fs*1.35)
+                if _bold:
+                    _line += '{\\bfseries ' + esc(_ht2) + '}'   # 仅标题加粗;点线与页码保持常规体(与源书一致)
+                else:
+                    _line += esc(_ht2)
+                _line += ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}'
             _bd.append(_line + '\\par')
             if _cont:
                 if not _pg and len(_cont) <= 8:
