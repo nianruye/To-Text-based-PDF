@@ -1131,7 +1131,8 @@ for key in sorted(sl.keys(), key=int):
                     _cur['t'] = _cur['t'] + _t
                     _cur['same_title'] = True
                     continue
-                if _merge_label and _cur.get('same_title') and not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and not _pm and not _t.startswith('——'):
+                if (_merge_label and _cur.get('same_title') and not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and not _pm and not _t.startswith('——')
+                        and abs(_y - _cur.get('y', 0)) < 0.5 * (_cur.get('h') or 40)):
                     if _t.startswith('年') and _cur['t'].endswith(('）', ')')):
                         _cur['t'] = _cur['t'][:-1]   # 折行处 OCR 多给一个右括号
                     _cur['t'] = _cur['t'] + _t
@@ -1150,6 +1151,9 @@ for key in sorted(sl.keys(), key=int):
                     _cur['c'].append({'t': _t, 'p': '', 'y': _y})
         if _cur is not None: _entries.append(_cur)
         for _e in _entries:
+            if (_e.get('p') and _e['c'] and isinstance(_e['c'][-1], dict) and not _e['c'][-1].get('p')
+                    and str(_e['c'][-1].get('t', '')).startswith('年')):
+                _e['c'][-1]['p'] = _e['p']; _e['p'] = ''   # 折行标题: 页码跟末行(与源书一致)
             _nxt = ((_e['c'][0].get('t', '') if isinstance(_e['c'][0], dict) else _e['c'][0]) if _e['c'] else '')
             if _nxt.startswith('年') and _e['t'].endswith(('）', ')')):
                 _e['t'] = _e['t'][:-1]   # OCR 在折行处多给一个右括号(源书括号跨行)
