@@ -1096,6 +1096,56 @@ for key in sorted(sl.keys(), key=int):
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd))
         continue
+    if int(key) + 1 in _BUILD_OPTS.get('toc_split_pagenum_pages', []):
+        _entries = []; _cur = None; _title = ''
+        _lines = sl.get(key, []); _polys = co.get(key, [])
+        for _i, _t in enumerate(_lines):
+            _t = str(_t).strip()
+            if not _t: continue
+            _y = min((p[1] for p in _polys[_i]), default=0) if _i < len(_polys) and _polys[_i] else 0
+            if _t in ('目录', '目 录'):
+                _title = _t; continue
+            if _t.isdigit() and _y > 0.90 * page_px_h:
+                continue
+            _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+、|简短的?结论|人名索引|历代纪年表)', _t))
+            _pm = re.search(r'[.…\s]*(\d{1,4}(?:[-—–]\d{1,4})?)\s*$', _t)
+            if _head:
+                if _cur is not None:
+                    _entries.append(_cur)
+                    _cur = None
+                _cur = {'t': _t, 'p': '', 'c': []}
+                if _pm:
+                    _pre = _t[:_pm.start()].strip(' .…')
+                    if _pre:
+                        _cur['t'] = _pre; _cur['p'] = _pm.group(1)
+                continue
+            if _cur is not None:
+                if re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t):
+                    _cur['p'] = _t
+                elif _pm:
+                    _cur['p'] = _pm.group(1)
+                    _pre = _t[:_pm.start()].strip(' .…')
+                    if _pre: _cur['c'].append(_pre)
+                else:
+                    _cur['c'].append(_t)
+        if _cur is not None: _entries.append(_cur)
+        _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
+        if _title:
+            _bd.append('\\centerline{\\fontsize{20pt}{24pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
+        for _ei, _e in enumerate(_entries):
+            _ht = _e['t']; _cont = ' '.join(_e['c']).strip()
+            _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
+            _fs = 15.0 if _bold else (13.0 if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else 12.0)
+            _pg = _e.get('p') or ''
+            _line = '\\noindent\\hbox to \\textwidth{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '')
+            _line += esc(_ht) + ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}\\par'
+            _bd.append(_line)
+            if _cont:
+                _bd.append('\\noindent\\hspace*{2em}{\\fontsize{11pt}{13pt}\\selectfont ' + esc(_cont) + '}\\par')
+            if _ei < len(_entries)-1:
+                _bd.append('\\vfill')
+        _bd.append('}\\par\\newpage')
+        pages_tex.append('\n'.join(_bd)); continue
     _eng_txt = ''.join(sl.get(key, []))
     _eng_ratio = (sum(1 for c in _eng_txt if c.isascii() and c.isalpha()) / max(1, len(_eng_txt)))   # 提前算源 pitch(flush 用 bl=_pp,绕过 \linespread 对大字不生效致 pitch 偏小)
     # 图页/乱码页(书影封面等 OCR 只识零星大写/繁体,主体是图片)→ 整页贴源原图
@@ -1119,8 +1169,9 @@ for key in sorted(sl.keys(), key=int):
         _blks = _ld[int(key)].get('prunedResult', {}).get('parsing_res_list', [])
         _vt = sum(1 for _b in _blks if _b.get('block_label') == 'vertical_text')
         _img_n = sum(1 for _b in _blks if _b.get('block_label') == 'image')
-        if _vt >= 2 and _img_n >= 1:
-            _auto_fb_reason = 'orientation_mismatch(vt=%d,img=%d)' % (_vt, _img_n)
+        _sline_max = max((len(str(_t).strip()) for _t in sl.get(key, []) if str(_t).strip()), default=0)
+        if _vt >= 2 and (_img_n >= 1 or _sline_max <= 10):
+            _auto_fb_reason = 'orientation_mismatch(vt=%d,img=%d,maxline=%d)' % (_vt, _img_n, _sline_max)
             _page_img_full = True
             _AUTO_FALLBACK.append(dict(page=int(key)+1, reason=_auto_fb_reason))
             print('[fallback] p%d %s -> 整页贴图+文本3Tr' % (int(key)+1, _auto_fb_reason), flush=True)
