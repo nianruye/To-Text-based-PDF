@@ -3,5 +3,8 @@
   15,
   16
  ],
- "col_split": true
+ "col_split": true,
+ "toc_label_merge_pages": [
+  16
+ ]
 }

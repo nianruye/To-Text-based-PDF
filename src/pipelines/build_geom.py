@@ -1101,6 +1101,7 @@ for key in sorted(sl.keys(), key=int):
     if int(key) + 1 in _BUILD_OPTS.get('toc_split_pagenum_pages', []):
         _entries = []; _cur = None; _title = ''
         _lines = sl.get(key, []); _polys = co.get(key, [])
+        _merge_label = int(key) + 1 in _BUILD_OPTS.get('toc_label_merge_pages', [])
         for _i, _t in enumerate(_lines):
             _t = str(_t).strip()
             if not _t: continue
@@ -1115,13 +1116,22 @@ for key in sorted(sl.keys(), key=int):
                 if _cur is not None:
                     _entries.append(_cur)
                     _cur = None
-                _cur = {'t': _t, 'p': '', 'c': []}
+                _cur = {'t': _t, 'p': '', 'c': [], 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
                 if _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre:
                         _cur['t'] = _pre; _cur['p'] = _pm.group(1)
                 continue
             if _cur is not None:
+                if (_merge_label and not _cur.get('same_title') and not _cur.get('c') and
+                        abs(_y - _cur.get('y', 0)) < 0.5 * (_cur.get('h') or 40) and
+                        re.match(r'^第[一二三四五六七八九十百千零\d]+[章节]', _cur.get('t', ''))):
+                    _cur['t'] = _cur['t'] + _t
+                    _cur['same_title'] = True
+                    continue
+                if _merge_label and _cur.get('same_title') and not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and not _pm:
+                    _cur['t'] = _cur['t'] + _t
+                    continue
                 if re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t):
                     _cur['p'] = _t
                 elif _pm:
@@ -1141,7 +1151,7 @@ for key in sorted(sl.keys(), key=int):
             _ftype = 'chapter' if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else ('section' if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else ('part' if re.match(r'^第[一二三四五六七八九十百千零\d]+[编篇]', _ht) else 'other'))
             _fs = {'chapter': 17.3, 'section': 17.0, 'part': 19.1, 'other': 17.0}[_ftype]
             _pg = _e.get('p') or ''
-            _ht2 = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])(?=\S)', r'\1\\enspace{}', _ht)
+            _ht2 = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])(?=\S)', lambda _m: _m.group(1) + '\u3000', _ht)
             _ind = -15.0 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else (2.7 if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else (20.4 if re.match(r'^[一二三四五六七八九十]+、', _ht) else 0.0))
             if not _pg and len(_ht) <= 8:
                 _ct = '\\enspace{}'.join(list(_ht))
