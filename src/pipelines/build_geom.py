@@ -1141,13 +1141,13 @@ for key in sorted(sl.keys(), key=int):
                 elif _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre:
-                        _cur['c'].append({'t': _pre, 'p': _pm.group(1)})
+                        _cur['c'].append({'t': _pre, 'p': _pm.group(1), 'y': _y})
                     else:
                         _cur['p'] = _pm.group(1)
                 else:
                     if _t.startswith('年') and _cur['t'].endswith(('）', ')')):
                         _cur['t'] = _cur['t'][:-1]
-                    _cur['c'].append({'t': _t, 'p': ''})
+                    _cur['c'].append({'t': _t, 'p': '', 'y': _y})
         if _cur is not None: _entries.append(_cur)
         for _e in _entries:
             _nxt = ((_e['c'][0].get('t', '') if isinstance(_e['c'][0], dict) else _e['c'][0]) if _e['c'] else '')
@@ -1157,6 +1157,17 @@ for key in sorted(sl.keys(), key=int):
         _bd.append('\\vspace*{242pt}')
         if _title:
             _bd.append('\\centerline{\\fontsize{21.6pt}{25pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
+        _prev_y = [None]; _prev_fs = [17.0]
+        def _emit(_tex, _ysrc, _fs):
+            '按源 y 还原行距: 与上一行的源 y 差 − 上一行行高 = 本行前的 vspace。'
+            if _prev_y[0] and _ysrc:
+                _d = (_ysrc - _prev_y[0]) * 72.0 / DPI - _prev_fs[0] * 1.35
+                if _d > 0.8:
+                    _bd.append('\\vspace{%.1fpt}' % _d)
+            _bd.append(_tex + '\\par')
+            if _ysrc:
+                _prev_y[0] = _ysrc
+            _prev_fs[0] = _fs
         for _ei, _e in enumerate(_entries):
             _ht = _e['t']
             _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
@@ -1180,20 +1191,19 @@ for key in sorted(sl.keys(), key=int):
                 else:
                     _line += esc(_ht2)
                 _line += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_pg) + '}}'
-            _bd.append(_line + '\\par')
+            _emit(_line, _e.get('y', 0), _fs)
             for _c in _e['c']:   # 每条续行独立成行;页码跟着它自己那行(如「——唐 …… 113-427」)
                 _ct2, _cp = (_c.get('t', ''), _c.get('p', '')) if isinstance(_c, dict) else (_c, '')
                 if not _ct2: continue
                 if not _cp and len(_ct2) <= 8:
                     _cc = '\\enspace{}'.join(list(_ct2))   # 短标题(编名/朝代)居中,与源书一致
-                    _bd.append('\\centerline{\\fontsize{19.1pt}{22pt}\\selectfont ' + _cc + '}\\par')
+                    _emit('\\centerline{\\fontsize{19.1pt}{22pt}\\selectfont ' + _cc + '}', (_c.get('y', 0) if isinstance(_c, dict) else 0), 19.1)
                     continue
                 _ln = '\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_ct2) + '}'
                 if _cp:
                     _ln += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_cp) + '}'
-                _bd.append(_ln + '\\par')
-            if _ei < len(_entries)-1:
-                _bd.append('\\vspace{11.5pt}')
+                _emit(_ln, (_c.get('y', 0) if isinstance(_c, dict) else 0), 14.4)
+            # 条目间距改由 _emit 按源 y 给出
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     _eng_txt = ''.join(sl.get(key, []))
