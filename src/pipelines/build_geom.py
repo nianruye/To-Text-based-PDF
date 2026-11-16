@@ -566,6 +566,7 @@ for _k in sl:
         _big = _h > H_BODY * 1.8
         if not ((bool(_core) and len(_core) >= 2 and _core in toc_map) or _cen or _big): continue
         if _h <= H_BODY * 1.1: continue   # 只统计比正文高的真标题;前言/版权页居中文字是正文行高,会污染字号中位
+        if _h > H_BODY * 4.0: continue   # 上限:竖排列/合并行/图注框高可达成正文25倍,不能进标题字号中位
         _lvl_h[_head_level(_t, _big)].append(_h)
 tier_size = {lvl: round(statistics.median(hs) * FONT / H_BODY, 1) if hs else FONT for lvl, hs in _lvl_h.items()}
 print(f"[标题字号] 分{tier_size.get('part','—')}pt 大{tier_size.get('title','—')}pt 节{tier_size.get('section','—')}pt (按级行高中位,同级同号)")
@@ -1624,8 +1625,17 @@ for key in sorted(sl.keys(), key=int):
                         if _ntx and _ntx in _blk and not _f.get('is_head'):
                             _f['ink_bold'] = True
             print('[ink-bold] p%d %d行' % (int(key)+1, len(_ibl)), flush=True)
+    _div_top = None
+    if is_divider and flow:
+        _dsy = next((f.get('y0', 0) * 72.0 / DPI for f in flow if f.get('y0', 0) > 0), 0)
+        _dph = page_px_h * 72.0 / DPI
+        if _dsy and _dsy < 0.35 * _dph:
+            _div_top = max(0.0, _dsy)
     if is_divider:
-        body.append('\\vspace*{\\fill}')   # 分隔页:顶部填充(标题垂直居中)
+        if _div_top is not None:
+            body.append('\\vspace*{%.1fpt}' % _div_top)   # 分隔页标题按源 y(仅源在顶部;居中页仍 fill)
+        else:
+            body.append('\\vspace*{\\fill}')   # 分隔页:顶部填充(标题垂直居中)
     elif USE_POS and _top_vs * _pos_gscale > 1:
         body.append('\\vspace*{%.1fpt}' % (_top_vs * _pos_gscale))   # 首行落到源 y0(按 gscale 收缩防溢)
     para = []
@@ -1866,7 +1876,7 @@ for key in sorted(sl.keys(), key=int):
         para.append(f)
         _i += 1
     flush()
-    if is_divider:
+    if is_divider and _div_top is None:
         body.append('\\vspace*{\\fill}')   # 分隔页底部填充(配合顶部 fill → 标题垂直居中)
     if footnotes:
         if not _page_img_forced:   # 贴图页的脚注线由源图提供；文本层只保留1pt可搜内容，避免多画一条线
