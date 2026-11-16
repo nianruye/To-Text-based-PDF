@@ -1179,7 +1179,7 @@ for key in sorted(sl.keys(), key=int):
                     _line += '{\\bfseries ' + esc(_ht2) + '}'   # 仅标题加粗;点线与页码保持常规体(与源书一致)
                 else:
                     _line += esc(_ht2)
-                _line += '\\,\\dotfill\\,' + esc(_pg) + '}'
+                _line += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_pg) + '}}'
             _bd.append(_line + '\\par')
             for _c in _e['c']:   # 每条续行独立成行;页码跟着它自己那行(如「——唐 …… 113-427」)
                 _ct2, _cp = (_c.get('t', ''), _c.get('p', '')) if isinstance(_c, dict) else (_c, '')
@@ -1190,7 +1190,7 @@ for key in sorted(sl.keys(), key=int):
                     continue
                 _ln = '\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_ct2) + '}'
                 if _cp:
-                    _ln += '\\,\\dotfill\\,' + esc(_cp)
+                    _ln += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_cp) + '}'
                 _bd.append(_ln + '\\par')
             if _ei < len(_entries)-1:
                 _bd.append('\\vspace{11.5pt}')
