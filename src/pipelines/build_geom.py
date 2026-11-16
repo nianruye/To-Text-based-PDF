@@ -1130,29 +1130,32 @@ for key in sorted(sl.keys(), key=int):
                     _cur['c'].append(_t)
         if _cur is not None: _entries.append(_cur)
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
-        _bd.append('\\vspace*{223pt}')
+        _bd.append('\\vspace*{242pt}')
         if _title:
-            _bd.append('\\centerline{\\fontsize{20pt}{24pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
+            _bd.append('\\centerline{\\fontsize{21.6pt}{25pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
         for _ei, _e in enumerate(_entries):
             _ht = _e['t']; _cont = ' '.join(_e['c']).strip()
             _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
-            _fs = 15.0 if _bold else (13.0 if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else 12.0)
+            _ftype = 'chapter' if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else ('section' if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else ('part' if re.match(r'^第[一二三四五六七八九十百千零\d]+[编篇]', _ht) else 'other'))
+            _fs = {'chapter': 17.3, 'section': 17.0, 'part': 19.1, 'other': 17.0}[_ftype]
             _pg = _e.get('p') or ''
+            _ht2 = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])(?=\S)', r'\1\\enspace{}', _ht)
+            _ind = -15.0 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else (2.7 if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else (20.4 if re.match(r'^[一二三四五六七八九十]+、', _ht) else 0.0))
             if not _pg and len(_ht) <= 8:
                 _ct = '\\enspace{}'.join(list(_ht))
                 _line = '\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '') + _ct + '}'
             else:
-                _line = '\\noindent\\hbox to \\textwidth{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '')
-                _line += esc(_ht) + ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}'
+                _line = '\\noindent\\hbox to \\textwidth{\\hspace*{%.1fpt}\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_ind, _fs, _fs*1.35, '\\bfseries ' if _bold else '')
+                _line += esc(_ht2) + ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}'
             _bd.append(_line + '\\par')
             if _cont:
                 if not _pg and len(_cont) <= 8:
                     _cc = '\\enspace{}'.join(list(_cont))
-                    _bd.append('\\centerline{\\fontsize{11pt}{13pt}\\selectfont ' + _cc + '}\\par')
+                    _bd.append('\\centerline{\\fontsize{19.1pt}{22pt}\\selectfont ' + _cc + '}\\par')
                 else:
-                    _bd.append('\\noindent\\hspace*{2em}{\\fontsize{11pt}{13pt}\\selectfont ' + esc(_cont) + '}\\par')
+                    _bd.append('\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_cont) + '}\\par')
             if _ei < len(_entries)-1:
-                _bd.append('\\vspace{16pt}')
+                _bd.append('\\vspace{11.5pt}')
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     _eng_txt = ''.join(sl.get(key, []))
