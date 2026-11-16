@@ -1360,6 +1360,28 @@ for key in sorted(sl.keys(), key=int):
         if _adv:
             _adv_pt = statistics.median(_adv) * 72.0 / DPI
             _colk = max(0.5, min(1.2, FONT / _adv_pt)) if _adv_pt else 1.0
+    _capdx = 0.0; _capdy = 0.0
+    if _side_ids:
+        try:
+            _pg0 = _ld[int(key)]
+            _lw = float(_pg0.get('width') or 0); _lh = float(_pg0.get('height') or 0)
+            _sw = float(_pg0.get('page_width_pt') or PAGE_W); _sh = float(_pg0.get('page_height_pt') or PAGE_H)
+            if _lw > 0 and _lh > 0:
+                _scx = _sw / _lw; _scy = _sh / _lh
+                _side_rows0 = [r for r in rows if r.get('_reg_id') in _side_ids]
+                if _side_rows0:
+                    _fx0 = min(r['x0'] for r in _side_rows0); _fy0 = min(r['y0'] for r in _side_rows0)
+                    _fx0pt = _fx0 * 72.0 / DPI; _fy0pt = _fy0 * 72.0 / DPI
+                    for _b0 in (_pg0.get('prunedResult') or {}).get('parsing_res_list', []):
+                        _bb0 = _b0.get('block_bbox')
+                        if not _bb0 or _b0.get('block_label') not in ('vision_footnote', 'figure_caption', 'figure_title'):
+                            continue
+                        if abs(_bb0[0] - _fx0) < 60 or (_bb0[2] > _fx0 - 40 and _bb0[0] < _fx0 + 60):
+                            _capdx = _bb0[0] * _scx - _fx0pt
+                            _capdy = _bb0[1] * _scy - _fy0pt
+                            break
+        except Exception:
+            _capdx = _capdy = 0.0
     for _r in rows:
         _inf = False
         try:
@@ -1930,8 +1952,10 @@ for key in sorted(sl.keys(), key=int):
     while _i < len(flow):
         f = flow[_i]
         if f.get('is_col_frag'):
-            _fx = MARGIN + ((f.get('_src_x0') or 0) * 72.0 / DPI - MARGIN) * _colk
-            _fy = PAGE_H - ((f.get('_src_y0') or 0) + (f.get('_src_h') or 0)) * 72.0 / DPI
+            _sx_pt = (f.get('_src_x0') or 0) * 72.0 / DPI + _capdx
+            _fx = _sx_pt if _capdx else MARGIN + (_sx_pt - MARGIN) * _colk
+            _ffs0 = round(f.get('fnt', FONT_SM), 1) or FONT_SM
+            _fy = PAGE_H - ((f.get('_src_y0') or 0) + (f.get('_src_h') or 0)) * 72.0 / DPI - _capdy - (0.8 * _ffs0 if _capdy else 0.0)
             _ffs = round(f.get('fnt', FONT_SM), 1) or FONT_SM
             body.append('\\AddToShipoutPictureFG{\\put(%.1f,%.1f){\\fontsize{%spt}{%spt}\\selectfont %s}}' % (_fx, _fy, _ffs, round(_ffs*1.35, 1), esc(f.get('t', ''))))
             _i += 1; continue
