@@ -1184,6 +1184,10 @@ for key in sorted(sl.keys(), key=int):
             for _c in _e['c']:   # 每条续行独立成行;页码跟着它自己那行(如「——唐 …… 113-427」)
                 _ct2, _cp = (_c.get('t', ''), _c.get('p', '')) if isinstance(_c, dict) else (_c, '')
                 if not _ct2: continue
+                if not _cp and len(_ct2) <= 8:
+                    _cc = '\\enspace{}'.join(list(_ct2))   # 短标题(编名/朝代)居中,与源书一致
+                    _bd.append('\\centerline{\\fontsize{19.1pt}{22pt}\\selectfont ' + _cc + '}\\par')
+                    continue
                 _ln = '\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_ct2) + '}'
                 if _cp:
                     _ln += '\\,\\dotfill\\,' + esc(_cp)
