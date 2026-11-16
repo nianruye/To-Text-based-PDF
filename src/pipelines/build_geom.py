@@ -1106,6 +1106,7 @@ for key in sorted(sl.keys(), key=int):
             _t = str(_t).strip()
             if not _t: continue
             _y = min((p[1] for p in _polys[_i]), default=0) if _i < len(_polys) and _polys[_i] else 0
+            _x = min((p[0] for p in _polys[_i]), default=0) if _i < len(_polys) and _polys[_i] else 0
             if _t in ('目录', '目 录'):
                 _title = _t; continue
             if _t.isdigit() and _y > 0.90 * page_px_h:
@@ -1116,7 +1117,7 @@ for key in sorted(sl.keys(), key=int):
                 if _cur is not None:
                     _entries.append(_cur)
                     _cur = None
-                _cur = {'t': _t, 'p': '', 'c': [], 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
+                _cur = {'t': _t, 'p': '', 'c': [], 'x': _x, 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
                 if _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre:
@@ -1138,16 +1139,18 @@ for key in sorted(sl.keys(), key=int):
                 if re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t):
                     _cur['p'] = _t
                 elif _pm:
-                    _cur['p'] = _pm.group(1)
                     _pre = _t[:_pm.start()].strip(' .…')
-                    if _pre: _cur['c'].append(_pre)
+                    if _pre:
+                        _cur['c'].append({'t': _pre, 'p': _pm.group(1)})
+                    else:
+                        _cur['p'] = _pm.group(1)
                 else:
                     if _t.startswith('年') and _cur['t'].endswith(('）', ')')):
                         _cur['t'] = _cur['t'][:-1]
-                    _cur['c'].append(_t)
+                    _cur['c'].append({'t': _t, 'p': ''})
         if _cur is not None: _entries.append(_cur)
         for _e in _entries:
-            _nxt = (_e['c'][0] if _e['c'] else '')
+            _nxt = ((_e['c'][0].get('t', '') if isinstance(_e['c'][0], dict) else _e['c'][0]) if _e['c'] else '')
             if _nxt.startswith('年') and _e['t'].endswith(('）', ')')):
                 _e['t'] = _e['t'][:-1]   # OCR 在折行处多给一个右括号(源书括号跨行)
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
@@ -1155,7 +1158,7 @@ for key in sorted(sl.keys(), key=int):
         if _title:
             _bd.append('\\centerline{\\fontsize{21.6pt}{25pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
         for _ei, _e in enumerate(_entries):
-            _ht = _e['t']; _cont = ' '.join(_e['c']).strip()
+            _ht = _e['t']
             _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
             _ftype = 'chapter' if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else ('section' if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else ('part' if re.match(r'^第[一二三四五六七八九十百千零\d]+[编篇]', _ht) else 'other'))
             _fs = {'chapter': 17.3, 'section': 17.0, 'part': 19.1, 'other': 17.0}[_ftype]
@@ -1166,20 +1169,25 @@ for key in sorted(sl.keys(), key=int):
             if not _pg and len(_ht) <= 8:
                 _ct = '\\enspace{}'.join(list(_ht))
                 _line = '\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_fs, _fs*1.35, '\\bfseries ' if _bold else '') + _ct + '}'
+            elif not _pg:
+                # 无页码: 定宽行宽不设 hbox,避免 CJKglue 拉伸把字距撑开
+                _line = '\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_ind, _fs, _fs*1.35, '\\bfseries ' if _bold else '')
+                _line += esc(_ht2) + '}'
             else:
                 _line = '\\noindent\\hbox to \\textwidth{\\hspace*{%.1fpt}\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (_ind, _fs, _fs*1.35)
                 if _bold:
                     _line += '{\\bfseries ' + esc(_ht2) + '}'   # 仅标题加粗;点线与页码保持常规体(与源书一致)
                 else:
                     _line += esc(_ht2)
-                _line += ('\\,\\dotfill\\,' + esc(_pg) if _pg else '') + '}'
+                _line += '\\,\\dotfill\\,' + esc(_pg) + '}'
             _bd.append(_line + '\\par')
-            if _cont:
-                if not _pg and len(_cont) <= 8:
-                    _cc = '\\enspace{}'.join(list(_cont))
-                    _bd.append('\\centerline{\\fontsize{19.1pt}{22pt}\\selectfont ' + _cc + '}\\par')
-                else:
-                    _bd.append('\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_cont) + '}\\par')
+            for _c in _e['c']:   # 每条续行独立成行;页码跟着它自己那行(如「——唐 …… 113-427」)
+                _ct2, _cp = (_c.get('t', ''), _c.get('p', '')) if isinstance(_c, dict) else (_c, '')
+                if not _ct2: continue
+                _ln = '\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_ct2) + '}'
+                if _cp:
+                    _ln += '\\,\\dotfill\\,' + esc(_cp)
+                _bd.append(_ln + '\\par')
             if _ei < len(_entries)-1:
                 _bd.append('\\vspace{11.5pt}')
         _bd.append('}\\par\\newpage')
