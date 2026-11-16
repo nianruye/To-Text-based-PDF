@@ -308,6 +308,7 @@ if _toc_rules_f and os.path.exists(_toc_rules_f):
         print(f'[TOC_RULES] 加载失败: {_e}')
 _PAGE_IMG_PREFIX = os.environ.get('PAGE_IMAGE_PREFIX', '')
 _BUILD_OPTS = {}
+_PAGE_REGIONS = {}
 _AUTO_FALLBACK = []
 try:
     _book_opts = os.environ.get('CALIB_BOOK', '')
@@ -1250,13 +1251,80 @@ for key in sorted(sl.keys(), key=int):
     _CIP_PAGE = any('图书在版编目' in (r.get('t') or '') for r in rows)
     _COVER_FURN = any('上架建议' in (r.get('t') or '') for r in rows)
     rows.sort(key=lambda r: (r['y0'], r['x0']))
+    def _xycut_regions(_rows, _maxdepth=4):
+        """空间分栏检测:仅在存在两 x 簇且 y 重叠时切;正常页返回1区。"""
+        boxes = [(r['x0'], r['y0'], r['x0'] + r.get('w', 0), r['y0'] + r.get('h', 0), i)
+                 for i, r in enumerate(_rows)]
+        if len(boxes) < 4:
+            return [{'n': len(boxes), 'bbox': [round(min(b[0] for b in boxes),1), round(min(b[1] for b in boxes),1), round(max(b[2] for b in boxes),1), round(max(b[3] for b in boxes),1)], 'lines': list(range(len(boxes)))}] if boxes else []
+        # 找宽度<0.8页宽的行的 x 空隙, 选最大且左右各>=2行、y重叠>50%
+        narrow = [b for b in boxes if (b[2]-b[0]) < 0.65 * page_px]
+        xs = sorted((b[0], b[2]) for b in narrow)
+        best = None
+        for i in range(len(xs)-1):
+            gap = xs[i+1][0] - xs[i][1]
+            if gap < 40: continue
+            split = (xs[i][1] + xs[i+1][0]) / 2
+            L = [b for b in narrow if b[0] < split]; R = [b for b in narrow if b[0] >= split]
+            if len(L) < 2 or len(R) < 2: continue
+            ly = (min(b[1] for b in L), max(b[3] for b in L)); ry = (min(b[1] for b in R), max(b[3] for b in R))
+            ov = min(ly[1], ry[1]) - max(ly[0], ry[0])
+            if ov <= 0.5 * min(ly[1]-ly[0], ry[1]-ry[0]): continue
+            if best is None or gap > best[0]: best = (gap, split)
+        if best is None:
+            return [{'n': len(boxes), 'bbox': [round(min(b[0] for b in boxes),1), round(min(b[1] for b in boxes),1), round(max(b[2] for b in boxes),1), round(max(b[3] for b in boxes),1)], 'lines': list(range(len(boxes)))}]
+        split = best[1]
+        full = [b for b in boxes if (b[2]-b[0]) >= 0.65 * page_px]
+        left = [b for b in boxes if b not in full and b[0] < split]
+        right = [b for b in boxes if b not in full and b[0] >= split]
+        _fy = min(b[1] for b in full) if full else 0
+        _above = [b[3] for b in (left+right) if b[3] <= _fy + 20]
+        separate_full = bool(full and _above and _fy >= max(_above) - 5)
+        if separate_full:
+            _tail = [b for b in boxes if b not in full and b[1] >= _fy - 5]
+            full = full + _tail
+            left = [b for b in left if b not in _tail]
+            right = [b for b in right if b not in _tail]
+        groups = [g for g in (left, right, full if separate_full else []) if g]
+        if full and not separate_full:
+            left = left + full
+            groups = [g for g in (left, right) if g]
+        out = []
+        for _gi, g in enumerate(groups):
+            for _b in g:
+                try: _rows[_b[4]]['_reg_id'] = _gi
+                except Exception: pass
+            out.append({'n': len(g), 'bbox': [round(min(b[0] for b in g),1), round(min(b[1] for b in g),1), round(max(b[2] for b in g),1), round(max(b[3] for b in g),1)], 'lines': sorted(b[4] for b in g)})
+        return out
+    try:
+        _PAGE_REGIONS[int(key)+1] = _xycut_regions(rows)
+    except Exception:
+        _PAGE_REGIONS[int(key)+1] = []
+    _side_ids = set()
+    _rgs0 = _PAGE_REGIONS.get(int(key)+1) or []
+    if not _BUILD_OPTS.get('col_split'):
+        _rgs0 = []   # 区域分栏为每书选项(数据驱动,AGENTS #57):仅配置 col_split 的书启用
+    _bigfig_page = any((fb[2]-fb[0])*(fb[3]-fb[1]) >= 0.50 * page_px_h * page_px for _fp, fb in (_page_figs or []))
+    if _bigfig_page:
+        _rgs0 = []   # 大图页(地图/图版)内部标注属图内容,不做侧区拆分
+    if key in _TOC_PAGE:
+        _rgs0 = []   # 目录页走 TOC 专路径(条目+页码已内联),不做侧区拆分
+    if len(_rgs0) > 1:
+        _mi = max(range(len(_rgs0)), key=lambda i: _rgs0[i]['n'])
+        _mx0, _my0, _mx1, _my1 = _rgs0[_mi]['bbox']
+        for _gi, _rg in enumerate(_rgs0):
+            if _gi == _mi: continue
+            _rx0, _ry0, _rx1, _ry1 = _rg['bbox']
+            if _rx1 <= _mx0 or _rx0 >= _mx1:
+                _side_ids.add(_gi)
     _m = []
     for r in rows:
         if _m:
             p = _m[-1]
             yov = min(r['y0']+r['h'], p['y0']+p['h']) - max(r['y0'], p['y0'])
             _dig = PN_RE.fullmatch(r['t'].strip()) and (r['y0'] + r['h'] / 2) >= p['y0'] and (r['y0'] + r['h'] / 2) <= p['y0'] + p['h']   # 页码数字行中心落在上一行区间
-            if (min(r['h'], p['h']) > 0 and yov > 0.5 * min(r['h'], p['h'])) or _dig:
+            _crossreg = (p.get('_reg_id') in _side_ids) != (r.get('_reg_id') in _side_ids)
+            if ((min(r['h'], p['h']) > 0 and yov > 0.5 * min(r['h'], p['h'])) or _dig) and not _crossreg:
                 gap = r['x0'] - (p['x0'] + p['w'])
                 if (_CIP_PAGE and _fieldish(p.get('t','')) and _fieldish(r.get('t',''))
                         and not any(k in p['t'] for k in ('开本','版次','字数'))):
@@ -1282,6 +1350,14 @@ for key in sorted(sl.keys(), key=int):
                 continue
         _m.append(r)
     rows = _m
+    for _r in rows:
+        _inf = False
+        try:
+            _inf = bool(in_figure(_r.get('x0', 0), _r.get('y0', 0), _r.get('w', 0), _r.get('h', 0), key, _r.get('t', '')))
+        except Exception:
+            _inf = False
+        if _r.get('_reg_id') in _side_ids and not _r.get('invisible') and not _inf:   # 图块内文字(地图标注等)不当作侧区
+            _r['is_col_frag'] = True; _r['_src_x0'] = _r['x0']; _r['_src_y0'] = _r['y0']; _r['_src_h'] = _r['h']
     # t249：仅页内存在靠右/出纸的 OCR 行时才启用 XCLIP/脚注折行，避免正常页无谓改版。
     _xguard_page = any((r.get('t') or '').strip() and ((r.get('x0', 0) > page_px * 0.75) or ((r.get('x0', 0) + r.get('w', 0)) > page_px * 0.919)) for r in rows)
     # t236：OCR 整页并行守卫（非 p97 特判）：单行 poly 高 >3×页字体高或字数>100且高>>单行。
@@ -1433,7 +1509,7 @@ for key in sorted(sl.keys(), key=int):
         _is_fc = r.get('is_figcaption')
         if _is_fc: is_head = False; head_size = PF   # 图说明非标题,正文字号
         if os.environ.get('HEAD_DBG') and int(key)+1 in (61,84,14,33,23,27,15) and (is_head or _lay_lvl is not None): print('HEADDBG flow p%d lay=%s head=%s tier=%s fnt=%.2f t=%r' % (int(key)+1, _lay_lvl, is_head, _tier, head_size, t[:40]))
-        flow.append({'t': t, 'fnt': head_size, 'is_head': is_head, 'tier': _tier if is_head else None, 'lay_head': bool(_lay_lvl is not None), 'align': 'c' if (is_centered or is_big or _is_fc or _lay_lvl == 0) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
+        flow.append({'t': t, 'fnt': head_size, 'is_col_frag': bool(r.get('is_col_frag')), '_src_x0': r.get('_src_x0'), '_src_y0': r.get('_src_y0'), '_src_h': r.get('_src_h'), 'is_head': is_head, 'tier': _tier if is_head else None, 'lay_head': bool(_lay_lvl is not None), 'align': 'c' if (is_centered or is_big or _is_fc or _lay_lvl == 0) else 'l', 'x0': x0, 'w': w, 'frags': r.get('frags'), 'y0': y0, 'region': r.get('region'), 'is_figcaption': _is_fc, 'invisible': bool(r.get('invisible'))})
     if _CIP_PAGE and os.environ.get('CIP_DASH_FIX', '0') in ('1', 'true', 'True'):   # t242 p5 可选；默认关以保证 wz 零回归
         for _cf in flow:
             _ct = (_cf.get('t') or '').strip()
@@ -1565,6 +1641,8 @@ for key in sorted(sl.keys(), key=int):
         _top_vs = max(0.0, _fy * 72.0 / DPI - 12.0 - _hdr_h) if _fy else 0.0   # 源首行 y − 版心顶距(top=12pt)
         _strut_h = 0.0; _gap_h = 0.0; _pv = None
         for f in flow:
+            if f.get('is_col_frag'):
+                continue
             if f.get('is_figrow'):
                 if f['figs']:
                     _fy0 = min(fb[1][1]*200/LDPI for fb in f['figs'])
@@ -1841,6 +1919,12 @@ for key in sorted(sl.keys(), key=int):
     _i = 0
     while _i < len(flow):
         f = flow[_i]
+        if f.get('is_col_frag'):
+            _fx = (f.get('_src_x0') or 0) * 72.0 / DPI
+            _fy = PAGE_H - ((f.get('_src_y0') or 0) + (f.get('_src_h') or 0)) * 72.0 / DPI
+            _ffs = round(f.get('fnt', FONT_SM), 1) or FONT_SM
+            body.append('\\AddToShipoutPictureFG{\\put(%.1f,%.1f){\\fontsize{%spt}{%spt}\\selectfont %s}}' % (_fx, _fy, _ffs, round(_ffs*1.35, 1), esc(f.get('t', ''))))
+            _i += 1; continue
         if f.get('is_figrow'):
             if para: flush(); para = []
             if USE_POS and prev_y[0] is not None:
@@ -1947,6 +2031,10 @@ for key in sorted(sl.keys(), key=int):
     pages_tex.append(page_tex)
 if os.environ.get('POS_EST_LOG'):
     json.dump(_pos_est, open(os.environ['POS_EST_LOG'], 'w'))   # 导出各源页位置化估高,供 fit_positional 两趟校准
+try:
+    json.dump(_PAGE_REGIONS, open(OUT.rsplit('.',1)[0] + '.regions.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+except Exception:
+    pass
 latex = build_latex('geom', PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex)
 latex = latex.replace('\\begin{document}', '\\newfontfamily\\symbolfont{DejaVu Sans}\n\\newfontfamily\\symbolfontb{Noto Sans CJK SC}\n\\begin{document}', 1)
 tex_path = '/tmp/seg2_line.tex'
