@@ -1125,11 +1125,14 @@ for key in sorted(sl.keys(), key=int):
             if _cur is not None:
                 if (_merge_label and not _cur.get('same_title') and not _cur.get('c') and
                         abs(_y - _cur.get('y', 0)) < 0.5 * (_cur.get('h') or 40) and
+                        not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and
                         re.match(r'^第[一二三四五六七八九十百千零\d]+[章节]', _cur.get('t', ''))):
                     _cur['t'] = _cur['t'] + _t
                     _cur['same_title'] = True
                     continue
-                if _merge_label and _cur.get('same_title') and not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and not _pm:
+                if _merge_label and _cur.get('same_title') and not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and not _pm and not _t.startswith('——'):
+                    if _t.startswith('年') and _cur['t'].endswith(('）', ')')):
+                        _cur['t'] = _cur['t'][:-1]   # 折行处 OCR 多给一个右括号
                     _cur['t'] = _cur['t'] + _t
                     continue
                 if re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t):
@@ -1139,8 +1142,14 @@ for key in sorted(sl.keys(), key=int):
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre: _cur['c'].append(_pre)
                 else:
+                    if _t.startswith('年') and _cur['t'].endswith(('）', ')')):
+                        _cur['t'] = _cur['t'][:-1]
                     _cur['c'].append(_t)
         if _cur is not None: _entries.append(_cur)
+        for _e in _entries:
+            _nxt = (_e['c'][0] if _e['c'] else '')
+            if _nxt.startswith('年') and _e['t'].endswith(('）', ')')):
+                _e['t'] = _e['t'][:-1]   # OCR 在折行处多给一个右括号(源书括号跨行)
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
         _bd.append('\\vspace*{242pt}')
         if _title:
@@ -1151,6 +1160,7 @@ for key in sorted(sl.keys(), key=int):
             _ftype = 'chapter' if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else ('section' if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else ('part' if re.match(r'^第[一二三四五六七八九十百千零\d]+[编篇]', _ht) else 'other'))
             _fs = {'chapter': 17.3, 'section': 17.0, 'part': 19.1, 'other': 17.0}[_ftype]
             _pg = _e.get('p') or ''
+            _ht = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])\s+', r'\1', _ht)   # 统一章号后分隔(OCR 有半角空格时一并去掉)
             _ht2 = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])(?=\S)', lambda _m: _m.group(1) + '\u3000', _ht)
             _ind = -15.0 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else (2.7 if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else (20.4 if re.match(r'^[一二三四五六七八九十]+、', _ht) else 0.0))
             if not _pg and len(_ht) <= 8:
