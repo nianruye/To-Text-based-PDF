@@ -1101,7 +1101,7 @@ for key in sorted(sl.keys(), key=int):
             _fs = _src_fs if 12.0 <= _src_fs <= 26.0 else round(FONT * (1.15 if _lvl == 1 else (1.0 if _lvl == 2 else 0.90)), 1)
             _ind = {1: 0.0, 2: 2.0, 3: 4.0}.get(_lvl, 4.0)
             _ind_pt = {1: 0.0, 2: 2.0*FONT, 3: 4.0*FONT}.get(_lvl, 4.0*FONT)
-            _pgbox = ('\\,\\dotfill\\,{\\makebox[%.1fpt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}}' % (_numw, round(_fs*0.78,1), round(_fs*0.78*1.15,1), esc(_pg))) if _pg else ''
+            _pgbox = ('\\,\\dotfill\\hspace*{6pt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont\\makebox[%.1fpt][r]{%s}}' % (round(_fs*0.78,1), round(_fs*0.78*1.15,1), _numw, esc(_pg))) if _pg else ''
             # 纵向节奏: L1 前空一行(分组) / L2 前留半行 / 续行紧随
             if not _first:
                 if _lvl == 1:
@@ -1111,7 +1111,7 @@ for key in sorted(sl.keys(), key=int):
             _first = False
             _bd.append('\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_ind_pt, _fs, _fs*1.78, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
             for _c in _it['c']:
-                _bd.append('\\vspace{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (0.05*_fs, _ind_pt + _fs, _fs*0.95, _fs*0.95*1.78, esc(_c)))
+                _bd.append('\\vspace{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (0.05*_fs, _ind_pt + _fs*1.5, _fs*0.95, _fs*0.95*1.78, esc(_c)))
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     if (int(key) + 1 in _BUILD_OPTS.get('structured_toc_pages', []) and LAYJSON
