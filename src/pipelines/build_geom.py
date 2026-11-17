@@ -1111,7 +1111,7 @@ for key in sorted(sl.keys(), key=int):
                 _title = _t; continue
             if _t.isdigit() and _y > 0.90 * page_px_h:
                 continue
-            _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+[、\s]|第[一二三四五六七八九十]+部分|简短的?结论|人名索引|历代纪年表)', _t))
+            _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+[、\s]|第[一二三四五六七八九十]+部分|简短的?结论|人名索引|历代纪年表|导论|绪论|前言|序言|引言|结语|后记|参考文献|附录)', _t))
             _pm = re.search(r'[.…\s]*(\d{1,4}(?:[-—–]\d{1,4})?)\s*$', _t)
             if _head:
                 if _cur is not None:
@@ -1189,12 +1189,11 @@ for key in sorted(sl.keys(), key=int):
                 _line = '\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_ind, _fs, _fs*1.35, '\\bfseries ' if _bold else '')
                 _line += esc(_ht2) + '}'
             else:
-                _line = '\\noindent\\hbox to \\textwidth{\\hspace*{%.1fpt}\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (_ind, _fs, _fs*1.35)
-                if _bold:
-                    _line += '{\\bfseries ' + esc(_ht2) + '}'   # 仅标题加粗;点线与页码保持常规体(与源书一致)
-                else:
-                    _line += esc(_ht2)
-                _line += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_pg) + '}}'
+                # 普通段落(不用 \hbox to \textwidth): 长标题自然折行,
+                # 点线与页码接在段落末尾 → 各书标题长短都适用
+                _line = '\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_ind, _fs, _fs*1.35, '\\bfseries ' if _bold else '')
+                _line += esc(_ht2) + '}'
+                _line += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_pg) + '}'
             _emit(_line, _e.get('y', 0), _fs)
             for _c in _e['c']:   # 每条续行独立成行;页码跟着它自己那行(如「——唐 …… 113-427」)
                 _ct2, _cp = (_c.get('t', ''), _c.get('p', '')) if isinstance(_c, dict) else (_c, '')
