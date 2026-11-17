@@ -29,7 +29,7 @@ def build_latex(mode, PAGE_W, PAGE_H, MARGIN, USE_REGION, LINESPREAD, pages_tex)
 \\usepackage{{graphicx}}
 \\usepackage{{eso-pic}}   % 边栏旁注(竖排)绝对定位贴回
 \\setCJKmainfont{{Noto Serif CJK SC}}   % SC=简体字形(JP 版部分汉字日式写法)
-\\xeCJKDeclareCharClass{{CJK}}{{"25A0->"25FF,"2605->"2606,"2460->"2473,"24EA}}   % 几何符号□◎○★/带圈数字①-⑳:归 CJK 字体(西文字体无此字形→空白+文本层 U+FFFF)
+\\xeCJKDeclareCharClass{{CJK}}{{"25A0->"25FF,"2605->"2606}}   % 几何符号□◎○★/带圈数字①-⑳:归 CJK 字体(西文字体无此字形→空白+文本层 U+FFFF)
 \\setCJKfamilyfont{{heiti}}{{Noto Sans CJK SC}}
 \setCJKfamilyfont{{song}}{{Noto Serif CJK SC}}   % song=宋体标题(FONT_TITLE=song 时)
 \setCJKfamilyfont{{kai}}{{AR PL KaitiM GB}}   % kai=楷体标题(FONT_TITLE/FONT_SUBTITLE=kai 时, 如 wz1 三级标题)
