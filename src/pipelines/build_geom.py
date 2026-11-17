@@ -1176,7 +1176,7 @@ for key in sorted(sl.keys(), key=int):
             _ht = _e['t']
             _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
             _ftype = 'chapter' if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _ht) else ('section' if re.match(r'^第[一二三四五六七八九十百千零\d]+节', _ht) else ('part' if re.match(r'^第[一二三四五六七八九十百千零\d]+[编篇]', _ht) else 'other'))
-            _fs = {'chapter': 17.3, 'section': 17.0, 'part': 19.1, 'other': 17.0}[_ftype]
+            _fs = {'chapter': round(FONT * 1.02, 1), 'section': round(FONT, 1), 'part': round(FONT * 1.12, 1), 'other': round(FONT, 1)}[_ftype]
             _pg = _e.get('p') or ''
             _ht = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])\s+', r'\1', _ht)   # 统一章号后分隔(OCR 有半角空格时一并去掉)
             _ht2 = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])(?=\S)', lambda _m: _m.group(1) + '\u3000', _ht)
@@ -1193,18 +1193,18 @@ for key in sorted(sl.keys(), key=int):
                 # 点线与页码接在段落末尾 → 各书标题长短都适用
                 _line = '\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (_ind, _fs, _fs*1.35, '\\bfseries ' if _bold else '')
                 _line += esc(_ht2) + '}'
-                _line += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_pg) + '}'
+                _line += '\\,\\dotfill\\,{\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (round(FONT * 0.75, 1), round(FONT * 0.92, 1)) + esc(_pg) + '}'
             _emit(_line, _e.get('y', 0), _fs)
             for _c in _e['c']:   # 每条续行独立成行;页码跟着它自己那行(如「——唐 …… 113-427」)
                 _ct2, _cp = (_c.get('t', ''), _c.get('p', '')) if isinstance(_c, dict) else (_c, '')
                 if not _ct2: continue
                 if not _cp and len(_ct2) <= 8:
                     _cc = '\\enspace{}'.join(list(_ct2))   # 短标题(编名/朝代)居中,与源书一致
-                    _emit('\\centerline{\\fontsize{19.1pt}{22pt}\\selectfont ' + _cc + '}', (_c.get('y', 0) if isinstance(_c, dict) else 0), 19.1)
+                    _emit('\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (round(FONT * 1.10, 1), round(FONT * 1.28, 1)) + _cc + '}', (_c.get('y', 0) if isinstance(_c, dict) else 0), round(FONT * 1.10, 1))
                     continue
-                _ln = '\\noindent\\hspace*{2em}{\\fontsize{14.4pt}{16.5pt}\\selectfont ' + esc(_ct2) + '}'
+                _ln = '\\noindent\\hspace*{2em}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (round(FONT * 0.83, 1), round(FONT * 0.95, 1)) + esc(_ct2) + '}'
                 if _cp:
-                    _ln += '\\,\\dotfill\\,{\\fontsize{13pt}{16pt}\\selectfont ' + esc(_cp) + '}'
+                    _ln += '\\,\\dotfill\\,{\\fontsize{%.1fpt}{%.1fpt}\\selectfont ' % (round(FONT * 0.75, 1), round(FONT * 0.92, 1)) + esc(_cp) + '}'
                 _emit(_ln, (_c.get('y', 0) if isinstance(_c, dict) else 0), 14.4)
             # 条目间距改由 _emit 按源 y 给出
         _bd.append('}\\par\\newpage')
