@@ -1071,6 +1071,42 @@ else:
 _prev_pn = None   # 跨页页码(单调性过滤 pn_ocr 用,排除目录页误识)
 for key in sorted(sl.keys(), key=int):
     _pp = page_pitch(key) if PER_PAGE_PITCH else None
+    if _BUILD_OPTS.get('toc_normalize') and key in _TOC_PAGE:
+        _lns = sl.get(key, []); _pol = co.get(key, [])
+        _items = []; _cur = None; _pending = None; _lasty = 0
+        for _i, _raw in enumerate(_lns):
+            _t = str(_raw).strip()
+            if not _t or _t in ('目录', 'CONTENTS'): continue
+            _yy = min((q[1] for q in _pol[_i]), default=0) if _i < len(_pol) and _pol[_i] else 0
+            _hh = (max(q[1] for q in _pol[_i]) - _yy) if _i < len(_pol) and _pol[_i] else 40
+            if re.fullmatch(r'\d{1,4}', _t):
+                if _yy > 0.90 * page_px_h: continue
+                if _cur is not None and not _cur.get('p'):
+                    _cur['p'] = _t
+                else:
+                    _pending = _t
+                continue
+            _is_start = bool(re.match(r'^([一二三四五六七八九十]+|\d+[.．、]|第[一二三四五六七八九十百千零\d]+[章节编篇])', _t))
+            if _cur is not None and not _is_start and (_yy - _lasty) <= 2.5*max(_hh, 30):
+                _cur['c'].append(_t); _lasty = _yy; continue
+            _cur = {'t': _t, 'p': _pending or '', 'c': []}; _items.append(_cur); _pending = None; _lasty = _yy
+        _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG', '\\vspace*{22pt}']
+        _bd.append('\\centerline{\\fontsize{18pt}{22pt}\\selectfont\\bfseries 目录}')
+        _bd.append('\\centerline{\\fontsize{9pt}{11pt}\\selectfont CONTENTS}\\vspace{10pt}')
+        _numw = round(max([len(str(_it.get('p') or '')) for _it in _items] + [1]) * FONT * 0.78 * 0.52 + 8.0, 1)   # 全页统一页码盒宽
+        for _it in _items:
+            _tt = _it['t'].strip(); _pg = _it.get('p') or ''
+            _lvl = 1 if re.match(r'^[一二三四五六七八九十]+', _tt) else (2 if re.match(r'^(\d+[.．、]|第[一二三四五六七八九十百千零\d]+[章节])', _tt) else 3)
+            _fs = round(FONT * (1.15 if _lvl == 1 else (1.0 if _lvl == 2 else 0.90)), 1)
+            _ind = {1: 0.0, 2: 2.0, 3: 4.0}.get(_lvl, 4.0)
+            _ind_pt = {1: 0.0, 2: 2.0*FONT, 3: 4.0*FONT}.get(_lvl, 4.0*FONT)
+            _pgbox = ('\\makebox[%.1fpt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_numw, FONT*0.78, FONT*0.78*1.15, esc(_pg))) if _pg else ''
+            _bd.append('\\noindent\\makebox[\\textwidth][l]{\\hspace*{%.1fpt}\\parbox[t]{\\dimexpr\\textwidth-%.1fpt-%.1fpt\\relax}{\\raggedright\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s\\unskip\\dotfill}%s}\\par' % (_ind_pt, _ind_pt, _numw, _fs, _fs*1.15, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
+            for _c in _it['c']:
+                _bd.append('\\vspace{0.15em}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (_ind_pt + _fs, _fs, _fs*1.15, esc(_c)))
+            _bd.append('\\vspace{%.1fpt}' % (0.45*_fs))
+        _bd.append('}\\par\\newpage')
+        pages_tex.append('\n'.join(_bd)); continue
     if (int(key) + 1 in _BUILD_OPTS.get('structured_toc_pages', []) and LAYJSON
             and os.path.exists(LAYJSON) and int(key) < len(_ld)):
         _blocks = _ld[int(key)].get('prunedResult', {}).get('parsing_res_list', [])
