@@ -1105,13 +1105,13 @@ for key in sorted(sl.keys(), key=int):
             # 纵向节奏: L1 前空一行(分组) / L2 前留半行 / 续行紧随
             if not _first:
                 if _lvl == 1:
-                    _bd.append('\\vspace{%.1fpt}' % (0.95 * _fs))
+                    _bd.append('\\vspace{%.1fpt}' % (2.30 * _fs))   # 分组空行(wz1 实测 分组间距/字号≈3.8, 含行距)
                 else:
-                    _bd.append('\\vspace{%.1fpt}' % (0.42 * _fs))
+                    _bd.append('\\vspace{%.1fpt}' % (0.15 * _fs))
             _first = False
-            _bd.append('\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_ind_pt, _fs, _fs*1.15, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
+            _bd.append('\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_ind_pt, _fs, _fs*1.78, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
             for _c in _it['c']:
-                _bd.append('\\vspace{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (0.10*_fs, _ind_pt + _fs, _fs*0.95, _fs*0.95*1.2, esc(_c)))
+                _bd.append('\\vspace{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (0.05*_fs, _ind_pt + _fs, _fs*0.95, _fs*0.95*1.78, esc(_c)))
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     if (int(key) + 1 in _BUILD_OPTS.get('structured_toc_pages', []) and LAYJSON
