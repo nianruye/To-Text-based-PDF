@@ -1091,9 +1091,9 @@ for key in sorted(sl.keys(), key=int):
                 _cur['c'].append(_t); _lasty = _yy; continue
             _cur = {'t': _t, 'p': _pending or '', 'c': [], 'h': _hh}; _items.append(_cur); _pending = None; _lasty = _yy
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG', '\\vspace*{22pt}']
-        _bd.append('\\centerline{\\fontsize{18pt}{22pt}\\selectfont\\bfseries 目录}')
-        _bd.append('\\centerline{\\fontsize{9pt}{11pt}\\selectfont CONTENTS}\\vspace{10pt}')
+        _bd.append('\\centerline{{\\fontsize{18pt}{22pt}\\selectfont\\bfseries 目录}\\hspace{8pt}{\\fontsize{9pt}{11pt}\\selectfont CONTENTS}}\\vspace{14pt}')
         _numw = round(max([len(str(_it.get('p') or '')) for _it in _items] + [1]) * FONT * 0.78 * 0.52 + 8.0, 1)   # 全页统一页码盒宽
+        _first = True
         for _it in _items:
             _tt = _it['t'].strip(); _pg = _it.get('p') or ''
             _lvl = 1 if re.match(r'^[一二三四五六七八九十]+', _tt) else (2 if re.match(r'^(\d+[.．、]|第[一二三四五六七八九十百千零\d]+[章节])', _tt) else 3)
@@ -1102,10 +1102,16 @@ for key in sorted(sl.keys(), key=int):
             _ind = {1: 0.0, 2: 2.0, 3: 4.0}.get(_lvl, 4.0)
             _ind_pt = {1: 0.0, 2: 2.0*FONT, 3: 4.0*FONT}.get(_lvl, 4.0*FONT)
             _pgbox = ('\\,\\dotfill\\,{\\makebox[%.1fpt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}}' % (_numw, round(_fs*0.78,1), round(_fs*0.78*1.15,1), esc(_pg))) if _pg else ''
+            # 纵向节奏: L1 前空一行(分组) / L2 前留半行 / 续行紧随
+            if not _first:
+                if _lvl == 1:
+                    _bd.append('\\vspace{%.1fpt}' % (0.95 * _fs))
+                else:
+                    _bd.append('\\vspace{%.1fpt}' % (0.42 * _fs))
+            _first = False
             _bd.append('\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_ind_pt, _fs, _fs*1.15, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
             for _c in _it['c']:
-                _bd.append('\\vspace{0.15em}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (_ind_pt + _fs, _fs, _fs*1.15, esc(_c)))
-            _bd.append('\\vspace{%.1fpt}' % (0.45*_fs))
+                _bd.append('\\vspace{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (0.10*_fs, _ind_pt + _fs, _fs*0.95, _fs*0.95*1.2, esc(_c)))
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     if (int(key) + 1 in _BUILD_OPTS.get('structured_toc_pages', []) and LAYJSON
