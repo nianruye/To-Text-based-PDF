@@ -1856,14 +1856,14 @@ for key in sorted(sl.keys(), key=int):
                 if f.get('toc_block'):
                     _t0 = (f.get('t') or '').strip()
                     _lvl = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _t0) else (2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|\d+[.．、])', _t0) else 3)
-                    _fnt = 15.4 if _lvl == 1 else 14.0
+                    _fnt = round(FONT * 0.93, 1) if _lvl == 1 else round(FONT * 0.85, 1)
                     _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
                     _ttex = _inv(_esc_toc_title(f['t']), f)
                     if _lvl <= 2:
                         _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
                     _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, round(_fnt*1.5,1), _ttex)
                     if _pg and not f.get('toc_cont'):
-                        _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
+                        _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (round(FONT * 0.78, 1), round(FONT * 0.91, 1), esc(_pg))
                     _l += '}'
                     body.append('\\par' + _l + '\\par')
                     continue
@@ -1872,14 +1872,14 @@ for key in sorted(sl.keys(), key=int):
                 _l2 = bool(re.match(r'^\d+[.．、]', _t0))
                 _lvl = 1 if _l1 else (2 if _l2 else 3)
                 _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
-                _fnt = 18.7 if _lvl == 1 else 16.5
+                _fnt = round(FONT * 1.13, 1) if _lvl == 1 else round(FONT, 1)
                 _bl = round(_fnt * (1.5 if _lvl == 1 else 1.6), 1)
                 _ttex = _inv(_esc_toc_title(f['t']), f)
                 if _lvl <= 2:
                     _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
                 _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, _bl, _ttex)
                 if _pg and not f.get('toc_cont'):
-                    _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{12.9pt}{15pt}\\selectfont %s}' % esc(_pg)
+                    _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (round(FONT * 0.78, 1), round(FONT * 0.91, 1), esc(_pg))
                 _l += '}'
                 body.append('\\par' + _l + '\\par')
                 continue
