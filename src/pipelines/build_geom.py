@@ -1158,9 +1158,12 @@ for key in sorted(sl.keys(), key=int):
             if _nxt.startswith('年') and _e['t'].endswith(('）', ')')):
                 _e['t'] = _e['t'][:-1]   # OCR 在折行处多给一个右括号(源书括号跨行)
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
-        _bd.append('\\vspace*{242pt}')
+        _ys0 = [min(x[1] for x in co[key][i]) for i, t in enumerate(sl.get(key, []))
+                if str(t).strip() and i < len(co.get(key, [])) and co[key][i]
+                and not (str(t).strip().isdigit() and min(x[1] for x in co[key][i]) > 0.90 * page_px_h)]
+        _bd.append('\\vspace*{%.1fpt}' % (max(0.0, min(_ys0) * 72.0 / DPI - 6.0) if _ys0 else 242.0))
         if _title:
-            _bd.append('\\centerline{\\fontsize{21.6pt}{25pt}\\selectfont\\bfseries ' + esc(_title) + '}\\vspace{8pt}')
+            _bd.append('\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont\\bfseries ' % (round(FONT * 1.24, 1), round(FONT * 1.44, 1)) + esc(_title) + '}\\vspace{8pt}')
         _prev_y = [None]; _prev_fs = [17.0]
         def _emit(_tex, _ysrc, _fs):
             '按源 y 还原行距: 与上一行的源 y 差 − 上一行行高 = 本行前的 vspace。'
