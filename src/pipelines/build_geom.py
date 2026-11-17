@@ -1117,7 +1117,7 @@ for key in sorted(sl.keys(), key=int):
                 if _cur is not None:
                     _entries.append(_cur)
                     _cur = None
-                _cur = {'t': _t, 'p': '', 'c': [], 'x': _x, 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
+                _cur = {'t': _t, 'p': '', 'c': [], 'x': _x, 'x1': (max(p[0] for p in _polys[_i]) if _i < len(_polys) and _polys[_i] else _x), 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
                 if _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre:
@@ -1142,13 +1142,13 @@ for key in sorted(sl.keys(), key=int):
                 elif _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre:
-                        _cur['c'].append({'t': _pre, 'p': _pm.group(1), 'y': _y})
+                        _cur['c'].append({'t': _pre, 'p': _pm.group(1), 'x': _x, 'x1': (max(q[0] for q in _polys[_i]) if _i < len(_polys) and _polys[_i] else _x), 'y': _y})
                     else:
                         _cur['p'] = _pm.group(1)
                 else:
                     if _t.startswith('年') and _cur['t'].endswith(('）', ')')):
                         _cur['t'] = _cur['t'][:-1]
-                    _cur['c'].append({'t': _t, 'p': '', 'y': _y})
+                    _cur['c'].append({'t': _t, 'p': '', 'x': _x, 'x1': (max(q[0] for q in _polys[_i]) if _i < len(_polys) and _polys[_i] else _x), 'y': _y})
         if _cur is not None: _entries.append(_cur)
         for _e in _entries:
             if (_e.get('p') and _e['c'] and isinstance(_e['c'][-1], dict) and not _e['c'][-1].get('p')
@@ -1166,10 +1166,14 @@ for key in sorted(sl.keys(), key=int):
             _e['level'] = _lv
             _e['bold'] = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编篇]', _t0))
             _e['size'] = round(FONT * (1.02 if _lv == 1 else 1.0), 1)
+            _e['center'] = (((_e.get('x', 0) + _e.get('x1', 0)) / 2.0) * 72.0 / DPI >= PAGE_W / 2.0 - 12.0
+                            and len(_t0) <= 8)   # 源行中心在版心中线附近且短 → 居中标题
             for _c in _e.get('c', []):
                 if isinstance(_c, dict):
                     _c['level'] = _lv
                     _c['size'] = round(FONT * 0.83, 1)
+                    _c['center'] = ((((_c.get('x', 0) + _c.get('x1', 0)) / 2.0) * 72.0 / DPI >= PAGE_W / 2.0 - 12.0)
+                                    and len(str(_c.get('t', ''))) <= 8)
         if os.environ.get('TOC_DUMP'):
             try:
                 import json as _json
@@ -1195,6 +1199,36 @@ for key in sorted(sl.keys(), key=int):
             if _ysrc:
                 _prev_y[0] = _ysrc
             _prev_fs[0] = _fs
+        # ── 统一渲染: 每条按自己的源 x/y + size/bold 绝对定位(无层级分支) ──
+        def _toc_line(_txt, _x_px, _sz, _bd_, _page, _center=False, _x1_px=None):
+            if _center and not _page and len(str(_txt).strip()) <= 8:
+                _cc = '\\enspace{}'.join(list(str(_txt).strip()))
+                return '\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (
+                    _sz * 1.10, _sz * 1.28, '\\bfseries ' if _bd_ else '') + _cc + '}'
+            _ind = (_x_px or 0) * 72.0 / DPI - MARGIN
+            _t = str(_txt).strip()
+            _t = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])\s+', r'\1', _t)
+            _t = re.sub(r'^(第[一二三四五六七八九十百千零\d]+[章节])(?=\S)', lambda _m: _m.group(1) + '\u3000', _t)
+            _l = '\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s' % (
+                _ind, _sz, _sz * 1.35, '\\bfseries ' if _bd_ else '')
+            _l += esc(_t) + '}'
+            if _page:
+                _l += '\\,\\dotfill\\,{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (
+                    round(FONT * 0.75, 1), round(FONT * 0.92, 1), esc(str(_page)))
+            return _l
+        if os.environ.get('TOC_UNIFIED', '1') not in ('0', 'false', 'False'):
+            for _e in _entries:
+                _emit(_toc_line(_e['t'], _e.get('x'), float(_e.get('size') or FONT), _e.get('bold'),
+                                _e.get('p') or '', _e.get('center'), _e.get('x1')), _e.get('y', 0), float(_e.get('size') or FONT))
+                for _c in _e.get('c', []):
+                    if not isinstance(_c, dict) or not str(_c.get('t', '')).strip():
+                        continue
+                    _cs = float(_c.get('size') or FONT * 0.83)
+                    _emit(_toc_line(_c.get('t'), _c.get('x') or _e.get('x'), _cs, False, _c.get('p') or '',
+                                    _c.get('center'), _c.get('x1')), _c.get('y', 0), _cs)
+            _bd.append('\\par\\newpage')
+            pages_tex.append('\n'.join(_bd))
+            continue
         for _ei, _e in enumerate(_entries):
             _ht = _e['t']
             _bold = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编]', _ht))
