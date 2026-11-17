@@ -1158,6 +1158,26 @@ for key in sorted(sl.keys(), key=int):
             if _nxt.startswith('年') and _e['t'].endswith(('）', ')')):
                 _e['t'] = _e['t'][:-1]   # OCR 在折行处多给一个右括号(源书括号跨行)
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']
+        # ── 条目结构化(供统一渲染/审计): level / size / bold ──
+        for _e in _entries:
+            _t0 = str(_e.get('t') or '')
+            _lv = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+[章编篇]', _t0) else (
+                  2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|[一二三四五六七八九十]+[、\s])', _t0) else 3)
+            _e['level'] = _lv
+            _e['bold'] = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编篇]', _t0))
+            _e['size'] = round(FONT * (1.02 if _lv == 1 else 1.0), 1)
+            for _c in _e.get('c', []):
+                if isinstance(_c, dict):
+                    _c['level'] = _lv
+                    _c['size'] = round(FONT * 0.83, 1)
+        if os.environ.get('TOC_DUMP'):
+            try:
+                import json as _json
+                with open(os.environ['TOC_DUMP'], 'a', encoding='utf-8') as _df:
+                    _df.write(_json.dumps({'page': int(key) + 1, 'title': _title, 'font': FONT,
+                                           'entries': _entries}, ensure_ascii=False) + chr(10))
+            except Exception as _ex:
+                print('[TOC_DUMP] 失败:', _ex)
         _ys0 = [min(x[1] for x in co[key][i]) for i, t in enumerate(sl.get(key, []))
                 if str(t).strip() and i < len(co.get(key, [])) and co[key][i]
                 and not (str(t).strip().isdigit() and min(x[1] for x in co[key][i]) > 0.90 * page_px_h)]
