@@ -680,6 +680,8 @@ def _toc_pre_flow(flow):
             cur = nf; out.append(nf)
             continue
         if _TOC_NUM_RE.match(t):       # 原始形态：独立页码行
+            if pending is not None and cur is not None and not cur.get('toc_page'):
+                cur['toc_page'] = pending    # 前一个数字属于当前条目(尾部无后继条目时, 如页脚页码会跟在后)
             pending = t; continue
         if pending is not None:
             nf = dict(f); nf['toc_pre'] = True; nf['toc_page'] = pending; nf['is_head'] = False
@@ -1745,7 +1747,7 @@ for key in sorted(sl.keys(), key=int):
     if key in _TOC_PAGE and not any(f.get('toc_pre') for f in flow):   # 目录页:游离纯数字行→页码片段；toc_pre 已解析时不再并
         _nf7 = []
         for _f7 in flow:
-            if PN_RE.fullmatch(_f7['t'].strip()) and _nf7 and not _f7.get('is_head'):
+            if PN_RE.fullmatch(_f7['t'].strip()) and _nf7:   # 目录页:条目本身常被判为 head, 不能因 is_head 跳过合并
                 _p7 = _nf7[-1]
                 _fr7 = _p7.get('frags') or [(_p7['t'].strip(), _p7.get('x0', 0))]
                 if not any(_t7.strip().isdigit() for _t7, _ in _fr7):
@@ -1981,7 +1983,7 @@ for key in sorted(sl.keys(), key=int):
                     _lvl = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+章', _t0) else (2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|\d+[.．、])', _t0) else 3)
                     _fnt = round(FONT * 0.93, 1) if _lvl == 1 else round(FONT * 0.85, 1)
                     _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
-                    _ttex = _inv(_esc_toc_title(f['t']), f)
+                    _ttex = _inv(_esc_toc_title(f['t']), f).replace(' ', '\\enspace{}')
                     _m = re.match(r'^(第[一二三四五六七八九十百千零\\d]+[章节编篇]|[一二三四五六七八九十]+)', _t0)
                     if _lvl == 1 and _m:
                         _ttex = '{\\bfseries\\CJKfamily{heiti}' + _inv(_m.group(1), f) + '}' + _ttex[len(_inv(_m.group(1), f)):]   # 只加粗序号(源书标题本体是常规体)
@@ -1998,7 +2000,7 @@ for key in sorted(sl.keys(), key=int):
                 _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
                 _fnt = round(FONT * 1.13, 1) if _lvl == 1 else round(FONT, 1)
                 _bl = round(_fnt * (1.5 if _lvl == 1 else 1.6), 1)
-                _ttex = _inv(_esc_toc_title(f['t']), f)
+                _ttex = _inv(_esc_toc_title(f['t']), f).replace(' ', '\\enspace{}')
                 _m2 = re.match(r'^(第[一二三四五六七八九十百千零\\d]+[章节编篇]|[一二三四五六七八九十]+)', _t0)
                 if _lvl == 1 and _m2:
                     _ttex = '{\\bfseries\\CJKfamily{heiti}' + _inv(_m2.group(1), f) + '}' + _ttex[len(_inv(_m2.group(1), f)):]   # 只加粗序号
