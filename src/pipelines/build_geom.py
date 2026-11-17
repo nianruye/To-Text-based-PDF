@@ -1939,8 +1939,9 @@ for key in sorted(sl.keys(), key=int):
                     _fnt = round(FONT * 0.93, 1) if _lvl == 1 else round(FONT * 0.85, 1)
                     _ind = 0.0 if _lvl == 1 else (33.0 if _lvl == 2 else 66.0)
                     _ttex = _inv(_esc_toc_title(f['t']), f)
-                    if _lvl <= 2:
-                        _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
+                    _m = re.match(r'^(第[一二三四五六七八九十百千零\\d]+[章节编篇]|[一二三四五六七八九十]+)', _t0)
+                    if _lvl == 1 and _m:
+                        _ttex = '{\\bfseries\\CJKfamily{heiti}' + _inv(_m.group(1), f) + '}' + _ttex[len(_inv(_m.group(1), f)):]   # 只加粗序号(源书标题本体是常规体)
                     _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, round(_fnt*1.5,1), _ttex)
                     if _pg and not f.get('toc_cont'):
                         _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (round(FONT * 0.78, 1), round(FONT * 0.91, 1), esc(_pg))
@@ -1955,8 +1956,9 @@ for key in sorted(sl.keys(), key=int):
                 _fnt = round(FONT * 1.13, 1) if _lvl == 1 else round(FONT, 1)
                 _bl = round(_fnt * (1.5 if _lvl == 1 else 1.6), 1)
                 _ttex = _inv(_esc_toc_title(f['t']), f)
-                if _lvl <= 2:
-                    _ttex = '{\\bfseries\\CJKfamily{heiti}' + _ttex + '}'
+                _m2 = re.match(r'^(第[一二三四五六七八九十百千零\\d]+[章节编篇]|[一二三四五六七八九十]+)', _t0)
+                if _lvl == 1 and _m2:
+                    _ttex = '{\\bfseries\\CJKfamily{heiti}' + _inv(_m2.group(1), f) + '}' + _ttex[len(_inv(_m2.group(1), f)):]   # 只加粗序号
                 _l = '{\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_ind, _fnt, _bl, _ttex)
                 if _pg and not f.get('toc_cont'):
                     _l += '\\dotfill\\hspace*{4pt}\\makebox[36pt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (round(FONT * 0.78, 1), round(FONT * 0.91, 1), esc(_pg))
