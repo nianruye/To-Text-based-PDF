@@ -1096,24 +1096,27 @@ for key in sorted(sl.keys(), key=int):
         _bd.append('\\centerline{{\\fontsize{18pt}{22pt}\\selectfont\\bfseries 目录}\\hspace{8pt}{\\fontsize{9pt}{11pt}\\selectfont CONTENTS}}\\vspace{14pt}')
         _numw = round(max([len(str(_it.get('p') or '')) for _it in _items] + [1]) * FONT * 0.78 * 0.52 + 8.0, 1)   # 全页统一页码盒宽
         _first = True
+        _nl = len(_items) + sum(len(_it.get('c') or []) for _it in _items)   # 可渲染行数
+        _avail = PAGE_H - 22.0 - 70.0 - 90.0                                  # 顶部 + 标题块 + 底部安全余量(防溢出成两页)
+        _lead = max(FONT * 1.70, min(_avail / max(_nl + 1.5, 1), FONT * 3.3))  # 行距: 尽量铺满, 夹在 1.70~3.3×正文
+
         for _it in _items:
             _tt = _it['t'].strip(); _pg = _it.get('p') or ''
             _lvl = 1 if re.match(r'^[一二三四五六七八九十]+', _tt) else (2 if re.match(r'^(\d+[.．、]|第[一二三四五六七八九十百千零\d]+[章节])', _tt) else 3)
-            _src_fs = round((_it.get('h') or 0) * 72.0 / DPI / 0.88, 1)
-            _fs = _src_fs if 12.0 <= _src_fs <= 26.0 else round(FONT * (1.15 if _lvl == 1 else (1.0 if _lvl == 2 else 0.90)), 1)
+            _fs = round(FONT * (1.02 if _lvl == 1 else (0.94 if _lvl == 2 else 0.86)), 1)   # 目录字号随正文, 不跟源书放大
             _ind = {1: 0.0, 2: 2.0, 3: 4.0}.get(_lvl, 4.0)
             _ind_pt = {1: 0.0, 2: 2.0*FONT, 3: 4.0*FONT}.get(_lvl, 4.0*FONT)
             _pgbox = ('\\,\\dotfill\\hspace*{6pt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont\\makebox[%.1fpt][r]{%s}}' % (round(_fs*0.78,1), round(_fs*0.78*1.15,1), _numw, esc(_pg))) if _pg else ''
             # 纵向节奏: L1 前空一行(分组) / L2 前留半行 / 续行紧随
             if not _first:
                 if _lvl == 1:
-                    _bd.append('\\vspace{%.1fpt}' % (2.30 * _fs))   # 分组空行(wz1 实测 分组间距/字号≈3.8, 含行距)
+                    _bd.append('\\vspace{%.1fpt}' % (0.45 * _lead))   # 分组额外留白
                 else:
-                    _bd.append('\\vspace{%.1fpt}' % (0.15 * _fs))
+                    _bd.append('\\vspace{%.1fpt}' % (0.0))
             _first = False
-            _bd.append('\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_ind_pt, _fs, _fs*1.78, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
+            _bd.append('\\setlength{\\baselineskip}{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_lead, _ind_pt, _fs, _lead, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
             for _c in _it['c']:
-                _bd.append('\\vspace{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (0.05*_fs, _ind_pt + _fs*1.5, _fs*0.95, _fs*0.95*1.78, esc(_c)))
+                _bd.append('\\setlength{\\baselineskip}{%.1fpt}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (_fs*1.30, _ind_pt + _fs*1.5, _fs*0.92, _fs*1.30, esc(_c)))
         _bd.append('}\\par\\newpage')
         pages_tex.append('\n'.join(_bd)); continue
     if (int(key) + 1 in _BUILD_OPTS.get('structured_toc_pages', []) and LAYJSON
