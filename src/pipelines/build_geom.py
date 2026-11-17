@@ -1111,7 +1111,7 @@ for key in sorted(sl.keys(), key=int):
                 _title = _t; continue
             if _t.isdigit() and _y > 0.90 * page_px_h:
                 continue
-            _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+、|简短的?结论|人名索引|历代纪年表)', _t))
+            _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+[、\s]|第[一二三四五六七八九十]+部分|简短的?结论|人名索引|历代纪年表)', _t))
             _pm = re.search(r'[.…\s]*(\d{1,4}(?:[-—–]\d{1,4})?)\s*$', _t)
             if _head:
                 if _cur is not None:
@@ -1127,7 +1127,7 @@ for key in sorted(sl.keys(), key=int):
                 if (_merge_label and not _cur.get('same_title') and not _cur.get('c') and
                         abs(_y - _cur.get('y', 0)) < 0.5 * (_cur.get('h') or 40) and
                         not re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t) and
-                        re.match(r'^第[一二三四五六七八九十百千零\d]+[章节]', _cur.get('t', ''))):
+                        re.match(r'^第[一二三四五六七八九十百千零\d]+(?:[章节]|部分|编|篇)', _cur.get('t', ''))):
                     _cur['t'] = _cur['t'] + _t
                     _cur['same_title'] = True
                     continue
