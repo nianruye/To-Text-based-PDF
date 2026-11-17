@@ -1099,7 +1099,7 @@ for key in sorted(sl.keys(), key=int):
         pages_tex.append('\n'.join(_bd))
         continue
     if int(key) + 1 in _BUILD_OPTS.get('toc_split_pagenum_pages', []):
-        _entries = []; _cur = None; _title = ''
+        _entries = []; _cur = None; _title = ''; _title_y = 0
         _lines = sl.get(key, []); _polys = co.get(key, [])
         _merge_label = int(key) + 1 in _BUILD_OPTS.get('toc_label_merge_pages', [])
         for _i, _t in enumerate(_lines):
@@ -1108,7 +1108,7 @@ for key in sorted(sl.keys(), key=int):
             _y = min((p[1] for p in _polys[_i]), default=0) if _i < len(_polys) and _polys[_i] else 0
             _x = min((p[0] for p in _polys[_i]), default=0) if _i < len(_polys) and _polys[_i] else 0
             if _t in ('目录', '目 录'):
-                _title = _t; continue
+                _title = _t; _title_y = _y; continue
             if _t.isdigit() and _y > 0.90 * page_px_h:
                 continue
             _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+[、\s]|第[一二三四五六七八九十]+部分|简短的?结论|人名索引|历代纪年表|导论|绪论|前言|序言|引言|结语|后记|参考文献|附录)', _t))
@@ -1187,8 +1187,10 @@ for key in sorted(sl.keys(), key=int):
                 and not (str(t).strip().isdigit() and min(x[1] for x in co[key][i]) > 0.90 * page_px_h)]
         _bd.append('\\vspace*{%.1fpt}' % (max(0.0, min(_ys0) * 72.0 / DPI - 6.0) if _ys0 else 242.0))
         if _title:
-            _bd.append('\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont\\bfseries ' % (round(FONT * 1.24, 1), round(FONT * 1.44, 1)) + esc(_title) + '}\\vspace{8pt}')
+            _bd.append('\\centerline{\\fontsize{%.1fpt}{%.1fpt}\\selectfont\\bfseries ' % (round(FONT * 1.24, 1), round(FONT * 1.44, 1)) + esc(_title) + '}\\par')
         _prev_y = [None]; _prev_fs = [17.0]
+        if _title_y:
+            _prev_y[0] = _title_y; _prev_fs[0] = round(FONT * 1.24, 1)   # 首条目按源间距接标题
         def _emit(_tex, _ysrc, _fs):
             '按源 y 还原行距: 与上一行的源 y 差 − 上一行行高 = 本行前的 vspace。'
             if _prev_y[0] and _ysrc:
