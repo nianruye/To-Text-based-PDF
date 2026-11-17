@@ -1089,7 +1089,7 @@ for key in sorted(sl.keys(), key=int):
             _is_start = bool(re.match(r'^([一二三四五六七八九十]+|\d+[.．、]|第[一二三四五六七八九十百千零\d]+[章节编篇])', _t))
             if _cur is not None and not _is_start and (_yy - _lasty) <= 2.5*max(_hh, 30):
                 _cur['c'].append(_t); _lasty = _yy; continue
-            _cur = {'t': _t, 'p': _pending or '', 'c': []}; _items.append(_cur); _pending = None; _lasty = _yy
+            _cur = {'t': _t, 'p': _pending or '', 'c': [], 'h': _hh}; _items.append(_cur); _pending = None; _lasty = _yy
         _bd = ['{\\linespread{1}\\selectfont\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG', '\\vspace*{22pt}']
         _bd.append('\\centerline{\\fontsize{18pt}{22pt}\\selectfont\\bfseries 目录}')
         _bd.append('\\centerline{\\fontsize{9pt}{11pt}\\selectfont CONTENTS}\\vspace{10pt}')
@@ -1097,11 +1097,12 @@ for key in sorted(sl.keys(), key=int):
         for _it in _items:
             _tt = _it['t'].strip(); _pg = _it.get('p') or ''
             _lvl = 1 if re.match(r'^[一二三四五六七八九十]+', _tt) else (2 if re.match(r'^(\d+[.．、]|第[一二三四五六七八九十百千零\d]+[章节])', _tt) else 3)
-            _fs = round(FONT * (1.15 if _lvl == 1 else (1.0 if _lvl == 2 else 0.90)), 1)
+            _src_fs = round((_it.get('h') or 0) * 72.0 / DPI / 0.88, 1)
+            _fs = _src_fs if 12.0 <= _src_fs <= 26.0 else round(FONT * (1.15 if _lvl == 1 else (1.0 if _lvl == 2 else 0.90)), 1)
             _ind = {1: 0.0, 2: 2.0, 3: 4.0}.get(_lvl, 4.0)
             _ind_pt = {1: 0.0, 2: 2.0*FONT, 3: 4.0*FONT}.get(_lvl, 4.0*FONT)
-            _pgbox = ('\\makebox[%.1fpt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}' % (_numw, FONT*0.78, FONT*0.78*1.15, esc(_pg))) if _pg else ''
-            _bd.append('\\noindent\\makebox[\\textwidth][l]{\\hspace*{%.1fpt}\\parbox[t]{\\dimexpr\\textwidth-%.1fpt-%.1fpt\\relax}{\\raggedright\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s\\unskip\\dotfill}%s}\\par' % (_ind_pt, _ind_pt, _numw, _fs, _fs*1.15, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
+            _pgbox = ('\\,\\dotfill\\,{\\makebox[%.1fpt][r]{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}}' % (_numw, round(_fs*0.78,1), round(_fs*0.78*1.15,1), esc(_pg))) if _pg else ''
+            _bd.append('\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s%s}%s\\par' % (_ind_pt, _fs, _fs*1.15, '\\bfseries ' if _lvl==1 else '', esc(_tt), _pgbox))
             for _c in _it['c']:
                 _bd.append('\\vspace{0.15em}\\noindent\\hspace*{%.1fpt}{\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}\\par' % (_ind_pt + _fs, _fs, _fs*1.15, esc(_c)))
             _bd.append('\\vspace{%.1fpt}' % (0.45*_fs))
