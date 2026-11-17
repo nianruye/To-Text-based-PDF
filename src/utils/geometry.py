@@ -97,6 +97,37 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
     # 用全部合格行的 P90 行宽 + 行字数中位；MEASURE 取实测行宽（不再除 OVERBOUND），
     # 避免旧公式把版心压窄 1.115 倍导致二次换行。高 full_ratio 走原公式（零变化）。
     _estimator = 'full_line'
+    _ov_book = None
+    if src_pdf and os.environ.get('COLW_RATIO', '1') not in ('0','false','False'):
+        try:
+            import fitz as _fz
+            _doc = _fz.open(src_pdf); _rats = []
+            for _k in list(sl)[:80]:
+                _polys = co.get(_k, []); _pi = int(_k)
+                if _pi >= _doc.page_count: continue
+                _pix = _doc[_pi].get_pixmap(dpi=150); _W,_H=_pix.width,_pix.height; _im=_pix.samples; _nc=_pix.n
+                _sc=150.0/DPI; _mw=max([max(q[0] for q in _pp)-min(q[0] for q in _pp) for _pp in _polys if _pp] or [1])
+                for _i,_poly in enumerate(_polys):
+                    if not _poly or _i >= len(sl[_k]) or len(sl[_k][_i].strip()) < 10: continue
+                    _xs=[q[0] for q in _poly]; _ys=[q[1] for q in _poly]; _pw=max(_xs)-min(_xs)
+                    if _pw < 0.8*_mw: continue
+                    _ax=max(0,int((min(_xs)-20/(72.0/DPI))*_sc)); _bx=min(_W,int((max(_xs)+20/(72.0/DPI))*_sc)); _ay=max(0,int(min(_ys)*_sc)); _by=min(_H,int(max(_ys)*_sc)); _mn=_mx=None
+                    for _yy in range(_ay,_by):
+                        _row=_yy*_W*_nc
+                        for _xx in range(_ax,_bx):
+                            _ii=_row+_xx*_nc
+                            if _im[_ii]<170 or _im[_ii+1]<170 or _im[_ii+2]<170:
+                                _mn=_xx if _mn is None else min(_mn,_xx); _mx=_xx if _mx is None else max(_mx,_xx)
+                    if _mn is not None and _mx is not None and _mx>_mn:
+                        _iw=(_mx-_mn)/150.0*72
+                        if _iw>1: _rats.append((_pw*72.0/DPI)/_iw)
+            if len(_rats) >= 50:
+                _ov_book = round(statistics.median(_rats), 4)
+                print(f"[标定·overbound] {len(_rats)} 条 OCR/ink 中位 {_ov_book}", flush=True)
+            else:
+                print(f"[标定·overbound] 样本不足({len(_rats)}) 回退 1.115", flush=True)
+        except Exception as _oe:
+            print(f"[标定·overbound] 失败 {_oe} 回退 1.115", flush=True)
     _fb = None
     if _eligible and _full_ratio < _fb_thresh:
         _sw = sorted(widths)
@@ -113,7 +144,7 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
     else:
         cw = int(statistics.median([c for w, c in full])) if full else 30
         MEASURE_POLY = round(statistics.median([w for w, c in full]) * 72 / DPI) if full else round(PAGE_W*0.8)
-        MEASURE = round(MEASURE_POLY / OVERBOUND)
+        MEASURE = round(MEASURE_POLY / (_ov_book or OVERBOUND))
     # 显式覆盖优先（HORIZ_CW 字数；HORIZ_FONT_MEASURE 字号 pt）。
     _cw_env = os.environ.get('HORIZ_CW', '').strip()
     if _cw_env:
