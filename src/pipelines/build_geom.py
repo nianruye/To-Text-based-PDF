@@ -1099,7 +1099,7 @@ for key in sorted(sl.keys(), key=int):
         pages_tex.append('\n'.join(_bd))
         continue
     if int(key) + 1 in _BUILD_OPTS.get('toc_split_pagenum_pages', []):
-        _entries = []; _cur = None; _title = ''; _title_y = 0
+        _entries = []; _cur = None; _title = ''; _title_y = 0; _pending_pn = ''
         _lines = sl.get(key, []); _polys = co.get(key, [])
         _merge_label = int(key) + 1 in _BUILD_OPTS.get('toc_label_merge_pages', [])
         for _i, _t in enumerate(_lines):
@@ -1109,19 +1109,27 @@ for key in sorted(sl.keys(), key=int):
             _x = min((p[0] for p in _polys[_i]), default=0) if _i < len(_polys) and _polys[_i] else 0
             if _t in ('目录', '目 录'):
                 _title = _t; _title_y = _y; continue
+            if re.fullmatch(r'CONTENTS?', _t, re.I):
+                _title = (_title + ' ' + _t).strip(); continue   # 英文并列标题
             if _t.isdigit() and _y > 0.90 * page_px_h:
                 continue
-            _head = bool(re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+[、\s]|第[一二三四五六七八九十]+部分|简短的?结论|人名索引|历代纪年表|导论|绪论|前言|序言|引言|结语|后记|参考文献|附录)', _t))
+            _head = bool(re.match('^(第[一二三四五六七八九十百千零\\d]+[章节编]|[一二三四五六七八九十]+[、\\s\"“”‘’]|\\d+[.．、]|第[一二三四五六七八九十]+部分|简短的?结论|人名索引|历代纪年表|导论|绪论|前言|序言|引言|结语|后记|参考文献|附录)', _t))
             _pm = re.search(r'[.…\s]*(\d{1,4}(?:[-—–]\d{1,4})?)\s*$', _t)
             if _head:
                 if _cur is not None:
                     _entries.append(_cur)
                     _cur = None
-                _cur = {'t': _t, 'p': '', 'c': [], 'x': _x, 'x1': (max(p[0] for p in _polys[_i]) if _i < len(_polys) and _polys[_i] else _x), 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
+                _cur = {'t': _t, 'p': (_pending_pn or ''), 'p_first': bool(_pending_pn), 'c': [], 'x': _x, 'x1': (max(p[0] for p in _polys[_i]) if _i < len(_polys) and _polys[_i] else _x), 'y': _y, 'h': (max(p[1] for p in _polys[_i]) - min(p[1] for p in _polys[_i])) if _i < len(_polys) and _polys[_i] else 0, 'same_title': False}
                 if _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
                     if _pre:
                         _cur['t'] = _pre; _cur['p'] = _pm.group(1)
+                continue
+            if _cur is None or True:
+                pass
+            if _cur is None:
+                if re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t):
+                    _pending_pn = _t   # 首条目之前就出现页码(ghbq: 页码排在标题前)
                 continue
             if _cur is not None:
                 if (_merge_label and not _cur.get('same_title') and not _cur.get('c') and
@@ -1138,6 +1146,18 @@ for key in sorted(sl.keys(), key=int):
                     _cur['t'] = _cur['t'] + _t
                     continue
                 if re.fullmatch(r'\d{1,4}(?:[-—–]\d{1,4})?', _t):
+                    _pn_next = ''
+                    _pn_ny = 0
+                    for _jj in range(_i + 1, min(_i + 3, len(_lines))):
+                        _tj = str(_lines[_jj]).strip()
+                        if not _tj: continue
+                        _pn_next = _tj
+                        _pn_ny = min((q[1] for q in _polys[_jj]), default=0) if _jj < len(_polys) and _polys[_jj] else 0
+                        break
+                    if (_pn_next and re.match('^(第[一二三四五六七八九十百千零\\d]+[章节编]|[一二三四五六七八九十]+[、\\s\"“”‘’]|\\d+[.．、])', _pn_next)
+                            and abs(_pn_ny - _y) < 0.6 * (_cur.get('h') or 40)):
+                        _pending_pn = _t   # OCR 把页码排到了标题前: 留给下一条
+                        continue
                     _cur['p'] = _t
                 elif _pm:
                     _pre = _t[:_pm.start()].strip(' .…')
@@ -1151,8 +1171,9 @@ for key in sorted(sl.keys(), key=int):
                     _cur['c'].append({'t': _t, 'p': '', 'x': _x, 'x1': (max(q[0] for q in _polys[_i]) if _i < len(_polys) and _polys[_i] else _x), 'y': _y})
         if _cur is not None: _entries.append(_cur)
         for _e in _entries:
-            if (_e.get('p') and _e['c'] and isinstance(_e['c'][-1], dict) and not _e['c'][-1].get('p')
-                    and str(_e['c'][-1].get('t', '')).startswith('年')):
+            if (_e.get('p') and not _e.get('p_first') and _e['c'] and isinstance(_e['c'][-1], dict)
+                    and not _e['c'][-1].get('p')
+                    and not str(_e['c'][-1].get('t', '')).startswith('——')):   # 折行(非副标题) → 页码跟末行
                 _e['c'][-1]['p'] = _e['p']; _e['p'] = ''   # 折行标题: 页码跟末行(与源书一致)
             _nxt = ((_e['c'][0].get('t', '') if isinstance(_e['c'][0], dict) else _e['c'][0]) if _e['c'] else '')
             if _nxt.startswith('年') and _e['t'].endswith(('）', ')')):
@@ -1161,8 +1182,8 @@ for key in sorted(sl.keys(), key=int):
         # ── 条目结构化(供统一渲染/审计): level / size / bold ──
         for _e in _entries:
             _t0 = str(_e.get('t') or '')
-            _lv = 1 if re.match(r'^第[一二三四五六七八九十百千零\d]+[章编篇]', _t0) else (
-                  2 if re.match(r'^(第[一二三四五六七八九十百千零\d]+节|[一二三四五六七八九十]+[、\s])', _t0) else 3)
+            _lv = 1 if re.match('^第[一二三四五六七八九十百千零\\d]+[章编篇]', _t0) else (
+                  2 if re.match('^(第[一二三四五六七八九十百千零\\d]+节|[一二三四五六七八九十]+[、\\s\"“”‘’]|\\d+[.．、])', _t0) else 3)
             _e['level'] = _lv
             _e['bold'] = bool(re.match(r'^第[一二三四五六七八九十百千零\d]+[章编篇]', _t0))
             _e['size'] = round(FONT * (1.02 if _lv == 1 else 1.0), 1)

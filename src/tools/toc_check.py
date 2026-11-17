@@ -33,7 +33,7 @@ def _furniture(t: str, y: float, page_h: float) -> str:
     tt = str(t).strip()
     if re.fullmatch(r'\d{1,4}', tt):
         return '页码'
-    if re.fullmatch(r'目\s*录(\s*\d{1,4})?', tt):
+    if re.fullmatch(r'目\s*录(\s*\d{1,4})?|CONTENTS?', tt, re.I):
         return '书眉'
     if y and page_h and y < 0.12 * page_h:
         return '书眉区'          # 顶部区域且不像条目
