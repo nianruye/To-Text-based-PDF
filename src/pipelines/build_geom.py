@@ -780,6 +780,23 @@ try:
                 _fs.append(_h * FONT / H_BODY if H_BODY else FONT)
         _toc_font_med = statistics.median(_fs) if len(_fs) >= 3 else FONT
         _TOC_CAL['font_line'] = round(_toc_font_med * 1.15, 1)
+        # 1b) entry_gap: 目录「条目间」距离(pt)。源书把「标题」「页码」各排一行(各 ~12.3pt),
+        #     我们合并成一行, 所以行距应 ≈ 条目间距离(实测 wz3 23.7 / 组间 43), 不是单行 12.3。
+        _eg, _gg = [], []
+        for _k in _tocI:
+            _rows = sorted((min(q[1] for q in _pl) * 72.0 / DPI, str(_t).strip())
+                           for _t, _pl in _all_rows.get(_k, []) if _pl and str(_t).strip())
+            _ent = [y for y, _t in _rows if not PN_RE.fullmatch(_t)]
+            for _i in range(len(_ent) - 1):
+                _d = round(_ent[_i + 1] - _ent[_i], 1)
+                if 8.0 <= _d <= 30.0:
+                    _eg.append(_d)
+                elif 30.0 < _d <= 60.0:
+                    _gg.append(_d)
+        if len(_eg) >= 5:
+            _TOC_CAL['entry_gap'] = round(statistics.median(_eg), 1)
+            _TOC_CAL['group_gap'] = round(statistics.median(_gg), 1) if len(_gg) >= 2 else round(_TOC_CAL['entry_gap'] * 1.8, 1)
+            print(f"[目录·行距] 条目间 {_TOC_CAL['entry_gap']}pt / 组间 {_TOC_CAL['group_gap']}pt (n={len(_eg)}/{len(_gg)})", flush=True)
         # 2) foot_x: 底部 y>80% 数字按 x 桶(5%页宽)聚类, 页脚=按页序连续率最高的桶
         _buckets = {}
         for _k in _all_rows:
@@ -1994,7 +2011,11 @@ for key in sorted(sl.keys(), key=int):
             prev_y[0] = f.get('y0', prev_y[0])   # 更新页级上一行 y0(跨段位置还原用)
             fnt = f['fnt']
             if USE_POS:
-                if _pp and PF > 13:   # 大字(wz2 15.7):\linespread 对 makebox 大字不生效→bl=源pitch 直接设 baselineskip;小字(wz1 10.1)走原 \linespread(pitch=strut+墨高 凑巧准)
+                if key in _TOC_PAGE and _TOC_CAL.get('entry_gap'):
+                    # 目录页: 源把「标题」「页码」各占一行, 我们合并成一行(条目),
+                    # 故行距取「条目间」距离而非单行 pitch(否则目录只占半页)
+                    bl = round(_TOC_CAL['entry_gap'] * _pos_sscale, 1)
+                elif _pp and PF > 13:   # 大字(wz2 15.7):\linespread 对 makebox 大字不生效→bl=源pitch 直接设 baselineskip;小字(wz1 10.1)走原 \linespread(pitch=strut+墨高 凑巧准)
                     bl = round((_pp - 2.0) * _pos_sscale, 1)   # -2pt 补偿:大字 pitch=strut+墨高 比 bl 大2pt(实测输出pitch=源+2),减2让 pitch=源(消溢出)
                 else:
                     bl = round(fnt * 1.34 * _pos_sscale, 1)
@@ -2114,8 +2135,12 @@ for key in sorted(sl.keys(), key=int):
                 body.append('\\fontsize{' + str(round(fnt*1.22,1)) + 'pt}{' + str(bl) + 'pt}\\selectfont \\centerline{' + _mt17 + '}}')
                 continue
             if _toc:   # 目录条目:整体左移 _toc_shift(匹配源绝对宽度)+ 按源 x0 相对缩进 + 标题 + 点引导(\dotfill)+ 页码右
-                if key in _TOC_PAGE:   # F29 目录页行距统一: 全行同距(源书目录视觉均匀); bl 优先=源目录页 pitch(_pp 紧凑), 缺失回退正文公式
-                    if USE_POS and _pp:
+                if key in _TOC_PAGE:   # F29 目录页行距统一: 全行同距(源书目录视觉均匀)
+                    # 行距优先用「条目间距离」(entry_gap): 源书把标题/页码各占一行, 我们合并成一行,
+                    # 用单行 pitch(_pp) 会让目录只占半页(wz3 实测 17.3 vs 源条目间 23.7)
+                    if USE_POS and _TOC_CAL.get('entry_gap'):
+                        bl = round(_TOC_CAL['entry_gap'] * _pos_sscale, 1)
+                    elif USE_POS and _pp:
                         bl = round((_pp - 2.0) * _pos_sscale, 1)
                     elif USE_POS:
                         bl = round(PF * 1.34 * _pos_sscale, 1)
