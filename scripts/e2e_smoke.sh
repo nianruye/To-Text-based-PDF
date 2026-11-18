@@ -79,4 +79,17 @@ if [ "$REPEAT" -gt 1 ]; then
     exit 1
   fi
 fi
+# 目录覆盖率守卫（toc_check）：目录页内容必须 100% 还原，否则视为回归
+TOC_OUT="$($PY "$ROOT/src/tools/toc_check.py" "$BOOK" "$INPUT" "$OUT" 2>&1)"; TOC_RC=$?
+TOC_LINE="$(echo "$TOC_OUT" | grep '^合计' | tail -1)"
+if [ -z "$TOC_LINE" ]; then
+  echo "[e2e] 目录校验：本书无目录页（跳过）"
+else
+  echo "[e2e] $TOC_LINE"
+  if [ "$TOC_RC" -ne 0 ]; then
+    echo "[e2e] FAIL 目录覆盖率未达 100%"
+    echo "$TOC_OUT" | grep -E '缺\(条目\)|^p[0-9]+:' | head -10 | sed 's/^/  /'
+    exit 1
+  fi
+fi
 echo "[e2e] book=$BOOK out=$OUT repeat=$REPEAT $s (repeatable)"
