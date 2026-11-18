@@ -2141,13 +2141,14 @@ for key in sorted(sl.keys(), key=int):
                 _tlvl = 1 if re.search(r'第[一二三四五六七八九十百千零\d]+章', _tt0[:8]) else (2 if re.search(r'第[一二三四五六七八九十百千零\d]+节', _tt0[:8]) else (3 if re.match(r'^[一二三四五六七八九十]+[、]', _tt0) else 3))
                 if _tlvl <= 2:
                     if _BUILD_OPTS.get('toc_bold_ink'):
-                        # 源书目录条目墨迹 ratio≈1.0；保守不加粗。调试：INK_BOLD_DBG=1
-                        _bold = False
-                        if os.environ.get('INK_BOLD_DBG'):
-                            print('[toc-bold] p%d ratio=1.00 -> Regular %r' % (int(key)+1, (f.get('t') or '')[:30]), flush=True)
-                        if _bold:
-                            _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
+                        _bold = False          # 源书目录通篇不加粗的书(如 wz9)
                     else:
+                        # 按书选项: 哪些层级加粗。默认 [1,2] = 章/节都粗(wz4 源书如此);
+                        # wz2/wz3 源书是「章粗、节常规」→ 配 [1]
+                        _bold = _tlvl in (_BUILD_OPTS.get('toc_bold_levels') or [1, 2])
+                    if os.environ.get('INK_BOLD_DBG'):
+                        print('[toc-bold] p%d lvl=%d -> %s %r' % (int(key)+1, _tlvl, 'Bold' if _bold else 'Regular', (f.get('t') or '')[:30]), flush=True)
+                    if _bold:
                         _toc_title = '{\\bfseries\\CJKfamily{heiti}' + _toc_title + '}'
                 elif f.get('toc_hei'):
                     _toc_title = '{\\CJKfamily{heiti}' + _toc_title + '}'

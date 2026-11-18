@@ -178,5 +178,8 @@
   619,
   731
  ],
- "_comment_faithful": "由 src/tools/faithful_pages.py 依 verify_geom 的逐页 p_err 生成，勿手改"
+ "_comment_faithful": "由 src/tools/faithful_pages.py 依 verify_geom 的逐页 p_err 生成，勿手改",
+ "toc_bold_levels": [
+  1
+ ]
 }
