@@ -1847,7 +1847,20 @@ for key in sorted(sl.keys(), key=int):
     if USE_POS and flow and not is_divider and not USE_REGION:
         _fy = next((f['y0'] for f in flow if f.get('y0', 0) > 0), 0)   # 含 figrow(书影带可能是页首元素,排除会误取下文 y0→top_vs 巨大溢出)
         _hdr_h = (FONT_SM * 1.2 + 2.4) if headers else 0   # 有页眉:页眉行高+vspace2+hrule0.4,减去防正文下移溢出
-        _top_vs = max(0.0, _fy * 72.0 / DPI - 12.0 - _hdr_h) if _fy else 0.0   # 源首行 y − 版心顶距(top=12pt)
+        # 有页眉时: 正文前间距按「源书 页眉→首正文」的实际间距给(AGENTS #59)
+        # pitch 指标量的是行间距而非绝对位置, 所以只要把这段间距还原成源书的, 短页即可达标
+        _hdr_y = 0
+        if headers:
+            try:
+                _hys = [min(p[1] for p in co[key][_i]) for _i, _t in enumerate(sl[key])
+                        if str(_t).strip() and len(str(_t).strip()) < 30 and not re.fullmatch(r'\d+', str(_t).strip())
+                        and _i < len(co.get(key, [])) and co[key][_i]
+                        and min(p[1] for p in co[key][_i]) < page_px_h * 0.10]
+                _hdr_y = min(_hys) if _hys else 0
+            except Exception:
+                _hdr_y = 0
+        _top_vs = (max(0.0, (_fy - _hdr_y) * 72.0 / DPI - _hdr_h - 11.0) if (_fy and _hdr_y)
+                   else (max(0.0, _fy * 72.0 / DPI - 12.0 - _hdr_h) if _fy else 0.0))
         _strut_h = 0.0; _gap_h = 0.0; _pv = None
         for f in flow:
             if f.get('is_col_frag'):
