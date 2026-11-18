@@ -329,6 +329,9 @@ try:
             break
 except Exception:
     _BUILD_OPTS = {}
+_FAITHFUL_PAGES = set(int(x) for x in (json.load(open(os.path.join('config','books', os.environ.get('CALIB_BOOK','')+'.json'), encoding='utf-8')).get('faithful_pages') or []) if str(x).strip()) if os.environ.get('CALIB_BOOK') and os.path.exists(os.path.join('config','books', os.environ.get('CALIB_BOOK','')+'.json')) else set()
+FAITHFUL_DPI = int(os.environ.get('FAITHFUL_DPI', '150'))
+FAITHFUL_JPEG_Q = int(os.environ.get('FAITHFUL_JPEG_Q', '82'))
 INK_BOLD = os.environ.get('INK_BOLD', '1') not in ('0','false','False')
 INK_BOLD_RATIO = float(os.environ.get('INK_BOLD_RATIO', '1.30'))
 _ink_bold_audit = []
@@ -555,6 +558,16 @@ def is_garbage_page(lines):
 def render_src_page(k):
     import fitz
     _d = fitz.open(SRC); _pix = _d[int(k)].get_pixmap(dpi=200); _p = f'/tmp/srcpage_{k}.png'; _pix.save(_p); _d.close(); return _p
+def render_faithful_page(k):
+    """保真页背景图: 150dpi JPEG(q82) —— 200dpi PNG 会让整书体积翻 3-4 倍(wz2 达 203MB)。"""
+    import fitz
+    _d = fitz.open(SRC)
+    _pix = _d[int(k)].get_pixmap(dpi=FAITHFUL_DPI)
+    _p = f'/tmp/faithful_{k}.jpg'
+    _pix.pil_save(_p, format='JPEG', quality=FAITHFUL_JPEG_Q, optimize=True)
+    _d.close(); return _p
+
+
 pages_tex = []
 # 预扫描:各级标题字号 = 该级行高中位 × FONT/H_BODY(同级同字号,抗 OCR poly 噪声——
 # 同级节标题 poly 在 39–56px 乱跳,按单个 poly 算会导致 3.和4. 字号不一)
@@ -1623,6 +1636,20 @@ for key in sorted(sl.keys(), key=int):
     elif pn_ocr and not _pn_ocr_use:
         _prev_pn = None   # 突变弃用(目录页误识):重置 prev,允许下页重新起步(序列断裂后恢复连续,否则 prev 卡住致后续全弃用)
     body = [f'\\setcounter{{page}}{{{pn}}}' if pn else '\\thispagestyle{empty}', '\\ClearShipoutPictureFG', '\\ClearShipoutPictureBG']   # 清上页旁注叠加+图页背景
+    if int(key) + 1 in _FAITHFUL_PAGES:   # 页级保真回退: 源图铺满 + 3Tr 文本层按源坐标落位(AGENTS #64)
+        body.append('\\AddToShipoutPictureBG{\\includegraphics[width=%.1fpt,height=%.1fpt]{%s}}' % (PAGE_W, PAGE_H, render_faithful_page(key)))
+        body.append('\\special{pdf:literal direct q 3 Tr}')
+        for _ii, _poly in enumerate(co.get(key, [])):
+            _ft = sl.get(key, [])
+            if not _poly or _ii >= len(_ft) or not str(_ft[_ii]).strip(): continue
+            _xs = [q[0] for q in _poly]; _ys = [q[1] for q in _poly]
+            _xpt = min(_xs) * 72.0 / DPI
+            _fpt = max(5.0, (max(_ys) - min(_ys)) * 72.0 / DPI)
+            _asc = 1.63 if (_ii == 0 or _fpt >= 25.0) else 1.0
+            _ypt = PAGE_H - (min(_ys) * 72.0 / DPI + _asc * _fpt)
+            body.append('\\AddToShipoutPictureFG{\\put(%.2fpt,%.2fpt){\\fontsize{%.1fpt}{%.1fpt}\\selectfont %s}}' % (_xpt, _ypt, _fpt, _fpt * 1.2, esc(str(_ft[_ii]))))
+        body.append('\\null\\par\\newpage')
+        pages_tex.append('\n'.join(body)); continue
     if _giant_page:
         body.append('\\thispagestyle{empty}')   # 整页贴图：页脚页码由源图提供，禁止文本层再画一个
     if _page_img_full:
