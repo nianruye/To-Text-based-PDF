@@ -28,6 +28,15 @@ SRC = sys.argv[4] if len(sys.argv) > 4 else ''   # 源 PDF(图页/乱码页贴�
 DPI = 200
 sl = json.load(open(SL, encoding='utf-8'))
 co = json.load(open(CO, encoding='utf-8'))
+# 按书选项 colw_ratio → 注入 COLW_RATIO（calibrate 在 import 时执行，必须先设 env；
+# 此时 _BUILD_OPTS 尚未加载，直接读 config/books/<CALIB_BOOK>.json）
+try:
+    _bo0 = os.environ.get('CALIB_BOOK', '')
+    _fp0 = os.path.join('config', 'books', _bo0 + '.json') if _bo0 else ''
+    if _fp0 and os.path.exists(_fp0) and json.load(open(_fp0, encoding='utf-8')).get('colw_ratio'):
+        os.environ['COLW_RATIO'] = '1'
+except Exception:
+    pass
 _G = calibrate(sl, co, DPI, src_pdf=SRC)
 DPI = _G['DPI']   # 自适应后的真实 dpi(coords 尺度随 API 批次漂移 200/142)
 PAGE_W, PAGE_H = _G['PAGE_W'], _G['PAGE_H']

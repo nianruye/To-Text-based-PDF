@@ -1,3 +1,4 @@
 {
- "toc_normalize": true
+ "toc_normalize": true,
+ "colw_ratio": true
 }

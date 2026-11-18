@@ -98,7 +98,11 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
     # 避免旧公式把版心压窄 1.115 倍导致二次换行。高 full_ratio 走原公式（零变化）。
     _estimator = 'full_line'
     _ov_book = None
-    if src_pdf and os.environ.get('COLW_RATIO', '1') not in ('0','false','False'):
+    # COLW_RATIO 默认关: 仅当本书的坐标尺度可信时才用「按书 OCR/ink 比值」。
+    # wz8 实测坐标过覆盖 2.8%(612 vs 源书 595), 固定 1.115 恰好抵消该错误;
+    # 换成按书比值后 MEASURE 552 vs 525 → 断行全变 → pitch 96.3→60.6。
+    # 现改为按书选项 config/books/<book>.json 的 colw_ratio 启用（AGENTS #57）。
+    if src_pdf and os.environ.get('COLW_RATIO', '0') not in ('0','false','False'):
         try:
             import fitz as _fz
             _doc = _fz.open(src_pdf); _rats = []
