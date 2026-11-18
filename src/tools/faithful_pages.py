@@ -42,15 +42,58 @@ def run_verify(pdf, coords, lines, src_pdf, tol_pitch, out_json):
         raise SystemExit(f'[faithful] verify_geom 未产出 JSON: {out_json}')
 
 
-def select(doc, tol_pitch):
+def _toc_like(lines):
+    """目录页/续页判据：含「目录」标记，或多数行为「条目形」（纯页码 / 带点线 / 章节制式）。"""
+    ne = [str(t).strip() for t in lines if str(t).strip()]
+    if not ne:
+        return False
+    if any(('目录' in t) or ('CONTENTS' in t.upper()) for t in ne):
+        return True
+    import re as _re
+    n = 0
+    for t in ne:
+        if _re.fullmatch(r'\d{1,4}', t):
+            n += 1
+        elif _re.search(r'[…]{2,}\s*\d{1,4}$', t) or _re.search(r'\.{4,}\s*\d{1,4}$', t):
+            n += 1
+        elif _re.match(r'^(第[一二三四五六七八九十百千零\d]+[章节编]|[一二三四五六七八九十]+、|\d+[.．、])', t):
+            n += 1
+    return n >= max(3, int(len(ne) * 0.5))
+
+
+def toc_pages(lines_json):
+    """返回目录页集合（0-based 页 key）。含标记页 + 与之相邻的条目形续页。"""
+    import json as _json
+    if not lines_json:
+        return set()
+    L = _json.load(open(lines_json, encoding='utf-8'))
+    marked = set()
+    like = set()
+    for k, v in L.items():
+        if _toc_like(v):
+            like.add(int(k))
+            if any(('目录' in str(t)) or ('CONTENTS' in str(t).upper()) for t in v):
+                marked.add(int(k))
+    out = set(marked)
+    for m in marked:                      # 与标记页连续（±3 页内）的条目形页也算目录
+        for d in range(-3, 4):
+            if (m + d) in like:
+                out.add(m + d)
+    return out
+
+
+def select(doc, tol_pitch, exclude=()):
     rows = doc.get('rows') or []
     bad = []
     for r in rows:
         if not r.get('comparable', True):
             continue          # 门禁不计入判定的页，贴图无意义
+        pg = int(r['page'])
+        if (pg - 1) in exclude:   # 目录页必须保持文字层（用户要求：目录不能变成图）
+            continue
         pe = r.get('p_err')
         if pe is not None and pe >= tol_pitch:
-            bad.append(int(r['page']))
+            bad.append(pg)
     return sorted(set(bad))
 
 
@@ -84,6 +127,7 @@ def main():
     ap.add_argument('--from-json', default='')
     ap.add_argument('--tol-pitch', type=float, default=0.03)
     ap.add_argument('--write-config', action='store_true')
+    ap.add_argument('--keep-toc-image', action='store_true', help='允许目录页也走保真贴图（默认排除）')
     ap.add_argument('--out-json', default='/tmp/faithful_verify.json')
     a = ap.parse_args()
 
@@ -96,7 +140,10 @@ def main():
         doc = json.load(open(a.out_json, encoding='utf-8'))
 
     total = int(doc.get('n_out') or doc.get('n_src') or len(doc.get('rows') or []))
-    bad = select(doc, a.tol_pitch)
+    _toc = set() if a.keep_toc_image else toc_pages(a.lines)
+    if _toc:
+        print(f'[faithful] 排除目录页 {len(_toc)} 个（目录必须保持文字层）: {sorted(x + 1 for x in _toc)}')
+    bad = select(doc, a.tol_pitch, _toc)
     est_mb = round(len(bad) * 0.30, 1)
     print(f"[faithful] {a.book}: 共 {total} 页 | 选中 {len(bad)} 页 ({100.0*len(bad)/max(1,total):.1f}%) | 预估 {est_mb} MB (300KB/页)")
     if bad:
