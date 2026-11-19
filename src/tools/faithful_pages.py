@@ -82,7 +82,7 @@ def toc_pages(lines_json):
     return out
 
 
-def select(doc, tol_pitch, exclude=()):
+def select(doc, tol_pitch, exclude=(), a_dn=3, a_pe=0.20):
     rows = doc.get('rows') or []
     bad = []
     for r in rows:
@@ -92,7 +92,12 @@ def select(doc, tol_pitch, exclude=()):
         if (pg - 1) in exclude:   # 目录页必须保持文字层（用户要求：目录不能变成图）
             continue
         pe = r.get('p_err')
-        if pe is not None and pe >= tol_pitch:
+        if pe is None:
+            continue
+        # 只把「结构性失败」的页贴图。仅行距比超标(常见于断行差 1–2 行, 见 AGENTS #60
+        # 字宽差 4–6%)的页**版面本身没问题**, 应保持文字层 —— 用户明确要求不要变成图片。
+        _dn = abs(int(r.get('src_n') or 0) - int(r.get('out_n') or 0))
+        if _dn >= a_dn or pe >= a_pe:
             bad.append(pg)
     return sorted(set(bad))
 
@@ -126,6 +131,8 @@ def main():
     ap.add_argument('--src-pdf', default='')
     ap.add_argument('--from-json', default='')
     ap.add_argument('--tol-pitch', type=float, default=0.03)
+    ap.add_argument('--dn', type=int, default=3, help='行数差 ≥ 此值 才贴图（结构性重排）')
+    ap.add_argument('--pe', type=float, default=0.20, help='行距比 ≥ 此值 才贴图（重大版式偏移）')
     ap.add_argument('--write-config', action='store_true')
     ap.add_argument('--keep-toc-image', action='store_true', help='允许目录页也走保真贴图（默认排除）')
     ap.add_argument('--out-json', default='/tmp/faithful_verify.json')
@@ -143,7 +150,7 @@ def main():
     _toc = set() if a.keep_toc_image else toc_pages(a.lines)
     if _toc:
         print(f'[faithful] 排除目录页 {len(_toc)} 个（目录必须保持文字层）: {sorted(x + 1 for x in _toc)}')
-    bad = select(doc, a.tol_pitch, _toc)
+    bad = select(doc, a.tol_pitch, _toc, a.dn, a.pe)
     est_mb = round(len(bad) * 0.30, 1)
     print(f"[faithful] {a.book}: 共 {total} 页 | 选中 {len(bad)} 页 ({100.0*len(bad)/max(1,total):.1f}%) | 预估 {est_mb} MB (300KB/页)")
     if bad:
