@@ -70,15 +70,7 @@ def _toc_like(texts):
         return True
     import re as _re
     entry = sum(1 for t in ts if len(t) <= 40 and _re.match(r'^\d+[\s.、]?[^\d]', t))
-    if entry >= 5:
-        return True
-    # AGENTS #67：古籍目录形态 —— 「标题行 + 独立页码行」交替（wz2 p8/p9 是「园池第十三 / 158」成对，无前导数字）。
-    # 判据：纯数字短行占比 ≥30% 且 ≥6 条，同时有 ≥6 条中文短行（标题）。
-    nums = sum(1 for t in ts if _re.fullmatch(r'\d{1,4}', t))
-    titles = sum(1 for t in ts if 2 <= len(t) <= 30 and not _re.fullmatch(r'\d{1,4}', t))
-    if nums >= 6 and titles >= 6 and nums / max(1, len(ts)) >= 0.30:
-        return True
-    return False
+    return entry >= 5
 
 
 def _content_extent(lines, page_h, page_w, h_ref=None):
