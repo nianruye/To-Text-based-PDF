@@ -211,7 +211,9 @@ def main():
     ap.add_argument("src_lines", nargs="?", default="")
     ap.add_argument("--src-pdf", default="", help="必带：源 PDF，用于 DPI 自适应（缺省按 200dpi 可能误判）")
     ap.add_argument("--dpi", type=int, default=0, help="0=自动从 coords P95 y 与 --src-pdf 页高反推(coords 尺度随 API 批次漂移 200/142), 显式传值则用该值")
-    ap.add_argument("--tol-width", type=float, default=0.01, help="页宽相对误差上限 (默认 1%%; 0=不判)")
+    ap.add_argument("--tol-width", type=float, default=0.04, help="页宽相对误差上限 (默认 4%%; 0=不判)\n"
+                        "实测各书 0.4~3.2%（OCR 坐标尺度误差，有正有负）—— 4%% 覆盖正常波动，\n"
+                        "同时仍能拦住 wz3 当初的 +46%%（AGENTS #66）")
     ap.add_argument("--pitch-fix", type=float, default=0.0, help="coords 行距修正系数(>1 则 src_pitch 除以它; AGENTS #67)")
     ap.add_argument("--sample", type=int, default=0, help="只抽前 N 页(0=全书)")
     ap.add_argument("--json", default="")
