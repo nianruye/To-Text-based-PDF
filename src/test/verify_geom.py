@@ -89,6 +89,10 @@ def _content_extent(lines, page_h, page_w, h_ref=None):
     return min(l[0] for l in L), max(l[1] for l in L)
 
 
+PITCH_FIX = float(os.environ.get('VERIFY_PITCH_FIX', '0'))   # 手动指定修正系数(优先)
+PITCH_SCAN = os.environ.get('VERIFY_PITCH_SCAN', '1') not in ('0', 'false', 'False')   # 用源图投影实测取代 coords 行距
+
+
 def _body_lines(lines, page_h, page_w=0):
     """lines: [(y_top,y_bot,y_center,height,x_left,x_right), ...] in pt.
     return (body_sorted_by_y, pitch_pt, block_h_pt, top_y, bot_y, n).
@@ -114,7 +118,45 @@ def _body_lines(lines, page_h, page_w=0):
         pitch = 0.0
     top_y = min(l[0] for l in body)
     bot_y = max(l[1] for l in body)
+    if PITCH_FIX > 1.0001 and pitch:
+        # AGENTS #67：coords 行距系统性偏大（源图投影实测 wz3 +6.8%）。与 geometry.calibrate 同口径。
+        pitch = pitch / PITCH_FIX
     return body, pitch, bot_y - top_y, top_y, bot_y, len(body)
+
+
+def _src_pitch_from_scan(doc, pages, dpi=150):
+    """用源图水平投影量真实行距(pt)。页号 pages 为 0-based。
+    AGENTS #67：coords 的 poly 框比字形大，y 差系统性偏大 3~8%；
+    源图投影是**唯一独立证据**（不依赖 OCR）。返回中位或 None。"""
+    import numpy as _np
+    meds = []
+    for pn in pages:
+        if pn < 0 or pn >= doc.page_count:
+            continue
+        pix = doc[pn].get_pixmap(dpi=dpi)
+        arr = _np.frombuffer(pix.samples, dtype=_np.uint8).reshape(pix.height, pix.width, pix.n)
+        bw = arr[:, :, :3].mean(axis=2) < 128
+        proj = bw.sum(axis=1)
+        thr = max(2, 0.004 * bw.shape[1])
+        bands = []; inb = False
+        for y, v in enumerate(proj):
+            if v > thr and not inb:
+                st = y; inb = True
+            elif v <= thr and inb:
+                if y - st >= 4:
+                    bands.append((st, y))
+                inb = False
+        mg = []
+        for a, b in bands:
+            if mg and a - mg[-1][1] <= 3:
+                mg[-1] = (mg[-1][0], b)
+            else:
+                mg.append((a, b))
+        cs = [(a + b) / 2 * 72.0 / dpi for a, b in mg]
+        diffs = [b - a for a, b in zip(cs, cs[1:]) if 10 < b - a < 80]
+        if len(diffs) >= 8:
+            meds.append(_median(diffs))
+    return _median(meds) if len(meds) >= 3 else None
 
 
 def src_pages(coords, lines, dpi):
@@ -170,12 +212,16 @@ def main():
     ap.add_argument("--src-pdf", default="", help="必带：源 PDF，用于 DPI 自适应（缺省按 200dpi 可能误判）")
     ap.add_argument("--dpi", type=int, default=0, help="0=自动从 coords P95 y 与 --src-pdf 页高反推(coords 尺度随 API 批次漂移 200/142), 显式传值则用该值")
     ap.add_argument("--tol-width", type=float, default=0.01, help="页宽相对误差上限 (默认 1%%; 0=不判)")
+    ap.add_argument("--pitch-fix", type=float, default=0.0, help="coords 行距修正系数(>1 则 src_pitch 除以它; AGENTS #67)")
     ap.add_argument("--sample", type=int, default=0, help="只抽前 N 页(0=全书)")
     ap.add_argument("--json", default="")
     ap.add_argument("--tol-height", type=float, default=0.05)
     ap.add_argument("--tol-pitch", type=float, default=0.03)
     a = ap.parse_args()
 
+    global PITCH_FIX
+    if a.pitch_fix > 0:
+        PITCH_FIX = a.pitch_fix
     coords = json.load(open(a.src_coords, encoding="utf-8"))
     lines = json.load(open(a.src_lines, encoding="utf-8")) if a.src_lines else {}
     # DPI 自适应: coords 实际尺度(API 批次间 200/142dpi 漂移), P95 y 抗页码/噪声
@@ -210,6 +256,28 @@ def main():
         src[_k]['lines'] = _logical_lines(src[_k]['lines'], _tol)
         src[_k]['line_tol'] = _tol
     src_keys = sorted(src, key=lambda k: int(k))
+    # AGENTS #67：用源图投影实测行距替换 coords 口径（coords 的 poly 框偏大 → 系统性偏大 3~8%）
+    _scan_ratio = 1.0
+    if PITCH_SCAN and a.src_pdf and PITCH_FIX <= 1.0001:
+        try:
+            import fitz as _fz
+            _sd = _fz.open(a.src_pdf)
+            _np = _sd.page_count
+            _pick = [int(_np * f) for f in (0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60)]
+            _sp = _src_pitch_from_scan(_sd, _pick)
+            _sd.close()
+            if _sp:
+                _cps = []
+                for _k in src_keys:
+                    _b, _pp2, _h, _t, _bt, _n2 = _body_lines(src[_k]['lines'], 800, 0)
+                    if _pp2:
+                        _cps.append(_pp2)
+                _cp = _median(_cps) if _cps else 0
+                if _cp and 1.02 <= _cp / _sp <= 1.20:
+                    _scan_ratio = _cp / _sp
+                    print(f"行距口径: 源图投影 {_sp:.2f}pt vs coords {_cp:.2f}pt → 用源图口径 (÷{_scan_ratio:.3f})")
+        except Exception as _e:
+            print(f"行距口径: 源图量测失败({_e}), 用 coords")
     n_src, n_out = len(src_keys), len(out)
     print(f"页数: 源 OCR {n_src} 页  |  输出 PDF {n_out} 页  |  {'✓ 1:1' if n_src == n_out else '✗ 不一致'}")
 
@@ -261,6 +329,8 @@ def main():
         _href = _median([l[3] for l in src[key]["lines"] if l[3] > 0]) or None
         _toc = _toc_like(lines.get(key, []))
         sb, sp, sh, st, sbot, sn = _body_lines(src[key]["lines"], ph, pw)
+        if _scan_ratio > 1.0001 and sp:
+            sp = sp / _scan_ratio   # 用源图投影口径（AGENTS #67）
         s_top, s_bot = _content_extent(src[key]["lines"], ph, pw, _href)
         comparable = sn >= 8 and 10.0 <= sp <= 45.0 and not _toc
 

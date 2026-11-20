@@ -16,8 +16,9 @@ co = {}
 sl = {}
 page_px_h = 0.0
 DPI = 200.0
-def configure(*, co, sl, page_px_h, dpi):
-    globals().update(co=co, sl=sl, page_px_h=page_px_h, DPI=dpi)
+PITCH_RATIO = 1.0   # coords 行距修正系数（源图投影标定，见 geometry.calibrate / AGENTS #67）
+def configure(*, co, sl, page_px_h, dpi, pitch_ratio=1.0):
+    globals().update(co=co, sl=sl, page_px_h=page_px_h, DPI=dpi, PITCH_RATIO=pitch_ratio)
 _t2s = opencc.OpenCC('t2s')
 def _has_trad(t):
     return _t2s.convert(t) != t
@@ -117,4 +118,10 @@ def page_pitch(key):
     # 目录页/标题页行距虽乱,但 verify comparable 已排除;此处取中位不会比回退全局更差。
     pitch_px = statistics.median([d for d in diffs if d <= 1.8 * m0]) or m0
     pt = pitch_px * 72.0 / DPI
+    # AGENTS #67：coords 行距系统性偏大（源图投影实测 wz3 +6.8% / wz2 +7.7%）。
+    # 正文排版由**逐页 _pp** 主导（PER_PAGE_PITCH），BASELINE 只作回退 →
+    # 修正必须放在这里，才能实际改变产物行距。
+    _pr = globals().get('PITCH_RATIO', 1.0)   # 单测隔离 namespace 无此全局
+    if _pr > 1.0001:
+        pt = pt / _pr
     return round(pt, 2) if 10.0 <= pt <= 45.0 else None

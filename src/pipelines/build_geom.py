@@ -77,7 +77,7 @@ if not toc_map:
     if toc_map:
         print(f"[toc_map] 自动提取 {len(toc_map)} 个目录标题(未设 TOC_HEADING_MAP)")
 page_px_h = PAGE_H * DPI / 72
-layout_model.configure(co=co, sl=sl, page_px_h=page_px_h, dpi=DPI)
+layout_model.configure(co=co, sl=sl, page_px_h=page_px_h, dpi=DPI, pitch_ratio=_G.get('PITCH_RATIO', 1.0))
 # ── 改动1:按页实测行距(PER_PAGE_PITCH=1)──
 # 全局单值 LINESPREAD 对单规制书(wz1)只差~3%,但对多规制书(wz2:正文/注疏/卷首字号行距各异)
 # 会把大行距页压成小行距 → 底部大片空白。按页从源相邻正文行 y_center 差的中位数反推该页
@@ -2024,7 +2024,10 @@ for key in sorted(sl.keys(), key=int):
                     # 故行距取「条目间」距离而非单行 pitch(否则目录只占半页)
                     bl = round(_TOC_CAL['entry_gap'] * _pos_sscale, 1)
                 elif _pp and PF > 13:   # 大字(wz2 15.7):\linespread 对 makebox 大字不生效→bl=源pitch 直接设 baselineskip;小字(wz1 10.1)走原 \linespread(pitch=strut+墨高 凑巧准)
-                    bl = round((_pp - 2.0) * _pos_sscale, 1)   # -2pt 补偿:大字 pitch=strut+墨高 比 bl 大2pt(实测输出pitch=源+2),减2让 pitch=源(消溢出)
+                    # 下限 fnt*1.2：bl < 字号最小行高时 LaTeX 会强行撑大（AGENTS #67）
+                    # —— wz3 p468 行框 h=28.9pt（OCR 并了两行→字号被高估）,
+                    #    _pp=21.1 → bl=19.1 < 22×1.2=26.4 → 实测产物被撑到 26.4（源书 21.4）
+                    bl = round(max(_pp - 2.0, fnt * 1.2) * _pos_sscale, 1)
                 else:
                     bl = round(fnt * 1.34 * _pos_sscale, 1)
                 _strut = '\\rule{0pt}{%.1fpt}' % round(bl - fnt*0.13, 1)   # strut 定 makebox 行盒高度→hbox 堆叠 pitch=strut+descender≈bl。校准:\rule{0pt}{31}→pitch34。\\[X]/\par 在逐行 group 失效或破坏分页,strut 是唯一可靠旋钮

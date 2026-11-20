@@ -204,6 +204,68 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
         for a, b in zip(_ys, _ys[1:]):
             if 10 < b - a < 80: pitches.append(b - a)
     _pitch_med = statistics.median(pitches) * 72 / DPI if pitches else None
+    # PITCH_MEASURE（AGENTS #67）：coords 行距系统性偏大（wz3 +6.8% / wz2 +7.7% / ghbq +3.0% / wz1 +2.8%，
+    # 由「源图水平投影行带中心距」与「墨迹行带」两份独立证据确认）。
+    # 行框 padding 上下抵消、行高/字号比也不随书稳定 → 唯一可靠做法是**直接量源图**。
+    # 抽样 8 页（正文页），用水平投影找行带、算相邻中心距中位；与 coords 行距的比值即修正系数。
+    _pitch_ratio_out = 1.0   # 只用于 BASELINE；page_pitch 从 BASELINE 派生（防双重修正）
+    if _pitch_med is not None and src_pdf and os.environ.get('PITCH_MEASURE', '1') not in ('0', 'false', 'False'):
+        try:
+            import fitz as _fz
+            import numpy as _np
+            _doc = _fz.open(src_pdf)
+            # 取中部正文页（跳过封面/目录/前后附）
+            _n = _doc.page_count
+            _cand = [int(_n * f) for f in (0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60)]
+            _mds = []
+            for _pi in _cand:
+                if _pi >= _n:
+                    continue
+                _pix = _doc[_pi].get_pixmap(dpi=150)
+                _arr = _np.frombuffer(_pix.samples, dtype=_np.uint8).reshape(_pix.height, _pix.width, _pix.n)
+                _bw = _arr[:, :, :3].mean(axis=2) < 128
+                _proj = _bw.sum(axis=1)
+                _thr = max(2, 0.004 * _bw.shape[1])
+                _bands = []
+                _in = False
+                for _y, _v in enumerate(_proj):
+                    if _v > _thr and not _in:
+                        _st = _y; _in = True
+                    elif _v <= _thr and _in:
+                        if _y - _st >= 4:
+                            _bands.append((_st, _y))
+                        _in = False
+                _mg = []
+                for _a, _b2 in _bands:
+                    if _mg and _a - _mg[-1][1] <= 3:
+                        _mg[-1] = (_mg[-1][0], _b2)
+                    else:
+                        _mg.append((_a, _b2))
+                _cs = [(_a + _b2) / 2 * 72.0 / 150 for _a, _b2 in _mg]
+                _d = [_b2 - _a for _a, _b2 in zip(_cs, _cs[1:]) if 10 < _b2 - _a < 80]
+                if len(_d) >= 8:
+                    _mds.append(statistics.median(_d))
+            _doc.close()
+            if len(_mds) >= 3:
+                _pitch_scan = statistics.median(_mds)
+                _pr = _pitch_med / _pitch_scan if _pitch_scan > 0 else 1.0
+                # 只在偏差 2%~20% 区间内修正（超出多为量测失败/异常书，保守不动）
+                if 1.02 <= _pr <= 1.20:
+                    print(f"[标定·行距] 源图投影实测 {_pitch_scan:.2f}pt vs coords {_pitch_med:.2f}pt"
+                          f" → 修正 ÷{_pr:.3f} ({len(_mds)} 页)", flush=True)
+                    _pitch_source = 'src_scan'
+                    _pitch_ratio_out = _pr   # 只用于 page_pitch（正文）；BASELINE 保持 coords 原值
+                else:
+                    print(f"[标定·行距] 源图 {_pitch_scan:.2f} vs coords {_pitch_med:.2f}"
+                          f" → 比值 {_pr:.3f} 超出 [1.02,1.20], 不修正", flush=True)
+                    _pitch_source = 'coords'
+            else:
+                _pitch_source = 'coords'
+        except Exception as _pe:
+            print(f"[标定·行距] 源图量测失败({_pe}), 用 coords 口径", flush=True)
+            _pitch_source = 'coords'
+    else:
+        _pitch_source = 'coords'
     BASELINE = round(_pitch_med, 1) if _pitch_med is not None else round(FONT*1.5, 1)
     _font_source = ('env' if (os.environ.get('HORIZ_FONT_MEASURE') or os.environ.get('FONT_SCALE')) else ('fallback_ink' if _ink_applied else ('fallback' if _estimator == 'fallback' else 'formula')))
     _cw_source = ('env' if os.environ.get('HORIZ_CW') else ('fallback' if _estimator == 'fallback' else 'coords'))
@@ -255,6 +317,7 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
     return dict(PAGE_W=PAGE_W, PAGE_H=PAGE_H, DPI=DPI, cw=cw, MEASURE_POLY=MEASURE_POLY,
                 OVERBOUND=OVERBOUND, MEASURE=MEASURE, FONT=FONT, MARGIN=MARGIN,
                 BASELINE=BASELINE, LINESPREAD=LINESPREAD, FONT_SM=FONT_SM, H_BODY=H_BODY,
+                PITCH_RATIO=_pitch_ratio_out, PITCH_SOURCE=_pitch_source,
                 PUNCT_WEIGHT=PUNCT_WEIGHT, USE_REGION=USE_REGION,
                 REGION_FONT_SCALE=REGION_FONT_SCALE, page_px=page_px,
                 dpi_initial=_DPI0, dpi_residual=_dpi_residual,
