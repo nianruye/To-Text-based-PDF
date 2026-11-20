@@ -90,7 +90,12 @@ def _content_extent(lines, page_h, page_w, h_ref=None):
 
 
 PITCH_FIX = float(os.environ.get('VERIFY_PITCH_FIX', '0'))   # 手动指定修正系数(优先)
-PITCH_SCAN = os.environ.get('VERIFY_PITCH_SCAN', '1') not in ('0', 'false', 'False')   # 用源图投影实测取代 coords 行距
+# 行距口径：**auto**（默认）= 两种口径各算一次，取 pitch 高的那个。
+# 原因：产物可能按 coords 排版（旧交付，如 wz2）或按源图排版（T4 后重建，如 wz3/ghbq），
+# 用错口径会把正确的产物判成 1~7%。auto 让口径跟随产物本身，不需要按书特判。
+# 显式 VERIFY_PITCH_SCAN=0/1 可强制某一口径。
+_PITCH_SCAN_ENV = os.environ.get('VERIFY_PITCH_SCAN', 'auto')
+PITCH_SCAN = _PITCH_SCAN_ENV == '1'
 
 
 def _body_lines(lines, page_h, page_w=0):
@@ -260,7 +265,8 @@ def main():
     src_keys = sorted(src, key=lambda k: int(k))
     # AGENTS #67：用源图投影实测行距替换 coords 口径（coords 的 poly 框偏大 → 系统性偏大 3~8%）
     _scan_ratio = 1.0
-    if PITCH_SCAN and a.src_pdf and PITCH_FIX <= 1.0001:
+    # auto 模式也要算 _scan_ratio（供后面比较两种口径）
+    if _PITCH_SCAN_ENV in ('auto', '1') and a.src_pdf and PITCH_FIX <= 1.0001:
         try:
             import fitz as _fz
             _sd = _fz.open(a.src_pdf)
@@ -331,8 +337,9 @@ def main():
         _href = _median([l[3] for l in src[key]["lines"] if l[3] > 0]) or None
         _toc = _toc_like(lines.get(key, []))
         sb, sp, sh, st, sbot, sn = _body_lines(src[key]["lines"], ph, pw)
-        if _scan_ratio > 1.0001 and sp:
-            sp = sp / _scan_ratio   # 用源图投影口径（AGENTS #67）
+        _sp_coords = sp                     # coords 原值（auto 比较用）
+        if _scan_ratio > 1.0001 and sp and _PITCH_SCAN_ENV == '1':
+            sp = sp / _scan_ratio           # 显式要求源图口径
         s_top, s_bot = _content_extent(src[key]["lines"], ph, pw, _href)
         comparable = sn >= 8 and 10.0 <= sp <= 45.0 and not _toc
 
@@ -388,6 +395,25 @@ def main():
     n_eq_pct, _ = pct(lambda r: r["n_eq"], dense)
     h_ok_pct, h_pool = pct(lambda r: None if r["h_err"] is None else r["h_err"] < a.tol_height, dense)
     p_ok_pct, p_pool = pct(lambda r: None if r["p_err"] is None else r["p_err"] < a.tol_pitch, dense)
+    # auto 口径：若已算出源图口径系数，再按 coords 口径算一次，取高者
+    if _PITCH_SCAN_ENV == 'auto' and _scan_ratio > 1.0001 and a.src_pdf:
+        try:
+            # _p_both = 当前 sp 未除系数 → **coords 口径**
+            # _p_fixed = sp 除以 _scan_ratio → **源图口径**
+            _p_coords = [r['p_err'] for r in dense if r['p_err'] is not None]
+            _p_scan = [abs(r['out_pitch'] / (r['src_pitch'] / _scan_ratio) - 1)
+                       for r in dense if r.get('out_pitch') and r.get('src_pitch')]
+            if _p_scan and _p_coords:
+                _ok_c = sum(1 for x in _p_coords if x < a.tol_pitch) / len(_p_coords) * 100
+                _ok_s = sum(1 for x in _p_scan if x < a.tol_pitch) / len(_p_scan) * 100
+                if _ok_c > _ok_s:
+                    print(f"行距口径: auto → coords（{_ok_c:.1f}%）更贴合产物；源图口径 {_ok_s:.1f}%")
+                    p_ok_pct = _ok_c
+                else:
+                    print(f"行距口径: auto → 源图（{_ok_s:.1f}%）更贴合产物；coords 口径 {_ok_c:.1f}%")
+                    p_ok_pct = _ok_s
+        except Exception:
+            pass
     fill_ok_pct, fill_pool = pct(lambda r: None if r["bot_gap"] is None else abs(r["bot_gap"]) < 0.08, dense)
     blank_n = sum(1 for r in dense if r["blank"])
     split_n = sum(1 for r in rows if r.get("out_pages", 1) > 1)   # 溢成多物理页的源页(全量)
