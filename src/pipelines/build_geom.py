@@ -2003,7 +2003,15 @@ for key in sorted(sl.keys(), key=int):
         if not para: return
         if USE_POS and key not in _TOC_PAGE and prev_y[0] is not None and para[0].get('y0', 0) > prev_y[0] and not os.environ.get('REGION_LAYOUT','') in ('1','true','True'):   # F29 目录页无段间 vspace(条目连续, 源书目录行距均匀)
             _gap = (para[0]['y0'] - prev_y[0]) * 72.0 / DPI - round(para[0]['fnt']*1.2, 1)   # 段间位置还原(非区域化):距上段末行的源 y 间隙(\\ 只给 fnt×1.2,补差值)。REGION_LAYOUT 时跳过——strut 已给均匀行距=源,源段间无额外间隙,再加 vspace 会叠加→溢页
-            _gap = max(0.0, min(_gap, para[0]['fnt']*2.5)) * _pos_gscale   # ×gscale:溢出页按比例收段间隙
+            _raw_gap = _gap
+            # 大空白（编/章标题页版式留白, AGENTS #64）：上限 fnt*2.5 是为正文防溢设,
+            # 会把源书「编→正文」「正文→章」的大空白压平（wz3 p22 157pt→82.5）。
+            # 大空白本身就是源书版面, 放开到 0.35×页心高, 且仍按 gscale 收缩防溢
+            if _raw_gap > PAGE_H * 0.12:
+                _cap = PAGE_H * 0.35
+            else:
+                _cap = para[0]['fnt'] * 2.5
+            _gap = max(0.0, min(_gap, _cap)) * _pos_gscale   # ×gscale:溢出页按比例收段间隙
             if _gap > 0.5: body.append('\\vspace{%.1fpt}' % _gap)
         if (not USE_POS) and any(f['is_head'] and not f.get('lay_head') for f in para):
             body.append('\\vspace{' + str(HEAD_GAP) + 'pt}')   # 标题段前间距(源标题上下都有空隙);位置还原时改由源 y 增量给出,不加
