@@ -51,8 +51,19 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
             DPI = _dpi_r
         _dpi_residual = abs(DPI - _ymax_c * 72 / _ah)
     # 页面尺寸从 coords 推导（占位 405,633，coords 覆盖；与 OCR 坐标一致）
+    # x 方向与上方 y 的 1.15 噪声保护对齐：单个离群 poly 会把页宽放大
+    # （wz3 实测 x_max=2427 而 p99.9=1555 → 874pt vs 真实 595pt，+47%；AGENTS #66）
     _ymax = max((p[1] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2), default=0)
-    _xmax = max((p[0] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2), default=0)
+    _all_x = [p[0] for _k in co for _poly in co.get(_k, []) if _poly for p in _poly if len(p) >= 2]
+    if _aw and _all_x:
+        _capx = _aw * 1.15 * DPI / 72          # 与 y 同口径：页宽 1.15 倍以上的视为噪声
+        _kept = [x for x in _all_x if x <= _capx]
+        if len(_kept) < len(_all_x):
+            print(f"[页尺寸] 剔除 x 离群点 {len(_all_x) - len(_kept)} 个 (>{_capx:.0f}px, 页宽{_aw:.0f}pt×1.15)",
+                  flush=True)
+        _xmax = max(_kept, default=max(_all_x))
+    else:
+        _xmax = max(_all_x, default=0)
     _coords_w, _coords_h = (round(_xmax * 72 / DPI), round(_ymax * 72 / DPI)) if _xmax and _ymax else (405, 633)
     PAGE_W, PAGE_H = _coords_w, _coords_h
     _coverage_x = _coverage_y = None
@@ -68,8 +79,12 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
             _src_w, _src_h = round(_aw), round(_ah)
             _coverage_x = round(coverage, 4)
             _coverage_y = round(PAGE_H / _ah, 4) if _ah else None
-            if coverage < thresh:
-                print(f"[页尺寸] 来源=src_pdf(覆盖率{coverage:.0%}<{thresh:.0%}), 实际{_aw:.0f}x{_ah:.0f}pt 替代 coords 推导{PAGE_W}x{PAGE_H}pt", flush=True)
+            if coverage < thresh or coverage > 1.0 / thresh:
+                # 双向退化：推导偏小 OR 偏大都用 src_pdf 实际页尺寸（AGENTS #66）
+                # 注意 _source_page 必须保持 'src_pdf'（枚举白名单，见 L418 与 test_horizontal_calib）
+                _dir = '偏小' if coverage < thresh else '偏大'
+                print(f"[页尺寸] 来源=src_pdf({_dir}, 覆盖率{coverage:.2f} 越界"
+                      f"[{thresh:.2f},{1.0/thresh:.2f}]), 实际{_aw:.0f}x{_ah:.0f}pt 替代 coords 推导{PAGE_W}x{PAGE_H}pt", flush=True)
                 PAGE_W, PAGE_H = round(_aw), round(_ah)
                 _source_page = 'src_pdf'; _coverage_degraded = True
             else:
@@ -181,7 +196,7 @@ def calibrate(sl, co, DPI=200, src_pdf=''):
                 # 无收益/越界：ink 估计落在 FONT 合理区间外（ghbq ink=23.5），保留 fallback 并记录
                 print(f"[标定·ink] fallback font={FONT} vs ink={_ink_font} (>20%) 但 ink∉[6,20] -> 保留 fallback", flush=True)
                 _ink_reject = 'out_of_range'
-    MARGIN = round((PAGE_W - MEASURE) / 2)
+    MARGIN = max(12.0, round((PAGE_W - MEASURE) / 2))   # 下限保护: 页宽异常时防负值/巨型 margin
     pitches = []
     for _k in sl:
         _polys = co.get(_k, [])

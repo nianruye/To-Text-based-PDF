@@ -169,6 +169,7 @@ def main():
     ap.add_argument("src_lines", nargs="?", default="")
     ap.add_argument("--src-pdf", default="", help="必带：源 PDF，用于 DPI 自适应（缺省按 200dpi 可能误判）")
     ap.add_argument("--dpi", type=int, default=0, help="0=自动从 coords P95 y 与 --src-pdf 页高反推(coords 尺度随 API 批次漂移 200/142), 显式传值则用该值")
+    ap.add_argument("--tol-width", type=float, default=0.01, help="页宽相对误差上限 (默认 1%%; 0=不判)")
     ap.add_argument("--sample", type=int, default=0, help="只抽前 N 页(0=全书)")
     ap.add_argument("--json", default="")
     ap.add_argument("--tol-height", type=float, default=0.05)
@@ -185,7 +186,9 @@ def main():
             _n = doc.page_count
             _idxs = list(range(0, _n, max(1, _n // 10)))
             _ah = statistics.median(doc[i].rect.height for i in _idxs)   # 与 calibrate 同口径: 采样中位(首页常是封面尺寸不同)
+            _aw = statistics.median(doc[i].rect.width for i in _idxs)    # 源页宽, 供页宽门禁(AGENTS #66)
             doc.close()
+            globals()['_SRC_W_MED'] = _aw
             _ys = [p[1] for _k in coords for _poly in coords.get(_k, []) if _poly for p in _poly if len(p) >= 2]
             if _ys:
                 _cap = _ah * 1.15 * 200 / 72   # 与 calibrate 同噪声上限(200dpi 假设口径)
@@ -325,6 +328,13 @@ def main():
     print(f"  pitch 误差 <{a.tol_pitch:.0%}  : {p_ok_pct:.1f}%  (样本 {p_pool})")
     print(f"  底部占位 <8% 偏差: {fill_ok_pct:.1f}%   空白页 {blank_n}  溢出页(占位) {over_n}")
     print(f"  ▶ 溢成多物理页的源页(全量): {split_n}   缺失页: {miss_n}")
+    # 页宽门禁(AGENTS #66): 此前只卡页高, vz3 的 +47% 页宽一路绿灯
+    _src_w = globals().get('_SRC_W_MED', 0.0) or 0.0
+    _out_ws = [p["page_w"] for p in out if p.get("page_w")]
+    _ow = _median(_out_ws) if _out_ws else 0.0
+    w_err = abs(_ow - _src_w) / _src_w if (_src_w and _ow) else None
+    if w_err is not None:
+        print(f"  页宽误差        : {w_err:.1%}  (输出 {_ow:.0f}pt / 源 {_src_w:.0f}pt)")
     hs = [r['h_err'] for r in dense if r['h_err'] is not None]
     ps = [r['p_err'] for r in dense if r['p_err'] is not None]
     bs = [r['bot_gap'] for r in dense if r['bot_gap'] is not None]
@@ -355,7 +365,9 @@ def main():
         json.dump({"n_src": n_src, "n_out": n_out, "rows": rows,
                    "agg": {"n_eq_pct": n_eq_pct, "line_1to1": n_eq_pct, "h_ok_pct": h_ok_pct, "p_ok_pct": p_ok_pct,
                            "fill_ok_pct": fill_ok_pct, "blank": blank_n, "overflow": over_n,
-                           "split": split_n, "missing": miss_n, "comparable": len(dense)}},
+                           "split": split_n, "missing": miss_n, "comparable": len(dense),
+                           "out_w_pt": round(_ow, 1) if _ow else None, "src_w_pt": round(_src_w, 1) if _src_w else None,
+                           "w_err": round(w_err, 4) if w_err is not None else None}},
                   open(a.json, "w"), ensure_ascii=False, indent=1)
         print(f"\n报告 → {a.json}")
 
@@ -369,6 +381,8 @@ def main():
         fails.append(f"溢成多物理页的源页 {split_n} 个(应 0,校准失效)")
     if miss_n > 0:
         fails.append(f"缺失页 {miss_n} 个")
+    if a.tol_width > 0 and w_err is not None and w_err > a.tol_width:
+        fails.append(f"页宽误差 {w_err:.1%} > {a.tol_width:.0%} (输出 {_ow:.0f}pt vs 源 {_src_w:.0f}pt)")
     if PITCH_FLOOR > 0 and p_ok_pct < PITCH_FLOOR:
         fails.append(f"pitch 达标率 {p_ok_pct:.1f}% < 阈值 {PITCH_FLOOR:g}%")
     if HEIGHT_FLOOR > 0 and h_ok_pct < HEIGHT_FLOOR:
