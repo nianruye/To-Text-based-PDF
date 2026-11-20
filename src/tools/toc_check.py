@@ -135,7 +135,11 @@ def main():
                 if not all(ch in got for ch in set(n)):
                     _iy = next((i for i, x in enumerate(src_rows) if x == t), -1)
                     _yy = min((q[1] for q in _cy[_iy]), default=0) if 0 <= _iy < len(_cy) and _cy[_iy] else 0
-                    k = _furniture(t, _yy, _ph)
+                    # coords 是 px、_ph 是 pt，不能直接比。用「本页 coords 的 max y ≈ 页高」做比例：
+                    # 免 DPI（各书 138~200 不同），口径与 _furniture 的 y/page_h 判据一致
+                    _pmax = max((q[1] for _pl in _cy if _pl for q in _pl), default=0)
+                    _rel = (_yy / _pmax) if (_yy and _pmax) else 0
+                    k = _furniture(t, _rel * _ph, _ph)
                     (furn if k else missing).append(f'{t} [{k}]' if k else t)
         hit = len(src_rows) - len(missing)
         tot_src += len(src_rows)
